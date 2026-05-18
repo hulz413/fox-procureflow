@@ -1,20 +1,42 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  仓库中的人类阅读型、非结构化文档内容默认使用中文描述；技术标识、路径、环境变量、服务名、代码级命名和第三方产品名保持原文。
+  提交代码时使用 Conventional Commits 规范。
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  展示名称：Fox Procureflow
+  项目名 / slug：fox-procureflow
+
+  产品定位：
+  Fox Procureflow 是面向集团内部采购场景的多公司采购协同平台，不是对外 SaaS 采购产品。MVP 以一个集团下两个公司主体作为演示范围，重点展示采购申请、审批、询报价、采购订单、收货、发票和三单匹配的完整业务闭环。
+
+  产品边界：
+  - 支持集团共享供应商池。
+  - 支持公司维度的数据隔离、审批规则和业务看板。
+  - MVP 必须包含三单匹配。
+  - MVP 暂不包含 Prometheus、Grafana、Jaeger/Zipkin、Keycloak。
+  - MVP 不做对外企业自助注册、套餐计费、订阅和多集团运营能力。
+  - 具体演示组织、供应商数据和业务切片以 docs/mvp/roadmap.md 为准。
+
+  技术选型：
+  以 docs/mvp/roadmap.md 的技术栈表为准。OpenSpec artifacts 不重复维护完整技术栈清单；只有当 change 涉及技术选型变化时，才在对应 artifact 中说明影响和理由。
+
+  本地运行策略：
+  Docker 运行数据库、中间件和对象存储；本机运行 React 前端和 Java 后端。
+
+  AI 策略：
+  AI 能力放在 MVP roadmap 后段实现，使用真实 DeepSeek API，不以 mock 作为最终方案。AI 输出建议、置信度和解释，不直接替代正式业务校验、审批或落库。
+
+rules:
+  proposal:
+    - 必须写清业务垂直切片、非目标和验收标准。
+    - 必须说明该 change 如何服务集团内部多公司采购协同场景。
+  design:
+    - 必须覆盖多公司组织边界、数据归属和权限影响。
+    - 涉及审批、采购订单、收货、发票或三单匹配时，必须说明状态流转和一致性边界。
+  tasks:
+    - 必须按可演示业务闭环拆分，不按纯技术层拆分。
+    - 每个任务应能对应到明确的用户价值、演示场景或验收行为。
+  spec:
+    - 必须包含可验证场景，并体现集团内部多公司语境。
+    - 涉及数据读写时，必须说明公司维度的数据隔离或共享规则。
