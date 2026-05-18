@@ -36,8 +36,8 @@ print_urls() {
   echo "Frontend:     http://localhost:${FRONTEND_PORT}"
   echo "Backend:      http://localhost:${BACKEND_PORT}/api/health"
   echo "Swagger UI:   http://localhost:${BACKEND_PORT}/swagger-ui.html"
-  echo "RabbitMQ UI:  http://localhost:15672"
-  echo "MinIO UI:     http://localhost:9001"
+  echo "RabbitMQ UI:  http://localhost:15672 (reserved)"
+  echo "MinIO UI:     http://localhost:9001 (reserved)"
 }
 
 start_infra() {
@@ -47,7 +47,7 @@ start_infra() {
   fi
 
   if ! command -v docker >/dev/null 2>&1; then
-    echo "Docker is not installed. Start MySQL, MongoDB, Redis, RabbitMQ, and MinIO manually, then rerun with SKIP_INFRA=1."
+    echo "Docker is not installed. Start MySQL manually for current core flows; MongoDB, Redis, RabbitMQ, and MinIO are reserved for later slices. Then rerun with SKIP_INFRA=1."
     return
   fi
 
