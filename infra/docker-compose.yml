@@ -1,0 +1,103 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: fox-procureflow-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: fox_procureflow
+      MYSQL_USER: fox
+      MYSQL_PASSWORD: fox
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - fox_mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u fox -pfox --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongodb:
+    image: mongo:7
+    container_name: fox-procureflow-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: fox
+      MONGO_INITDB_ROOT_PASSWORD: fox
+      MONGO_INITDB_DATABASE: fox_procureflow
+    ports:
+      - "27017:27017"
+    volumes:
+      - fox_mongodb_data:/data/db
+      - ./mongo/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: fox-procureflow-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - fox_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: fox-procureflow-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: fox
+      RABBITMQ_DEFAULT_PASS: fox
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - fox_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: fox-procureflow-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: fox
+      MINIO_ROOT_PASSWORD: fox-procureflow
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - fox_minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: fox-procureflow-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 fox fox-procureflow; do sleep 2; done;
+      mc mb --ignore-existing local/procurement-attachments;
+      mc mb --ignore-existing local/rfq-attachments;
+      mc mb --ignore-existing local/invoice-files;
+      "
+
+volumes:
+  fox_mysql_data:
+  fox_mongodb_data:
+  fox_redis_data:
+  fox_rabbitmq_data:
+  fox_minio_data:
