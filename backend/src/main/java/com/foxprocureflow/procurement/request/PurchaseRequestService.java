@@ -14,6 +14,8 @@ import com.foxprocureflow.identity.persistence.DemoSupplierJpaEntity;
 import com.foxprocureflow.identity.persistence.DemoSupplierRepository;
 import com.foxprocureflow.identity.persistence.DemoUserJpaEntity;
 import com.foxprocureflow.identity.persistence.DemoUserRepository;
+import com.foxprocureflow.procurement.approval.ApprovalDtos.ApprovalSummaryResponse;
+import com.foxprocureflow.procurement.approval.ApprovalService;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.CreateDraftLineRequest;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.CreateDraftRequest;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.PurchaseRequestDetailResponse;
@@ -48,6 +50,7 @@ public class PurchaseRequestService {
     private final DemoBudgetAccountRepository budgetAccountRepository;
     private final DemoSupplierRepository supplierRepository;
     private final DemoSupplierCategoryRepository supplierCategoryRepository;
+    private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
 
     public PurchaseRequestService(
@@ -60,6 +63,7 @@ public class PurchaseRequestService {
         DemoBudgetAccountRepository budgetAccountRepository,
         DemoSupplierRepository supplierRepository,
         DemoSupplierCategoryRepository supplierCategoryRepository,
+        ApprovalService approvalService,
         ObjectMapper objectMapper
     ) {
         this.purchaseRequestRepository = purchaseRequestRepository;
@@ -71,6 +75,7 @@ public class PurchaseRequestService {
         this.budgetAccountRepository = budgetAccountRepository;
         this.supplierRepository = supplierRepository;
         this.supplierCategoryRepository = supplierCategoryRepository;
+        this.approvalService = approvalService;
         this.objectMapper = objectMapper;
     }
 
@@ -104,7 +109,7 @@ public class PurchaseRequestService {
             fieldSnapshotJson));
         lineRepository.saveAll(lines);
 
-        return toDetailResponse(saved, lineRepository.findByRequestIdOrderByLineNoAsc(saved.getRequestId()));
+        return toDetailResponse(saved, lineRepository.findByRequestIdOrderByLineNoAsc(saved.getRequestId()), null);
     }
 
     @Transactional
@@ -115,10 +120,12 @@ public class PurchaseRequestService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only DRAFT purchase requests can be submitted");
         }
 
+        List<PurchaseRequestLineJpaEntity> lines = lineRepository.findByRequestIdOrderByLineNoAsc(request.getRequestId());
         request.submit();
         PurchaseRequestJpaEntity saved = purchaseRequestRepository.save(request);
+        ApprovalSummaryResponse approval = approvalService.createForSubmittedRequest(saved, lines);
 
-        return toDetailResponse(saved, lineRepository.findByRequestIdOrderByLineNoAsc(saved.getRequestId()));
+        return toDetailResponse(saved, lines, approval);
     }
 
     @Transactional(readOnly = true)
@@ -127,18 +134,23 @@ public class PurchaseRequestService {
         List<PurchaseRequestJpaEntity> requests = status == null
             ? purchaseRequestRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
             : purchaseRequestRepository.findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, status);
+        List<String> requestIds = requests.stream()
+            .map(PurchaseRequestJpaEntity::getRequestId)
+            .toList();
         Map<String, Long> lineCounts = requests.isEmpty()
             ? Map.of()
-            : lineRepository.findByRequestIdIn(requests.stream()
-                    .map(PurchaseRequestJpaEntity::getRequestId)
-                    .toList())
+            : lineRepository.findByRequestIdIn(requestIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                     PurchaseRequestLineJpaEntity::getRequestId,
                     Collectors.counting()));
+        Map<String, ApprovalSummaryResponse> approvalSummaries = approvalService.summariesByRequestIds(requestIds);
 
         return requests.stream()
-            .map(request -> toListItemResponse(request, lineCounts.getOrDefault(request.getRequestId(), 0L).intValue()))
+            .map(request -> toListItemResponse(
+                request,
+                lineCounts.getOrDefault(request.getRequestId(), 0L).intValue(),
+                approvalSummaries.get(request.getRequestId())))
             .toList();
     }
 
@@ -146,7 +158,10 @@ public class PurchaseRequestService {
     public PurchaseRequestDetailResponse detail(String requestId) {
         PurchaseRequestJpaEntity request = purchaseRequestRepository.findByRequestId(requestId)
             .orElseThrow(() -> notFound("Unknown requestId: " + requestId));
-        return toDetailResponse(request, lineRepository.findByRequestIdOrderByLineNoAsc(requestId));
+        return toDetailResponse(
+            request,
+            lineRepository.findByRequestIdOrderByLineNoAsc(requestId),
+            approvalService.findSummaryByRequestId(requestId));
     }
 
     private void validateMasterData(CreateDraftRequest request) {
@@ -247,7 +262,11 @@ public class PurchaseRequestService {
         return snapshot;
     }
 
-    private PurchaseRequestListItemResponse toListItemResponse(PurchaseRequestJpaEntity request, int lineCount) {
+    private PurchaseRequestListItemResponse toListItemResponse(
+        PurchaseRequestJpaEntity request,
+        int lineCount,
+        ApprovalSummaryResponse approval
+    ) {
         return new PurchaseRequestListItemResponse(
             request.getRequestId(),
             request.getCompanyId(),
@@ -263,12 +282,14 @@ public class PurchaseRequestService {
             request.getExpectedDeliveryDate(),
             request.getSubmittedAt(),
             request.getCreatedAt(),
-            lineCount);
+            lineCount,
+            approval);
     }
 
     private PurchaseRequestDetailResponse toDetailResponse(
         PurchaseRequestJpaEntity request,
-        List<PurchaseRequestLineJpaEntity> lines
+        List<PurchaseRequestLineJpaEntity> lines,
+        ApprovalSummaryResponse approval
     ) {
         return new PurchaseRequestDetailResponse(
             request.getRequestId(),
@@ -288,7 +309,8 @@ public class PurchaseRequestService {
             request.getCreatedAt(),
             request.getUpdatedAt(),
             fromJson(request.getFieldSnapshotJson()),
-            lines.stream().map(this::toLineResponse).toList());
+            lines.stream().map(this::toLineResponse).toList(),
+            approval);
     }
 
     private PurchaseRequestLineResponse toLineResponse(PurchaseRequestLineJpaEntity line) {

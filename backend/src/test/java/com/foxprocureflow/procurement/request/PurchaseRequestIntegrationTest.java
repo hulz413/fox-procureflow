@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -79,7 +80,10 @@ class PurchaseRequestIntegrationTest {
             .andExpect(jsonPath("$.data.requestId").value(requestId))
             .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
             .andExpect(jsonPath("$.data.submittedAt").exists())
-            .andExpect(jsonPath("$.data.totalAmount").value(186000.00));
+            .andExpect(jsonPath("$.data.totalAmount").value(186000.00))
+            .andExpect(jsonPath("$.data.approval.status").value("IN_PROGRESS"))
+            .andExpect(jsonPath("$.data.approval.currentNodeName").value("部门负责人审批"))
+            .andExpect(jsonPath("$.data.approval.currentApproverId").value("user-digital-approver"));
 
         mockMvc.perform(post("/api/purchase-requests/{requestId}/submit", requestId))
             .andExpect(status().isConflict())
@@ -97,7 +101,8 @@ class PurchaseRequestIntegrationTest {
                 .param("companyId", "company-digital"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[*].requestId", hasItem(digitalRequestId)))
-            .andExpect(jsonPath("$.data[*].requestId", not(hasItem(manufacturingRequestId))));
+            .andExpect(jsonPath("$.data[*].requestId", not(hasItem(manufacturingRequestId))))
+            .andExpect(jsonPath("$.data[*].approval.status", hasItem("IN_PROGRESS")));
 
         mockMvc.perform(get("/api/purchase-requests")
                 .param("companyId", "company-digital")
@@ -116,6 +121,15 @@ class PurchaseRequestIntegrationTest {
             .andExpect(jsonPath("$.data.fieldSnapshot.formVersion").value("purchase-request-intake-v1"))
             .andExpect(jsonPath("$.data.lineItems[0].itemName").value("商务笔记本电脑"))
             .andExpect(jsonPath("$.data.lineItems[0].estimatedAmount").value(186000.00));
+
+        mockMvc.perform(post("/api/purchase-requests/{requestId}/submit", requestId))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/purchase-requests/{requestId}", requestId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.approval.status").value("IN_PROGRESS"))
+            .andExpect(jsonPath("$.data.approval.matchedRuleId").value("rule-digital-it-high"))
+            .andExpect(jsonPath("$.data.approval.timeline[*].action", hasItem("CREATED")));
     }
 
     @Test
@@ -160,7 +174,9 @@ class PurchaseRequestIntegrationTest {
             .andExpect(jsonPath("$['paths']['/api/purchase-requests/drafts']").exists())
             .andExpect(jsonPath("$['paths']['/api/purchase-requests/{requestId}/submit']").exists())
             .andExpect(jsonPath("$['paths']['/api/purchase-requests']").exists())
-            .andExpect(jsonPath("$['paths']['/api/purchase-requests/{requestId}']").exists());
+            .andExpect(jsonPath("$['paths']['/api/purchase-requests/{requestId}']").exists())
+            .andExpect(jsonPath("$['paths']['/api/approvals/tasks']").exists())
+            .andExpect(content().string(containsString("approval")));
     }
 
     private String createDraft(Map<String, Object> payload) throws Exception {

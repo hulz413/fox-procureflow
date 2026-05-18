@@ -1,33 +1,4 @@
-# purchase-request-intake Spec
-
-## Purpose
-
-定义 Fox Procureflow MVP 的采购申请录入能力，确保申请人可以基于演示主数据创建、保存、提交、列表查看和打开采购申请，并为后续审批、询报价、采购订单、收货、发票和三单匹配流程提供稳定上游业务记录。
-
-## Requirements
-
-### Requirement: Purchase request drafts are created from validated master data
-The system SHALL allow a caller to create a purchase request draft using seeded company, requester, department, procurement category, and budget account master data.
-
-#### Scenario: Create a draft for the digital company laptop request
-- **WHEN** a caller submits a draft for `company-digital` with requester `user-digital-applicant`, category `category-it-hardware`, budget account `budget-digital-it-equipment`, title "20 台笔记本采购", expected delivery date, total amount, and at least one line item
-- **THEN** the system MUST persist a purchase request with status `DRAFT`
-- **AND** the system MUST return a stable `requestId`, the submitted company and requester identifiers, the calculated total amount, and all persisted line items
-
-#### Scenario: Reject mismatched budget account company
-- **WHEN** a caller submits a draft for `company-digital` using a budget account that belongs to `company-manufacturing`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT persist a purchase request
-
-#### Scenario: Reject mismatched category and budget account
-- **WHEN** a caller submits a draft whose `categoryId` does not match the selected `budgetAccountId`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the error MUST identify that the budget account is not valid for the category
-
-#### Scenario: Reject requester outside company
-- **WHEN** a caller submits a draft for one company using a requester from another company
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT fall back to the default active company
+## MODIFIED Requirements
 
 ### Requirement: Draft purchase requests can be submitted as upstream business records
 The system SHALL allow a valid draft purchase request to be submitted, making it the approval workflow entry and the upstream record for later RFQ, PO, receiving, invoice, and matching workflows.
@@ -78,18 +49,6 @@ The system SHALL expose read APIs that return purchase request list and detail d
 #### Scenario: Unknown company list request is rejected
 - **WHEN** a caller requests the purchase request list with an unknown `companyId`
 - **THEN** the system MUST return a client-visible error instead of falling back to a default company
-
-### Requirement: Purchase request endpoints are documented and usable in the current demo security model
-The system SHALL expose the purchase request Intake endpoints in generated API documentation and allow local demo calls before JWT authentication is implemented.
-
-#### Scenario: Swagger documents purchase request endpoints
-- **WHEN** a developer opens Swagger UI or requests `/v3/api-docs`
-- **THEN** the API documentation MUST include the draft creation, draft submission, list, and detail endpoints for purchase requests
-
-#### Scenario: Demo frontend can call purchase request APIs
-- **WHEN** the frontend calls purchase request GET and POST endpoints in the current skeleton environment
-- **THEN** Spring Security MUST allow the calls without JWT
-- **AND** the service layer MUST still validate explicit company and master data ownership
 
 ### Requirement: Frontend provides purchase request intake workflow
 The frontend SHALL provide a real purchase request page in the procurement workspace for creating, submitting, listing, viewing purchase requests, and seeing their approval state.

@@ -24,7 +24,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { keepPreviousData, QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Avatar, ConfigProvider, Drawer, Dropdown, Layout, Modal, Tooltip } from 'antd'
+import { Avatar, ConfigProvider, Drawer, Dropdown, Layout, Modal, Select, Tooltip } from 'antd'
 import type { MenuProps, ThemeConfig } from 'antd'
 import enUS from 'antd/locale/en_US'
 import zhCN from 'antd/locale/zh_CN'
@@ -176,6 +176,73 @@ type BudgetAccountSummary = {
 
 type PurchaseRequestStatus = 'DRAFT' | 'SUBMITTED'
 type PurchaseRequestDrawerMode = 'create' | 'detail'
+type ApprovalInstanceStatus = 'IN_PROGRESS' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
+type ApprovalNodeStatus = 'PENDING' | 'ACTIVE' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+type ApprovalAction = 'CREATED' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
+
+type ApprovalRecord = {
+  recordId: string
+  nodeId: string | null
+  actorId: string
+  action: ApprovalAction
+  comment: string | null
+  createdAt: string
+}
+
+type ApprovalSummary = {
+  approvalId: string
+  status: ApprovalInstanceStatus
+  currentNodeId: string | null
+  currentStepOrder: number | null
+  currentNodeName: string | null
+  currentApproverId: string | null
+  matchedRuleId: string
+  timeline: ApprovalRecord[]
+}
+
+type ApprovalTask = {
+  approvalId: string
+  nodeId: string
+  requestId: string
+  companyId: string
+  requesterId: string
+  title: string
+  totalAmount: number
+  currency: string
+  nodeName: string
+  approverId: string
+  activatedAt: string | null
+}
+
+type ApprovalNode = {
+  nodeId: string
+  stepOrder: number
+  nodeName: string
+  approverId: string
+  status: ApprovalNodeStatus
+  activatedAt: string | null
+  completedAt: string | null
+}
+
+type ApprovalDetail = {
+  approvalId: string
+  requestId: string
+  companyId: string
+  requesterId: string
+  matchedRuleId: string
+  status: ApprovalInstanceStatus
+  currentStepOrder: number | null
+  startedAt: string
+  completedAt: string | null
+  contextSnapshot: Record<string, unknown>
+  nodes: ApprovalNode[]
+  timeline: ApprovalRecord[]
+}
+
+type ApprovalActionPayload = {
+  actorId: string
+  comment?: string
+}
 
 type PurchaseRequestLine = {
   lineNo: number
@@ -204,6 +271,7 @@ type PurchaseRequestListItem = {
   submittedAt: string | null
   createdAt: string
   lineCount: number
+  approval: ApprovalSummary | null
 }
 
 type PurchaseRequestDetail = PurchaseRequestListItem & {
@@ -366,6 +434,34 @@ async function submitPurchaseRequest(requestId: string) {
   return postApi<PurchaseRequestDetail>(`/api/purchase-requests/${encodeURIComponent(requestId)}/submit`)
 }
 
+async function fetchApprovalTasks(companyId: string, approverId: string) {
+  return fetchApi<ApprovalTask[]>(
+    `/api/approvals/tasks?companyId=${encodeURIComponent(companyId)}&approverId=${encodeURIComponent(approverId)}`,
+  )
+}
+
+async function fetchApprovalDetail(approvalId: string, companyId?: string) {
+  const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
+  return fetchApi<ApprovalDetail>(`/api/approvals/${encodeURIComponent(approvalId)}${query}`)
+}
+
+async function fetchApprovalByRequest(requestId: string, companyId?: string) {
+  const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
+  return fetchApi<ApprovalDetail>(`/api/approvals/by-request/${encodeURIComponent(requestId)}${query}`)
+}
+
+async function approveApproval(approvalId: string, payload: ApprovalActionPayload) {
+  return postApi<ApprovalDetail>(`/api/approvals/${encodeURIComponent(approvalId)}/approve`, payload)
+}
+
+async function rejectApproval(approvalId: string, payload: ApprovalActionPayload) {
+  return postApi<ApprovalDetail>(`/api/approvals/${encodeURIComponent(approvalId)}/reject`, payload)
+}
+
+async function withdrawApproval(approvalId: string, payload: ApprovalActionPayload) {
+  return postApi<ApprovalDetail>(`/api/approvals/${encodeURIComponent(approvalId)}/withdraw`, payload)
+}
+
 const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -381,6 +477,7 @@ const localizedContent = {
       title: '采购工作台',
       foundationTitle: '组织与主数据',
       purchaseRequestsTitle: '采购申请',
+      approvalsTitle: '审批中心',
     },
     actions: {
       newRequest: '新建申请',
@@ -419,7 +516,7 @@ const localizedContent = {
     navItems: [
       { label: '采购工作台', icon: <DashboardOutlined />, path: '/' },
       { label: '采购申请', icon: <FileAddOutlined />, path: '/purchase-requests' },
-      { label: '审批中心', icon: <AuditOutlined /> },
+      { label: '审批中心', icon: <AuditOutlined />, path: '/approvals' },
       { label: '询报价', icon: <FileSearchOutlined /> },
       { label: '采购订单', icon: <ShoppingCartOutlined /> },
       { label: '收货发票', icon: <InboxOutlined /> },
@@ -582,6 +679,12 @@ const localizedContent = {
       currentStep: '当前节点',
       intakeStep: '申请录入',
       waitingApproval: '等待审批流',
+      noApproval: '暂无审批',
+      approvalStatus: '审批状态',
+      currentApprover: '当前审批人',
+      matchedRule: '命中规则',
+      approvalPath: '审批路径',
+      approvalTimeline: '审批记录',
       recentFromBackend: '后端申请数据',
       createSuccess: '草稿已保存',
       submitSuccess: '申请已提交',
@@ -590,6 +693,55 @@ const localizedContent = {
       discardTitle: '放弃本次编辑？',
       discardContent: '当前申请还没有保存，关闭后本次修改会丢失。',
       discardConfirm: '放弃编辑',
+    },
+    approval: {
+      dataState: '后端审批数据',
+      unavailable: '审批中心暂不可用',
+      loading: '加载中',
+      emptyTasks: '暂无待办',
+      taskList: '待审批任务',
+      detail: '审批详情',
+      approver: '审批人',
+      activeCompany: '当前公司',
+      requestSummary: '申请摘要',
+      path: '审批路径',
+      context: '审批上下文',
+      timeline: '审批记录',
+      status: '审批状态',
+      requester: '申请人',
+      currentApprover: '当前审批人',
+      matchedRule: '命中规则',
+      startedAt: '发起时间',
+      completedAt: '完成时间',
+      node: '节点',
+      comment: '审批意见',
+      commentPlaceholder: '填写通过或驳回意见',
+      approve: '通过',
+      reject: '驳回',
+      withdraw: '撤回',
+      approveSuccess: '审批已通过',
+      rejectSuccess: '已驳回审批',
+      withdrawSuccess: '审批已撤回',
+      actionFailed: '操作失败',
+      noApprover: '暂无审批人',
+      searchApprover: '搜索审批人姓名、职位或邮箱',
+      discardTitle: '放弃本次审批意见？',
+      discardContent: '当前审批意见还没有提交，关闭后本次输入会丢失。',
+      discardConfirm: '放弃意见',
+      noDetail: '请选择审批任务',
+      terminal: '已结束',
+      inProgress: '审批中',
+      approved: '已通过',
+      rejected: '已驳回',
+      withdrawn: '已撤回',
+      pending: '待处理',
+      active: '处理中',
+      cancelled: '已取消',
+      created: '发起',
+      approvedAction: '通过',
+      rejectedAction: '驳回',
+      withdrawnAction: '撤回',
+      unknown: '未知',
     },
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
   },
@@ -607,6 +759,7 @@ const localizedContent = {
       title: 'Procurement Workspace',
       foundationTitle: 'Organization & Master Data',
       purchaseRequestsTitle: 'Purchase Requests',
+      approvalsTitle: 'Approval Center',
     },
     actions: {
       newRequest: 'New Request',
@@ -645,7 +798,7 @@ const localizedContent = {
     navItems: [
       { label: 'Dashboard', icon: <DashboardOutlined />, path: '/' },
       { label: 'Requests', icon: <FileAddOutlined />, path: '/purchase-requests' },
-      { label: 'Approvals', icon: <AuditOutlined /> },
+      { label: 'Approvals', icon: <AuditOutlined />, path: '/approvals' },
       { label: 'RFQ', icon: <FileSearchOutlined /> },
       { label: 'Purchase Orders', icon: <ShoppingCartOutlined /> },
       { label: 'Receiving & Invoices', icon: <InboxOutlined /> },
@@ -808,6 +961,12 @@ const localizedContent = {
       currentStep: 'Current Step',
       intakeStep: 'Request Intake',
       waitingApproval: 'Waiting for approval flow',
+      noApproval: 'No approval',
+      approvalStatus: 'Approval Status',
+      currentApprover: 'Current Approver',
+      matchedRule: 'Matched Rule',
+      approvalPath: 'Approval Path',
+      approvalTimeline: 'Approval Timeline',
       recentFromBackend: 'Backend request data',
       createSuccess: 'Draft saved',
       submitSuccess: 'Request submitted',
@@ -816,6 +975,55 @@ const localizedContent = {
       discardTitle: 'Discard edits?',
       discardContent: 'This request has unsaved changes. Closing will discard your edits.',
       discardConfirm: 'Discard',
+    },
+    approval: {
+      dataState: 'Backend approvals',
+      unavailable: 'Approval center unavailable',
+      loading: 'Loading',
+      emptyTasks: 'No active tasks',
+      taskList: 'Approval Tasks',
+      detail: 'Approval Detail',
+      approver: 'Approver',
+      activeCompany: 'Active Company',
+      requestSummary: 'Request Summary',
+      path: 'Approval Path',
+      context: 'Approval Context',
+      timeline: 'Timeline',
+      status: 'Approval Status',
+      requester: 'Requester',
+      currentApprover: 'Current Approver',
+      matchedRule: 'Matched Rule',
+      startedAt: 'Started',
+      completedAt: 'Completed',
+      node: 'Node',
+      comment: 'Comment',
+      commentPlaceholder: 'Add approval or rejection comments',
+      approve: 'Approve',
+      reject: 'Reject',
+      withdraw: 'Withdraw',
+      approveSuccess: 'Approval advanced',
+      rejectSuccess: 'Approval rejected',
+      withdrawSuccess: 'Approval withdrawn',
+      actionFailed: 'Action failed',
+      noApprover: 'No approver',
+      searchApprover: 'Search approver by name, title, or email',
+      discardTitle: 'Discard approval comment?',
+      discardContent: 'This approval comment has not been submitted. Closing will discard it.',
+      discardConfirm: 'Discard comment',
+      noDetail: 'Select an approval task',
+      terminal: 'Closed',
+      inProgress: 'In Progress',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      withdrawn: 'Withdrawn',
+      pending: 'Pending',
+      active: 'Active',
+      cancelled: 'Cancelled',
+      created: 'Created',
+      approvedAction: 'Approved',
+      rejectedAction: 'Rejected',
+      withdrawnAction: 'Withdrawn',
+      unknown: 'Unknown',
     },
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
@@ -889,6 +1097,7 @@ function Workspace({
   const queryClient = useQueryClient()
   const isFoundationRoute = location.pathname === '/master-data'
   const isPurchaseRequestRoute = location.pathname === '/purchase-requests'
+  const isApprovalRoute = location.pathname === '/approvals'
   const [isCreateDrawerOpen, setCreateDrawerOpen] = useState(false)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const { data, isError, isLoading } = useQuery({
@@ -1107,7 +1316,9 @@ function Workspace({
                 ? messages.header.foundationTitle
                 : isPurchaseRequestRoute
                   ? messages.header.purchaseRequestsTitle
-                  : messages.header.title}
+                  : isApprovalRoute
+                    ? messages.header.approvalsTitle
+                    : messages.header.title}
             </h1>
           </div>
           <div className={isFoundationRoute ? 'top-actions compact' : 'top-actions'}>
@@ -1185,6 +1396,17 @@ function Workspace({
               suppliers={suppliersQuery.data?.data ?? []}
               users={usersQuery.data?.data ?? []}
             />
+          ) : isApprovalRoute ? (
+            <ApprovalCenterView
+              categories={categoriesQuery.data?.data ?? []}
+              isError={foundationError}
+              isLoading={foundationLoading}
+              language={language}
+              messages={messages}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
+              users={usersQuery.data?.data ?? []}
+            />
           ) : (
             <>
               <section className="kpi-grid" aria-label={messages.aria.procurementMetrics}>
@@ -1249,7 +1471,7 @@ function Workspace({
 	                                <TruncatedText text={companyNameOf(row.companyId, companies)} />
 	                              </td>
 	                              <td>{formatCurrency(row.totalAmount, row.currency, language)}</td>
-	                              <td>{currentStepOf(row.status, messages)}</td>
+	                              <td>{currentStepOf(row.status, messages, row.approval)}</td>
 	                              <td>
 	                                <span
 	                                  className={`tag ${statusToneOf(row.status)}`}
@@ -1358,6 +1580,7 @@ function PurchaseRequestView({
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
+  const [modal, modalContextHolder] = Modal.useModal()
   const wasCreateOpen = useRef(false)
   const [selectedRequestId, setSelectedRequestId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -1437,6 +1660,14 @@ function PurchaseRequestView({
     placeholderData: keepPreviousData,
     retry: 1,
   })
+  const selectedDetail = detailQuery.data?.data
+  const approvalDetailQuery = useQuery({
+    queryKey: ['approval-by-request', selectedDetail?.requestId, selectedDetail?.companyId],
+    queryFn: () => fetchApprovalByRequest(selectedDetail?.requestId ?? '', selectedDetail?.companyId),
+    enabled: Boolean(selectedDetail?.approval),
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
 
   const createMutation = useMutation({
     mutationFn: createPurchaseRequestDraft,
@@ -1470,6 +1701,7 @@ function PurchaseRequestView({
       setSelectedRequestId(response.data.requestId)
       onRefresh()
       void queryClient.invalidateQueries({ queryKey: ['purchase-request', response.data.requestId] })
+      void queryClient.invalidateQueries({ queryKey: ['approval-by-request', response.data.requestId] })
     },
   })
 
@@ -1477,7 +1709,7 @@ function PurchaseRequestView({
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.categories.some((category) => category.categoryId === form.categoryId),
   )
-  const selectedDetail = detailQuery.data?.data
+  const approvalDetail = approvalDetailQuery.data?.data
   const drawerMode: PurchaseRequestDrawerMode | null = isCreateOpen ? 'create' : isDetailDrawerOpen ? 'detail' : null
   const renderedDrawerMode = drawerMode ?? lastDrawerMode
   const drawerTitle = renderedDrawerMode === 'create' ? messages.purchaseRequest.create : messages.purchaseRequest.detail
@@ -1609,7 +1841,7 @@ function PurchaseRequestView({
   const handleDrawerClose = () => {
     if (drawerMode === 'create') {
       if (isCreateDirty) {
-        Modal.confirm({
+        modal.confirm({
           mousePosition: getViewportCenter(),
           centered: true,
           cancelText: messages.purchaseRequest.continueEdit,
@@ -1633,6 +1865,7 @@ function PurchaseRequestView({
 
   return (
     <>
+      {modalContextHolder}
       <section className="request-grid">
         <section className="panel request-list-panel">
           <PanelTitle
@@ -1649,13 +1882,14 @@ function PurchaseRequestView({
                   <th>{messages.purchaseRequest.title}</th>
                   <th>{messages.purchaseRequest.category}</th>
                   <th>{messages.purchaseRequest.totalAmount}</th>
+                  <th>{messages.purchaseRequest.currentStep}</th>
                   <th>{messages.purchaseRequest.status}</th>
                 </tr>
               </thead>
               <tbody>
                 {purchaseRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={5}>{isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}</td>
+                    <td colSpan={6}>{isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}</td>
                   </tr>
                 ) : (
 	                  purchaseRequests.map((request) => (
@@ -1678,6 +1912,9 @@ function PurchaseRequestView({
 	                      </td>
 	                      <td>
 	                        {formatCurrency(request.totalAmount, request.currency, language)}
+	                      </td>
+	                      <td>
+	                        <TruncatedText text={currentStepOf(request.status, messages, request.approval)} />
 	                      </td>
 	                      <td>
 	                        <span
@@ -1705,7 +1942,7 @@ function PurchaseRequestView({
 		        onClose={handleDrawerClose}
 	        open={drawerMode !== null}
 	        title={drawerTitle}
-	        width={760}
+	        size={760}
 	      >
 	        {renderedDrawerMode === 'create' ? (
 	        <form className="request-form" id="purchase-request-create-form" onSubmit={handleCreateDraft}>
@@ -1922,7 +2159,29 @@ function PurchaseRequestView({
 		              </div>
 		              <div>
 		                <dt>{messages.purchaseRequest.currentStep}</dt>
-		                <dd>{currentStepOf(selectedDetail.status, messages)}</dd>
+		                <dd>{currentStepOf(selectedDetail.status, messages, selectedDetail.approval)}</dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.approvalStatus}</dt>
+		                <dd>
+		                  {selectedDetail.approval
+		                    ? formatApprovalStatus(selectedDetail.approval.status, messages)
+		                    : messages.purchaseRequest.noApproval}
+		                </dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.currentApprover}</dt>
+		                <dd>
+		                  {selectedDetail.approval
+		                    ? selectedDetail.approval.currentApproverId
+		                      ? userNameOf(selectedDetail.approval.currentApproverId, users)
+		                      : messages.approval.terminal
+		                    : messages.purchaseRequest.noApproval}
+		                </dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.matchedRule}</dt>
+		                <dd>{selectedDetail.approval?.matchedRuleId ?? messages.purchaseRequest.noApproval}</dd>
 		              </div>
 		            </dl>
 		            {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
@@ -1956,12 +2215,460 @@ function PurchaseRequestView({
 	                </tbody>
 	              </table>
 	            </div>
+	            {selectedDetail.approval && (
+	              <section className="approval-section">
+	                <PanelTitle
+	                  icon={<AuditOutlined />}
+	                  title={messages.purchaseRequest.approvalPath}
+	                  aside={formatApprovalStatus(selectedDetail.approval.status, messages)}
+	                />
+	                {approvalDetail ? (
+	                  <>
+	                    <ApprovalPath messages={messages} nodes={approvalDetail.nodes} users={users} />
+	                    <ApprovalTimeline
+	                      language={language}
+	                      messages={messages}
+	                      records={approvalDetail.timeline}
+	                      users={users}
+	                    />
+	                  </>
+	                ) : (
+	                  <ApprovalTimeline
+	                    language={language}
+	                    messages={messages}
+	                    records={selectedDetail.approval.timeline}
+	                    users={users}
+	                  />
+	                )}
+	              </section>
+	            )}
 	          </div>
 	        ) : (
 	          <div className="empty-state">{isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}</div>
 	        )}
 	      </Drawer>
     </>
+  )
+}
+
+function ApprovalCenterView({
+  categories,
+  isError,
+  isLoading,
+  language,
+  messages,
+  selectedCompany,
+  selectedCompanyId,
+  users,
+}: {
+  categories: CategorySummary[]
+  isError: boolean
+  isLoading: boolean
+  language: Language
+  messages: LocalizedMessages
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  users: UserSummary[]
+}) {
+  const queryClient = useQueryClient()
+  const [modal, modalContextHolder] = Modal.useModal()
+  const approvers = users.filter(
+    (user) =>
+      user.active &&
+      user.companyId === selectedCompanyId &&
+      user.roles.some((role) => role.roleId === 'role-approver' || role.roleId === 'role-finance'),
+  )
+  const fallbackApprover = approvers[0]
+  const [selectedApproverId, setSelectedApproverId] = useState(fallbackApprover?.userId ?? '')
+  const [selectedApprovalId, setSelectedApprovalId] = useState<string | undefined>()
+  const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [comment, setComment] = useState('')
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+
+  useEffect(() => {
+    if (approvers.some((user) => user.userId === selectedApproverId)) {
+      return
+    }
+
+    setSelectedApproverId(fallbackApprover?.userId ?? '')
+  }, [approvers, fallbackApprover?.userId, selectedApproverId])
+
+  const tasksQuery = useQuery({
+    queryKey: ['approval-tasks', selectedCompanyId, selectedApproverId],
+    queryFn: () => fetchApprovalTasks(selectedCompanyId, selectedApproverId),
+    enabled: selectedCompanyId.length > 0 && selectedApproverId.length > 0,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
+  const tasks = tasksQuery.isPlaceholderData ? [] : (tasksQuery.data?.data ?? [])
+
+  const detailQuery = useQuery({
+    queryKey: ['approval-detail', selectedApprovalId, selectedCompanyId],
+    queryFn: () => fetchApprovalDetail(selectedApprovalId ?? '', selectedCompanyId),
+    enabled: Boolean(selectedApprovalId),
+    retry: 1,
+  })
+  const detail = detailQuery.data?.data
+  const activeNode = detail?.nodes.find((node) => node.status === 'ACTIVE')
+  const canApprove = detail?.status === 'IN_PROGRESS' && activeNode?.approverId === selectedApproverId
+  const canWithdraw = detail?.status === 'IN_PROGRESS'
+  const approverOptions = approvers.map((user) => ({
+    label: `${user.displayName} · ${user.positionTitle}`,
+    searchText: `${user.displayName} ${user.positionTitle} ${user.email} ${user.userId}`,
+    value: user.userId,
+  }))
+
+  const actionMutation = useMutation({
+    mutationFn: ({
+      action,
+      actorId,
+      approvalId,
+      comment,
+    }: {
+      action: 'approve' | 'reject' | 'withdraw'
+      actorId: string
+      approvalId: string
+      comment: string
+    }) => {
+      const payload = { actorId, comment: comment.trim() || undefined }
+      if (action === 'approve') {
+        return approveApproval(approvalId, payload)
+      }
+      if (action === 'reject') {
+        return rejectApproval(approvalId, payload)
+      }
+      return withdrawApproval(approvalId, payload)
+    },
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.approval.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response, variables) => {
+      const successMessage =
+        variables.action === 'approve'
+          ? messages.approval.approveSuccess
+          : variables.action === 'reject'
+            ? messages.approval.rejectSuccess
+            : messages.approval.withdrawSuccess
+      setComment('')
+      setFeedback({ message: successMessage, tone: 'success' })
+      setSelectedApprovalId(response.data.approvalId)
+      void queryClient.invalidateQueries({ queryKey: ['approval-tasks'] })
+      void queryClient.invalidateQueries({ queryKey: ['approval-detail', response.data.approvalId] })
+      void queryClient.invalidateQueries({ queryKey: ['approval-by-request', response.data.requestId] })
+      void queryClient.invalidateQueries({ queryKey: ['purchase-requests'] })
+      void queryClient.invalidateQueries({ queryKey: ['purchase-request', response.data.requestId] })
+    },
+  })
+
+  const runApprovalAction = (action: 'approve' | 'reject' | 'withdraw') => {
+    if (!detail) {
+      return
+    }
+
+    actionMutation.mutate({
+      action,
+      actorId: action === 'withdraw' ? detail.requesterId : selectedApproverId,
+      approvalId: detail.approvalId,
+      comment,
+    })
+  }
+
+  const handleApproverChange = (approverId: string) => {
+    setSelectedApproverId(approverId)
+    setSelectedApprovalId(undefined)
+    setDetailDrawerOpen(false)
+    setComment('')
+    setFeedback(null)
+  }
+
+  const closeApprovalDrawer = () => {
+    setDetailDrawerOpen(false)
+    setComment('')
+    setFeedback(null)
+  }
+
+  const handleApprovalDrawerClose = () => {
+    if (comment.length > 0) {
+      modal.confirm({
+        mousePosition: getViewportCenter(),
+        centered: true,
+        cancelText: messages.purchaseRequest.continueEdit,
+        content: messages.approval.discardContent,
+        focusable: { autoFocusButton: 'cancel' },
+        okType: 'danger',
+        okText: messages.approval.discardConfirm,
+        onOk: closeApprovalDrawer,
+        rootClassName: 'procure-confirm-modal',
+        title: messages.approval.discardTitle,
+      })
+      return
+    }
+
+    closeApprovalDrawer()
+  }
+
+  return (
+    <>
+    {modalContextHolder}
+    <section className="approval-grid">
+      <section className="panel approval-task-panel">
+        <PanelTitle icon={<AuditOutlined />} title={messages.approval.taskList} aside={selectedCompany.companyName} />
+        <div className="approval-toolbar">
+          <label>
+            <span>{messages.approval.approver}</span>
+            <Select
+              aria-label={messages.approval.approver}
+              className="approval-approver-select"
+              disabled={approvers.length === 0}
+              filterOption={(input, option) =>
+                String(option?.searchText ?? option?.label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }
+              notFoundContent={messages.approval.noApprover}
+              onChange={handleApproverChange}
+              optionFilterProp="label"
+              options={approverOptions}
+              placeholder={messages.approval.searchApprover}
+              showSearch
+              value={selectedApproverId || undefined}
+            />
+          </label>
+          <div>
+            <span>{messages.approval.activeCompany}</span>
+            <strong>{selectedCompany.companyName}</strong>
+          </div>
+        </div>
+        {(isError || tasksQuery.isError) && <div className="data-alert">{messages.approval.unavailable}</div>}
+        <div className="table-wrap">
+          <table className="request-table approval-task-table">
+            <thead>
+              <tr>
+                <th>{messages.purchaseRequest.requestId}</th>
+                <th>{messages.purchaseRequest.title}</th>
+                <th>{messages.purchaseRequest.totalAmount}</th>
+                <th>{messages.approval.node}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>
+                    {isLoading || tasksQuery.isLoading ? messages.approval.loading : messages.approval.emptyTasks}
+                  </td>
+                </tr>
+              ) : (
+                tasks.map((task) => (
+                  <tr key={task.nodeId}>
+                    <td>
+                      <button
+                        className={task.approvalId === selectedApprovalId ? 'row-link active' : 'row-link'}
+                        onClick={() => {
+                          setSelectedApprovalId(task.approvalId)
+                          setDetailDrawerOpen(true)
+                          setFeedback(null)
+                        }}
+                        type="button"
+                      >
+                        <TruncatedText text={task.requestId} />
+                      </button>
+                    </td>
+                    <td>
+                      <TruncatedText text={task.title} />
+                    </td>
+                    <td>{formatCurrency(task.totalAmount, task.currency, language)}</td>
+                    <td>
+                      <TruncatedText text={task.nodeName} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <Drawer
+      className="request-drawer approval-drawer"
+      destroyOnClose={false}
+      keyboard
+      maskClosable
+      onClose={handleApprovalDrawerClose}
+      open={isDetailDrawerOpen}
+      title={messages.approval.detail}
+      size={760}
+    >
+      {!detail ? (
+        <div className="empty-state">
+          {detailQuery.isLoading ? messages.approval.loading : messages.approval.noDetail}
+        </div>
+      ) : (
+        <div className="approval-detail">
+          <div className="detail-heading">
+            <div>
+              <TruncatedText className="text-strong" text={contextText(detail.contextSnapshot, 'title')} />
+              <TruncatedText className="text-small" text={detail.requestId} />
+            </div>
+            <span className={`tag ${approvalStatusToneOf(detail.status)}`}>
+              {formatApprovalStatus(detail.status, messages)}
+            </span>
+          </div>
+          <dl className="detail-grid">
+            <div>
+              <dt>{messages.approval.requester}</dt>
+              <dd>{userNameOf(detail.requesterId, users)}</dd>
+            </div>
+            <div>
+              <dt>{messages.purchaseRequest.category}</dt>
+              <dd>{categoryNameOf(contextText(detail.contextSnapshot, 'categoryId'), categories)}</dd>
+            </div>
+            <div>
+              <dt>{messages.purchaseRequest.totalAmount}</dt>
+              <dd>
+                {formatCurrency(
+                  contextAmount(detail.contextSnapshot, 'totalAmount'),
+                  contextText(detail.contextSnapshot, 'currency') || 'CNY',
+                  language,
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>{messages.approval.currentApprover}</dt>
+              <dd>{activeNode ? userNameOf(activeNode.approverId, users) : messages.approval.terminal}</dd>
+            </div>
+            <div>
+              <dt>{messages.approval.matchedRule}</dt>
+              <dd>{detail.matchedRuleId}</dd>
+            </div>
+            <div>
+              <dt>{messages.approval.startedAt}</dt>
+              <dd>{formatDateTime(detail.startedAt, language)}</dd>
+            </div>
+          </dl>
+
+          <section className="approval-context">
+            <PanelTitle icon={<ProfileOutlined />} title={messages.approval.requestSummary} />
+            <div className="context-grid">
+              <span>{contextText(detail.contextSnapshot, 'departmentId')}</span>
+              <span>{contextText(detail.contextSnapshot, 'budgetAccountId')}</span>
+              <span>{contextText(detail.contextSnapshot, 'supplierId') || messages.purchaseRequest.noSupplier}</span>
+              <span>{contextText(detail.contextSnapshot, 'expectedDeliveryDate')}</span>
+            </div>
+          </section>
+
+          <ApprovalPath messages={messages} nodes={detail.nodes} users={users} />
+          <ApprovalTimeline language={language} messages={messages} records={detail.timeline} users={users} />
+
+          <div className="approval-actions">
+            <label>
+              <span>{messages.approval.comment}</span>
+              <textarea
+                placeholder={messages.approval.commentPlaceholder}
+                value={comment}
+                onChange={(event) => setComment(event.target.value)}
+              />
+            </label>
+            <div>
+              <button
+                className="primary-button"
+                disabled={!canApprove || actionMutation.isPending}
+                onClick={() => runApprovalAction('approve')}
+                type="button"
+              >
+                <CheckCircleOutlined />
+                <span>{messages.approval.approve}</span>
+              </button>
+              <button
+                className="line-add-button danger-action"
+                disabled={!canApprove || actionMutation.isPending}
+                onClick={() => runApprovalAction('reject')}
+                type="button"
+              >
+                <AlertOutlined />
+                <span>{messages.approval.reject}</span>
+              </button>
+              <button
+                className="line-add-button"
+                disabled={!canWithdraw || actionMutation.isPending}
+                onClick={() => runApprovalAction('withdraw')}
+                type="button"
+              >
+                <SwapOutlined />
+                <span>{messages.approval.withdraw}</span>
+              </button>
+            </div>
+          </div>
+          {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+        </div>
+      )}
+    </Drawer>
+    </>
+  )
+}
+
+function ApprovalPath({
+  messages,
+  nodes,
+  users,
+}: {
+  messages: LocalizedMessages
+  nodes: ApprovalNode[]
+  users: UserSummary[]
+}) {
+  return (
+    <section className="approval-section">
+      <PanelTitle icon={<NodeIndexOutlined />} title={messages.approval.path} />
+      <div className="approval-path">
+        {nodes.map((node) => (
+          <div className={`approval-step ${approvalNodeToneOf(node.status)}`} key={node.nodeId}>
+            <span>{node.stepOrder}</span>
+            <div>
+              <TruncatedText className="text-strong" text={node.nodeName} />
+              <TruncatedText className="text-small" text={userNameOf(node.approverId, users)} />
+            </div>
+            <strong>{formatApprovalNodeStatus(node.status, messages)}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ApprovalTimeline({
+  language,
+  messages,
+  records,
+  users,
+}: {
+  language: Language
+  messages: LocalizedMessages
+  records: ApprovalRecord[]
+  users: UserSummary[]
+}) {
+  return (
+    <section className="approval-section">
+      <PanelTitle icon={<ProfileOutlined />} title={messages.approval.timeline} />
+      <div className="timeline-list">
+        {records.map((record) => (
+          <div className="timeline-item" key={record.recordId}>
+            <span className={`tag ${approvalActionToneOf(record.action)}`}>
+              {formatApprovalAction(record.action, messages)}
+            </span>
+            <div>
+              <TruncatedText className="text-strong" text={userNameOf(record.actorId, users)} />
+              <TruncatedText
+                className="text-small"
+                text={`${formatDateTime(record.createdAt, language)}${record.comment ? ` · ${record.comment}` : ''}`}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -2419,8 +3126,116 @@ function statusToneOf(status: PurchaseRequestStatus) {
   return status === 'SUBMITTED' ? 'success' : 'warn'
 }
 
-function currentStepOf(status: PurchaseRequestStatus, messages: LocalizedMessages) {
+function currentStepOf(
+  status: PurchaseRequestStatus,
+  messages: LocalizedMessages,
+  approval?: ApprovalSummary | null,
+) {
+  if (approval) {
+    if (approval.status === 'IN_PROGRESS') {
+      return approval.currentNodeName ?? messages.purchaseRequest.waitingApproval
+    }
+
+    return formatApprovalStatus(approval.status, messages)
+  }
+
   return status === 'SUBMITTED' ? messages.purchaseRequest.waitingApproval : messages.purchaseRequest.intakeStep
+}
+
+function formatApprovalStatus(status: ApprovalInstanceStatus, messages: LocalizedMessages) {
+  const labels = {
+    APPROVED: messages.approval.approved,
+    IN_PROGRESS: messages.approval.inProgress,
+    REJECTED: messages.approval.rejected,
+    WITHDRAWN: messages.approval.withdrawn,
+  }
+
+  return labels[status] ?? messages.approval.unknown
+}
+
+function approvalStatusToneOf(status: ApprovalInstanceStatus) {
+  if (status === 'APPROVED') {
+    return 'success'
+  }
+  if (status === 'REJECTED') {
+    return 'danger'
+  }
+  if (status === 'WITHDRAWN') {
+    return 'neutral'
+  }
+  return 'warn'
+}
+
+function formatApprovalNodeStatus(status: ApprovalNodeStatus, messages: LocalizedMessages) {
+  const labels = {
+    ACTIVE: messages.approval.active,
+    APPROVED: messages.approval.approved,
+    CANCELLED: messages.approval.cancelled,
+    PENDING: messages.approval.pending,
+    REJECTED: messages.approval.rejected,
+  }
+
+  return labels[status] ?? messages.approval.unknown
+}
+
+function approvalNodeToneOf(status: ApprovalNodeStatus) {
+  if (status === 'APPROVED') {
+    return 'success'
+  }
+  if (status === 'REJECTED') {
+    return 'danger'
+  }
+  if (status === 'ACTIVE') {
+    return 'warn'
+  }
+  return 'neutral'
+}
+
+function formatApprovalAction(action: ApprovalAction, messages: LocalizedMessages) {
+  const labels = {
+    APPROVED: messages.approval.approvedAction,
+    CREATED: messages.approval.created,
+    REJECTED: messages.approval.rejectedAction,
+    WITHDRAWN: messages.approval.withdrawnAction,
+  }
+
+  return labels[action] ?? messages.approval.unknown
+}
+
+function approvalActionToneOf(action: ApprovalAction) {
+  if (action === 'APPROVED') {
+    return 'success'
+  }
+  if (action === 'REJECTED') {
+    return 'danger'
+  }
+  if (action === 'WITHDRAWN') {
+    return 'neutral'
+  }
+  return 'warn'
+}
+
+function contextText(snapshot: Record<string, unknown>, key: string) {
+  const value = snapshot[key]
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  return ''
+}
+
+function contextAmount(snapshot: Record<string, unknown>, key: string) {
+  const value = snapshot[key]
+  if (typeof value === 'number') {
+    return value
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return 0
 }
 
 function companyNameOf(companyId: string, companies: CompanyContext[]) {
@@ -2567,6 +3382,10 @@ function App() {
             />
             <Route
               path="/purchase-requests"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/approvals"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />

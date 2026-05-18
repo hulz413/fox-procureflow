@@ -1,5 +1,6 @@
 package com.foxprocureflow.procurement.request;
 
+import com.foxprocureflow.procurement.approval.ApprovalDtos.ApprovalSummaryResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -58,7 +59,8 @@ public final class PurchaseRequestDtos {
         LocalDate expectedDeliveryDate,
         LocalDateTime submittedAt,
         LocalDateTime createdAt,
-        int lineCount
+        int lineCount,
+        ApprovalSummaryResponse approval
     ) {
     }
 
@@ -80,7 +82,8 @@ public final class PurchaseRequestDtos {
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         Map<String, Object> fieldSnapshot,
-        List<PurchaseRequestLineResponse> lineItems
+        List<PurchaseRequestLineResponse> lineItems,
+        ApprovalSummaryResponse approval
     ) {
     }
 
