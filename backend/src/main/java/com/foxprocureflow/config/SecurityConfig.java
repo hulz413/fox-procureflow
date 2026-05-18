@@ -27,6 +27,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/master-data/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/purchase-requests/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/purchase-requests/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated())
             .build();

@@ -204,7 +204,12 @@ h1 {
 }
 
 .primary-button {
+  height: 34px;
   padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
 }
 
 .user-menu-button {
@@ -232,6 +237,17 @@ h1 {
   white-space: nowrap;
 }
 
+.icon-button .anticon,
+.primary-button .anticon,
+.user-menu-button .anticon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.primary-button .anticon {
+  font-size: 15px;
+}
+
 .icon-button:hover,
 .icon-button:focus-visible {
   color: var(--pf-primary);
@@ -243,6 +259,25 @@ h1 {
 .primary-button:focus-visible {
   border-color: #2b6f47;
   background: #2b6f47;
+}
+
+.primary-button:disabled,
+.primary-button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.procure-confirm-modal .ant-modal {
+  top: 0;
+}
+
+.procure-confirm-modal .ant-modal-confirm-btns .ant-btn:focus,
+.procure-confirm-modal .ant-modal-confirm-btns .ant-btn:focus-visible,
+.procure-confirm-modal .ant-modal-confirm-btns .ant-btn-primary.ant-btn-dangerous:focus,
+.procure-confirm-modal .ant-modal-confirm-btns .ant-btn-primary.ant-btn-dangerous:focus-visible,
+.procure-confirm-modal .ant-modal-confirm-btns .ant-btn-primary.ant-btn-dangerous:active {
+  outline: 0;
+  box-shadow: none;
 }
 
 .user-menu-button:hover .user-avatar,
@@ -443,15 +478,20 @@ tbody tr:last-child td {
 }
 
 .tag {
-  min-height: 24px;
+  height: 28px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  padding: 0 8px;
+  padding: 0 11px;
   color: var(--pf-primary);
   background: #eef5f0;
   font-size: 12px;
   font-weight: 700;
+  line-height: 28px;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .tag.warn {
@@ -467,6 +507,26 @@ tbody tr:last-child td {
 .tag.neutral {
   color: #66726b;
   background: #f0f2f0;
+}
+
+.truncated-text {
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.truncated-text.text-strong {
+  color: var(--pf-text);
+  font-weight: 800;
+}
+
+.truncated-text.text-small {
+  margin-top: 3px;
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .flow-list,
@@ -487,6 +547,21 @@ tbody tr:last-child td {
   border: 1px solid var(--pf-border);
   border-radius: 8px;
   background: var(--pf-panel-soft);
+}
+
+.flow-item div,
+.risk-item div {
+  min-width: 0;
+}
+
+.flow-item strong,
+.flow-item small,
+.risk-item strong,
+.risk-item small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stage-index {
@@ -708,6 +783,331 @@ tbody tr:last-child td {
   padding: 12px;
 }
 
+.request-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.request-table th,
+.request-table td {
+  height: 46px;
+  vertical-align: middle;
+}
+
+.row-link {
+  max-width: 100%;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  color: var(--pf-primary);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.row-link span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-link.active {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.request-detail,
+.request-form {
+  padding: 14px;
+}
+
+.detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.detail-heading > div {
+  min-width: 0;
+}
+
+.detail-heading strong,
+.detail-heading span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-heading span {
+  margin-top: 3px;
+  color: var(--pf-muted);
+  font-size: 12px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.detail-grid div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  background: var(--pf-panel-soft);
+}
+
+.detail-grid dt {
+  margin-bottom: 4px;
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detail-grid dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-description {
+  margin: 0 0 12px;
+  color: var(--pf-muted);
+  line-height: 1.6;
+}
+
+.request-table strong,
+.request-table small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request-table small {
+  margin-top: 3px;
+  color: var(--pf-muted);
+}
+
+.empty-state {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  color: var(--pf-muted);
+}
+
+.request-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.request-form label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.request-form label span {
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.request-form input,
+.request-form select,
+.request-form textarea {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--pf-border);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--pf-text);
+  background: #fff;
+}
+
+.request-form textarea {
+  min-height: 74px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-wide,
+.request-form .data-alert {
+  grid-column: 1 / -1;
+}
+
+.line-items-card {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  background: var(--pf-panel-soft);
+}
+
+.line-items-heading,
+.line-items-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.line-items-heading > span,
+.line-items-total span {
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.line-add-button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #bfd0c5;
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--pf-primary);
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.line-add-button:hover,
+.line-add-button:focus-visible {
+  background: var(--pf-primary-soft);
+}
+
+.line-add-button:focus-visible {
+  outline: 2px solid #bfd0c5;
+  outline-offset: 2px;
+}
+
+.line-items-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.line-items-table {
+  min-width: 720px;
+  table-layout: fixed;
+}
+
+.line-items-table th,
+.line-items-table td {
+  height: 44px;
+  padding: 7px 6px;
+  vertical-align: middle;
+}
+
+.line-items-table th:nth-child(1),
+.line-items-table th:nth-child(2) {
+  width: 178px;
+}
+
+.line-items-table th:nth-child(3),
+.line-items-table th:nth-child(4) {
+  width: 82px;
+}
+
+.line-items-table th:nth-child(5),
+.line-items-table th:nth-child(6) {
+  width: 108px;
+}
+
+.line-items-table th:nth-child(7) {
+  width: 42px;
+}
+
+.line-items-table input {
+  min-height: 32px;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.line-subtotal {
+  overflow: hidden;
+  color: var(--pf-text);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-delete-button {
+  width: 30px;
+  min-height: 30px;
+  height: 30px;
+}
+
+.line-delete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.line-items-total {
+  justify-content: flex-end;
+}
+
+.line-items-total strong {
+  min-width: 112px;
+  text-align: right;
+  font-size: 18px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.data-alert.success {
+  border-color: #bfd0c5;
+  color: var(--pf-primary);
+  background: var(--pf-primary-soft);
+}
+
+.request-drawer .ant-drawer-body {
+  padding: 18px;
+}
+
+.request-drawer .ant-drawer-extra .primary-button {
+  min-height: 32px;
+  height: 32px;
+  gap: 6px;
+  padding: 0 11px;
+  font-size: 13px;
+}
+
+.request-drawer .request-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+}
+
+.request-drawer .request-detail {
+  padding: 0;
+}
+
 @media (max-width: 980px) {
   .sidebar {
     width: 86px !important;
@@ -768,7 +1168,9 @@ tbody tr:last-child td {
   }
 
   .foundation-grid,
-  .foundation-columns {
+  .foundation-columns,
+  .request-grid,
+  .request-form {
     grid-template-columns: 1fr;
   }
 }

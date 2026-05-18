@@ -7,11 +7,13 @@ import {
   CheckCircleOutlined,
   DashboardOutlined,
   DatabaseOutlined,
+  DeleteOutlined,
   FileAddOutlined,
   FileSearchOutlined,
   InboxOutlined,
   LogoutOutlined,
   NodeIndexOutlined,
+  PlusOutlined,
   ProfileOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
@@ -21,15 +23,15 @@ import {
   TranslationOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { Avatar, ConfigProvider, Dropdown, Layout, Tooltip } from 'antd'
+import { keepPreviousData, QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Avatar, ConfigProvider, Drawer, Dropdown, Layout, Modal, Tooltip } from 'antd'
 import type { MenuProps, ThemeConfig } from 'antd'
 import enUS from 'antd/locale/en_US'
 import zhCN from 'antd/locale/zh_CN'
 import ReactECharts from 'echarts-for-react'
-import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
-import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 
 const { Header, Sider, Content } = Layout
@@ -172,6 +174,89 @@ type BudgetAccountSummary = {
   active: boolean
 }
 
+type PurchaseRequestStatus = 'DRAFT' | 'SUBMITTED'
+type PurchaseRequestDrawerMode = 'create' | 'detail'
+
+type PurchaseRequestLine = {
+  lineNo: number
+  itemName: string
+  specification: string | null
+  quantity: number
+  unit: string
+  estimatedUnitPrice: number
+  estimatedAmount: number
+  categoryId: string
+}
+
+type PurchaseRequestListItem = {
+  requestId: string
+  companyId: string
+  requesterId: string
+  departmentId: string
+  categoryId: string
+  budgetAccountId: string
+  supplierId: string | null
+  title: string
+  status: PurchaseRequestStatus
+  totalAmount: number
+  currency: string
+  expectedDeliveryDate: string
+  submittedAt: string | null
+  createdAt: string
+  lineCount: number
+}
+
+type PurchaseRequestDetail = PurchaseRequestListItem & {
+  description: string | null
+  updatedAt: string
+  fieldSnapshot: Record<string, unknown>
+  lineItems: PurchaseRequestLine[]
+}
+
+type CreatePurchaseRequestDraftPayload = {
+  companyId: string
+  requesterId: string
+  departmentId: string
+  categoryId: string
+  budgetAccountId: string
+  supplierId?: string
+  title: string
+  description?: string
+  totalAmount: number
+  currency: string
+  expectedDeliveryDate: string
+  lineItems: Array<{
+    itemName: string
+    specification?: string
+    quantity: number
+    unit: string
+    estimatedUnitPrice: number
+    estimatedAmount: number
+  }>
+}
+
+type PurchaseRequestFormState = {
+  companyId: string
+  requesterId: string
+  departmentId: string
+  categoryId: string
+  budgetAccountId: string
+  supplierId: string
+  title: string
+  description: string
+  expectedDeliveryDate: string
+  lineItems: PurchaseRequestFormLine[]
+}
+
+type PurchaseRequestFormLine = {
+  lineKey: string
+  itemName: string
+  specification: string
+  quantity: number
+  unit: string
+  estimatedUnitPrice: number
+}
+
 const demoContext: DemoContext = {
   groupId: 'group-xinghe',
   groupName: '星河控股集团',
@@ -205,7 +290,14 @@ const demoContext: DemoContext = {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 async function fetchApi<T>(path: string): Promise<ApiEnvelope<T>> {
-  const response = await fetch(`${apiBaseUrl}${path}`)
+  return requestApi<T>(path)
+}
+
+async function requestApi<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    headers: init?.body ? { 'Content-Type': 'application/json', ...init.headers } : init?.headers,
+    ...init,
+  })
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null)
@@ -217,6 +309,13 @@ async function fetchApi<T>(path: string): Promise<ApiEnvelope<T>> {
   }
 
   return response.json() as Promise<ApiEnvelope<T>>
+}
+
+async function postApi<T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> {
+  return requestApi<T>(path, {
+    body: body === undefined ? undefined : JSON.stringify(body),
+    method: 'POST',
+  })
 }
 
 async function fetchHealth(): Promise<HealthEnvelope> {
@@ -251,6 +350,22 @@ async function fetchBudgetAccounts(companyId: string) {
   return fetchApi<BudgetAccountSummary[]>(`/api/master-data/companies/${companyId}/budget-accounts`)
 }
 
+async function fetchPurchaseRequests(companyId: string) {
+  return fetchApi<PurchaseRequestListItem[]>(`/api/purchase-requests?companyId=${encodeURIComponent(companyId)}`)
+}
+
+async function fetchPurchaseRequestDetail(requestId: string) {
+  return fetchApi<PurchaseRequestDetail>(`/api/purchase-requests/${encodeURIComponent(requestId)}`)
+}
+
+async function createPurchaseRequestDraft(payload: CreatePurchaseRequestDraftPayload) {
+  return postApi<PurchaseRequestDetail>('/api/purchase-requests/drafts', payload)
+}
+
+async function submitPurchaseRequest(requestId: string) {
+  return postApi<PurchaseRequestDetail>(`/api/purchase-requests/${encodeURIComponent(requestId)}/submit`)
+}
+
 const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -265,6 +380,7 @@ const localizedContent = {
     header: {
       title: '采购工作台',
       foundationTitle: '组织与主数据',
+      purchaseRequestsTitle: '采购申请',
     },
     actions: {
       newRequest: '新建申请',
@@ -302,7 +418,7 @@ const localizedContent = {
     },
     navItems: [
       { label: '采购工作台', icon: <DashboardOutlined />, path: '/' },
-      { label: '采购申请', icon: <FileAddOutlined /> },
+      { label: '采购申请', icon: <FileAddOutlined />, path: '/purchase-requests' },
       { label: '审批中心', icon: <AuditOutlined /> },
       { label: '询报价', icon: <FileSearchOutlined /> },
       { label: '采购订单', icon: <ShoppingCartOutlined /> },
@@ -378,10 +494,10 @@ const localizedContent = {
       },
     ],
     flowStages: [
-      { title: '申请提交', description: '动态字段、预算科目、附件', count: '27' },
-      { title: '审批流转', description: '公司、金额、品类规则', count: '5', tone: 'warn' },
-      { title: '询价比价', description: '供应商池、报价评分', count: '14' },
-      { title: '订单到票', description: 'PO、收货、发票、匹配', count: '3', tone: 'danger' },
+      { title: '申请提交', description: '草稿、提交、预算科目', count: '' },
+      { title: '审批流转', description: '公司、金额、品类规则', count: '', tone: 'warn' },
+      { title: '询价比价', description: '供应商池、报价评分', count: '' },
+      { title: '订单到票', description: 'PO、收货、发票、匹配', count: '', tone: 'danger' },
     ],
     riskItems: [
       { title: '发票金额偏差', detail: 'PO-2026-088 发票多 ¥2,300', tone: 'danger' },
@@ -424,6 +540,57 @@ const localizedContent = {
       groupLevel: '集团级',
       shared: '共享',
     },
+    purchaseRequest: {
+      dataState: '真实后端数据',
+      unavailable: '采购申请暂不可用',
+      empty: '暂无采购申请',
+      loading: '加载中',
+      companySelector: '公司选择',
+      list: '采购申请列表',
+      detail: '申请详情',
+      create: '新建采购申请',
+      continueEdit: '继续编辑',
+      saveDraft: '保存草稿',
+      submit: '提交申请',
+      requestId: '申请单号',
+      title: '申请标题',
+      description: '需求说明',
+      requester: '申请人',
+      department: '部门',
+      category: '品类',
+      budgetAccount: '预算科目',
+      supplier: '意向供应商',
+      expectedDeliveryDate: '期望交付日期',
+      itemName: '物品名称',
+      specification: '规格说明',
+      quantity: '数量',
+      unit: '单位',
+      estimatedUnitPrice: '预估单价',
+      totalAmount: '预计金额',
+      status: '状态',
+      createdAt: '创建时间',
+      submittedAt: '提交时间',
+      lineItems: '明细行',
+      addLineItem: '新增明细',
+      removeLineItem: '删除明细',
+      lineSubtotal: '小计',
+      draft: '草稿',
+      submitted: '已提交',
+      notSubmitted: '未提交',
+      upstreamOnly: '已提交申请将作为后续审批流的上游记录',
+      noSupplier: '暂不指定',
+      currentStep: '当前节点',
+      intakeStep: '申请录入',
+      waitingApproval: '等待审批流',
+      recentFromBackend: '后端申请数据',
+      createSuccess: '草稿已保存',
+      submitSuccess: '申请已提交',
+      createFailed: '保存失败',
+      submitFailed: '提交失败',
+      discardTitle: '放弃本次编辑？',
+      discardContent: '当前申请还没有保存，关闭后本次修改会丢失。',
+      discardConfirm: '放弃编辑',
+    },
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
   },
   en: {
@@ -439,6 +606,7 @@ const localizedContent = {
     header: {
       title: 'Procurement Workspace',
       foundationTitle: 'Organization & Master Data',
+      purchaseRequestsTitle: 'Purchase Requests',
     },
     actions: {
       newRequest: 'New Request',
@@ -476,7 +644,7 @@ const localizedContent = {
     },
     navItems: [
       { label: 'Dashboard', icon: <DashboardOutlined />, path: '/' },
-      { label: 'Requests', icon: <FileAddOutlined /> },
+      { label: 'Requests', icon: <FileAddOutlined />, path: '/purchase-requests' },
       { label: 'Approvals', icon: <AuditOutlined /> },
       { label: 'RFQ', icon: <FileSearchOutlined /> },
       { label: 'Purchase Orders', icon: <ShoppingCartOutlined /> },
@@ -552,10 +720,10 @@ const localizedContent = {
       },
     ],
     flowStages: [
-      { title: 'Submit Request', description: 'Dynamic fields, budget account, attachments', count: '27' },
-      { title: 'Approval Routing', description: 'Company, amount, category rules', count: '5', tone: 'warn' },
-      { title: 'RFQ Comparison', description: 'Supplier pool, quote scoring', count: '14' },
-      { title: 'Order to Invoice', description: 'PO, receiving, invoice, match', count: '3', tone: 'danger' },
+      { title: 'Submit Request', description: 'Draft, submit, budget account', count: '' },
+      { title: 'Approval Routing', description: 'Company, amount, category rules', count: '', tone: 'warn' },
+      { title: 'RFQ Comparison', description: 'Supplier pool, quote scoring', count: '' },
+      { title: 'Order to Invoice', description: 'PO, receiving, invoice, match', count: '', tone: 'danger' },
     ],
     riskItems: [
       { title: 'Invoice Amount Variance', detail: 'PO-2026-088 invoice over by ¥2,300', tone: 'danger' },
@@ -597,6 +765,57 @@ const localizedContent = {
       inactive: 'Inactive',
       groupLevel: 'Group Level',
       shared: 'Shared',
+    },
+    purchaseRequest: {
+      dataState: 'Backend data',
+      unavailable: 'Purchase requests unavailable',
+      empty: 'No purchase requests',
+      loading: 'Loading',
+      companySelector: 'Company selector',
+      list: 'Purchase Request List',
+      detail: 'Request Detail',
+      create: 'New Purchase Request',
+      continueEdit: 'Continue Editing',
+      saveDraft: 'Save Draft',
+      submit: 'Submit',
+      requestId: 'Request ID',
+      title: 'Title',
+      description: 'Need Description',
+      requester: 'Requester',
+      department: 'Department',
+      category: 'Category',
+      budgetAccount: 'Budget Account',
+      supplier: 'Preferred Supplier',
+      expectedDeliveryDate: 'Expected Delivery',
+      itemName: 'Item',
+      specification: 'Specification',
+      quantity: 'Quantity',
+      unit: 'Unit',
+      estimatedUnitPrice: 'Unit Price',
+      totalAmount: 'Estimated Amount',
+      status: 'Status',
+      createdAt: 'Created',
+      submittedAt: 'Submitted',
+      lineItems: 'Line Items',
+      addLineItem: 'Add Line',
+      removeLineItem: 'Remove Line',
+      lineSubtotal: 'Subtotal',
+      draft: 'Draft',
+      submitted: 'Submitted',
+      notSubmitted: 'Not submitted',
+      upstreamOnly: 'Submitted requests become upstream records for the later approval flow',
+      noSupplier: 'No supplier',
+      currentStep: 'Current Step',
+      intakeStep: 'Request Intake',
+      waitingApproval: 'Waiting for approval flow',
+      recentFromBackend: 'Backend request data',
+      createSuccess: 'Draft saved',
+      submitSuccess: 'Request submitted',
+      createFailed: 'Save failed',
+      submitFailed: 'Submit failed',
+      discardTitle: 'Discard edits?',
+      discardContent: 'This request has unsaved changes. Closing will discard your edits.',
+      discardConfirm: 'Discard',
     },
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
@@ -666,7 +885,11 @@ function Workspace({
   onLanguageChange: () => void
 }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const isFoundationRoute = location.pathname === '/master-data'
+  const isPurchaseRequestRoute = location.pathname === '/purchase-requests'
+  const [isCreateDrawerOpen, setCreateDrawerOpen] = useState(false)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
@@ -711,6 +934,12 @@ function Workspace({
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
+  const purchaseRequestsQuery = useQuery({
+    queryKey: ['purchase-requests', selectedCompanyId],
+    queryFn: () => fetchPurchaseRequests(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
 
   const messages = localizedContent[language]
   const rawContext = masterContextQuery.data?.data ?? data?.data.demoContext ?? demoContext
@@ -724,6 +953,9 @@ function Workspace({
   ).companies
   const selectedCompany = companies.find((company) => company.companyId === selectedCompanyId) ?? context.activeCompany
   const healthStatus = data?.data.status ?? (isLoading ? 'CHECKING' : 'OFFLINE')
+  const purchaseRequests = purchaseRequestsQuery.data?.data ?? []
+  const supplierCount = suppliersQuery.data?.data.length ?? 0
+  const dashboardKpis = getDashboardKpis(language, purchaseRequests, supplierCount)
   const foundationLoading =
     masterContextQuery.isLoading ||
     companiesQuery.isLoading ||
@@ -787,6 +1019,15 @@ function Workspace({
     }
   }
 
+  const handleNewRequestClick = () => {
+    if (isPurchaseRequestRoute) {
+      setCreateDrawerOpen(true)
+      return
+    }
+
+    navigate('/purchase-requests?new=1')
+  }
+
   useEffect(() => {
     if (companies.length === 0) {
       return
@@ -796,6 +1037,17 @@ function Workspace({
       setSelectedCompanyId(context.activeCompany.companyId)
     }
   }, [companies, context.activeCompany.companyId, selectedCompanyId])
+
+  useEffect(() => {
+    if (!isPurchaseRequestRoute) {
+      return
+    }
+
+    if (new URLSearchParams(location.search).get('new') === '1') {
+      setCreateDrawerOpen(true)
+      navigate('/purchase-requests', { replace: true })
+    }
+  }, [isPurchaseRequestRoute, location.search, navigate])
 
   return (
     <Layout className="app-shell">
@@ -850,7 +1102,13 @@ function Workspace({
       <Layout className="main-layout">
         <Header className="topbar">
           <div>
-            <h1>{isFoundationRoute ? messages.header.foundationTitle : messages.header.title}</h1>
+            <h1>
+              {isFoundationRoute
+                ? messages.header.foundationTitle
+                : isPurchaseRequestRoute
+                  ? messages.header.purchaseRequestsTitle
+                  : messages.header.title}
+            </h1>
           </div>
           <div className={isFoundationRoute ? 'top-actions compact' : 'top-actions'}>
             <Tooltip title={messages.aria.search} trigger={['hover', 'focus']}>
@@ -864,12 +1122,10 @@ function Workspace({
               </button>
             </Tooltip>
             {!isFoundationRoute && (
-              <Tooltip title={messages.actions.newRequest} trigger={['hover', 'focus']}>
-                <button type="button" className="primary-button">
-                  <FileAddOutlined />
-                  <span>{messages.actions.newRequest}</span>
-                </button>
-              </Tooltip>
+              <button className="primary-button" onClick={handleNewRequestClick} type="button">
+                <FileAddOutlined />
+                <span>{messages.actions.newRequest}</span>
+              </button>
             )}
             <Dropdown
               trigger={['click']}
@@ -910,10 +1166,29 @@ function Workspace({
               suppliers={suppliersQuery.data?.data ?? []}
               users={usersQuery.data?.data ?? []}
             />
+          ) : isPurchaseRequestRoute ? (
+              <PurchaseRequestView
+                budgetAccounts={budgetAccountsQuery.data?.data ?? []}
+                categories={categoriesQuery.data?.data ?? []}
+                isError={purchaseRequestsQuery.isError}
+                isLoading={purchaseRequestsQuery.isLoading}
+                language={language}
+                messages={messages}
+                onRefresh={() => {
+                  void queryClient.invalidateQueries({ queryKey: ['purchase-requests'] })
+                }}
+              isCreateOpen={isCreateDrawerOpen}
+              onCreateClose={() => setCreateDrawerOpen(false)}
+              purchaseRequests={purchaseRequests}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
+              suppliers={suppliersQuery.data?.data ?? []}
+              users={usersQuery.data?.data ?? []}
+            />
           ) : (
             <>
               <section className="kpi-grid" aria-label={messages.aria.procurementMetrics}>
-                {messages.kpis.map((kpi) => (
+                {dashboardKpis.map((kpi) => (
                   <article className="panel kpi" key={kpi.label}>
                     <div>
                       <span>{kpi.label}</span>
@@ -940,7 +1215,7 @@ function Workspace({
                     <PanelTitle
                       icon={<ProfileOutlined />}
                       title={messages.panels.recentRequests}
-                      aside={context.activeCompany.companyName}
+                      aside={messages.purchaseRequest.recentFromBackend}
                     />
                     <div className="table-wrap">
                       <table>
@@ -955,20 +1230,36 @@ function Workspace({
                           </tr>
                         </thead>
                         <tbody>
-                          {messages.purchaseRows.map((row) => (
-                            <tr key={row.id}>
-                              <td>
-                                <strong>{row.id}</strong>
-                              </td>
-                              <td>{row.category}</td>
-                              <td>{row.company}</td>
-                              <td>{row.amount}</td>
-                              <td>{row.node}</td>
-                              <td>
-                                <span className={`tag ${row.tone}`}>{row.status}</span>
+                          {purchaseRequests.length === 0 ? (
+                            <tr>
+                              <td colSpan={6}>
+                                {purchaseRequestsQuery.isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            purchaseRequests.slice(0, 5).map((row) => (
+	                            <tr key={row.requestId}>
+	                              <td>
+	                                <TruncatedText className="text-strong" text={row.requestId} />
+	                              </td>
+	                              <td>
+	                                <TruncatedText text={categoryNameOf(row.categoryId, categoriesQuery.data?.data ?? [])} />
+	                              </td>
+	                              <td>
+	                                <TruncatedText text={companyNameOf(row.companyId, companies)} />
+	                              </td>
+	                              <td>{formatCurrency(row.totalAmount, row.currency, language)}</td>
+	                              <td>{currentStepOf(row.status, messages)}</td>
+	                              <td>
+	                                <span
+	                                  className={`tag ${statusToneOf(row.status)}`}
+	                                >
+	                                  {formatPurchaseRequestStatus(row.status, messages)}
+	                                </span>
+                              </td>
+                            </tr>
+                          ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -983,10 +1274,10 @@ function Workspace({
                         <div className="flow-item" key={stage.title}>
                           <span className="stage-index">{index + 1}</span>
                           <div>
-                            <strong>{stage.title}</strong>
-                            <small>{stage.description}</small>
+	                            <TruncatedText className="text-strong" text={stage.title} />
+	                            <TruncatedText className="text-small" text={stage.description} />
                           </div>
-                          <span className={`tag ${toneOf(stage)}`}>{stage.count}</span>
+                          {stage.count && <span className={`tag ${toneOf(stage)}`}>{stage.count}</span>}
                         </div>
                       ))}
                     </div>
@@ -1001,10 +1292,10 @@ function Workspace({
                             <SafetyCertificateOutlined />
                           </span>
                           <div>
-                            <strong>{item.title}</strong>
-                            <small>{item.detail}</small>
-                          </div>
-                          <span className={`tag ${item.tone}`}>
+	                            <TruncatedText className="text-strong" text={item.title} />
+	                            <TruncatedText className="text-small" text={item.detail} />
+	                          </div>
+	                          <span className={`tag ${item.tone}`}>
                             {item.tone === 'danger' ? messages.riskAction.danger : messages.riskAction.review}
                           </span>
                         </div>
@@ -1032,6 +1323,645 @@ function Workspace({
         </Content>
       </Layout>
     </Layout>
+  )
+}
+
+function PurchaseRequestView({
+  budgetAccounts,
+  categories,
+  isError,
+  isCreateOpen,
+  isLoading,
+  language,
+  messages,
+  onCreateClose,
+  onRefresh,
+  purchaseRequests,
+  selectedCompany,
+  selectedCompanyId,
+  suppliers,
+  users,
+}: {
+  budgetAccounts: BudgetAccountSummary[]
+  categories: CategorySummary[]
+  isError: boolean
+  isCreateOpen: boolean
+  isLoading: boolean
+  language: Language
+  messages: LocalizedMessages
+  onCreateClose: () => void
+  onRefresh: () => void
+  purchaseRequests: PurchaseRequestListItem[]
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  suppliers: SupplierSummary[]
+  users: UserSummary[]
+}) {
+  const queryClient = useQueryClient()
+  const wasCreateOpen = useRef(false)
+  const [selectedRequestId, setSelectedRequestId] = useState<string | undefined>()
+  const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [isCreateDirty, setCreateDirty] = useState(false)
+  const [lastDrawerMode, setLastDrawerMode] = useState<PurchaseRequestDrawerMode>('detail')
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const [form, setForm] = useState<PurchaseRequestFormState>(() =>
+    buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers),
+  )
+
+  useEffect(() => {
+    if (purchaseRequests.length === 0) {
+      setSelectedRequestId(undefined)
+      setDetailDrawerOpen(false)
+      return
+    }
+
+    if (selectedRequestId && !purchaseRequests.some((request) => request.requestId === selectedRequestId)) {
+      setSelectedRequestId(undefined)
+      setDetailDrawerOpen(false)
+    }
+  }, [purchaseRequests, selectedRequestId])
+
+  useEffect(() => {
+    const didOpenCreateDrawer = isCreateOpen && !wasCreateOpen.current
+    wasCreateOpen.current = isCreateOpen
+
+    if (didOpenCreateDrawer) {
+      setLastDrawerMode('create')
+      setCreateDirty(false)
+      setFeedback(null)
+      setDetailDrawerOpen(false)
+      setForm(buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers))
+    }
+  }, [budgetAccounts, categories, isCreateOpen, selectedCompanyId, suppliers, users])
+
+  useEffect(() => {
+    setForm((current) => {
+      const currentRequester = users.find((user) => user.userId === current.requesterId)
+      const applicant = users.find((user) => user.roles.some((role) => role.roleId === 'role-applicant'))
+      const requester =
+        currentRequester?.roles.some((role) => role.roleId === 'role-applicant')
+          ? currentRequester
+          : applicant ?? users.find((user) => user.active) ?? users[0]
+      const currentCategory = categories.find((category) => category.categoryId === current.categoryId)
+      const defaultCategory = currentCategory ?? categories[0]
+      const budgetForCurrentCategory = budgetAccounts.find(
+        (account) =>
+          account.budgetAccountId === current.budgetAccountId &&
+          account.categoryId === defaultCategory?.categoryId &&
+          account.active,
+      )
+      const budgetAccount =
+        budgetForCurrentCategory ??
+        budgetAccounts.find((account) => account.categoryId === defaultCategory?.categoryId && account.active) ??
+        budgetAccounts.find((account) => account.active) ??
+        budgetAccounts[0]
+      const categoryId = budgetAccount?.categoryId ?? defaultCategory?.categoryId ?? ''
+      const supplier = preferredSupplierForCategory(categoryId, suppliers, current.supplierId)
+
+      return {
+        ...current,
+        budgetAccountId: budgetAccount?.budgetAccountId ?? '',
+        categoryId,
+        companyId: selectedCompanyId,
+        departmentId: requester?.departmentId ?? '',
+        requesterId: requester?.userId ?? '',
+        supplierId: supplier?.supplierId ?? '',
+      }
+    })
+  }, [budgetAccounts, categories, selectedCompanyId, suppliers, users])
+
+  const detailQuery = useQuery({
+    queryKey: ['purchase-request', selectedRequestId],
+    queryFn: () => fetchPurchaseRequestDetail(selectedRequestId ?? ''),
+    enabled: Boolean(selectedRequestId),
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
+
+  const createMutation = useMutation({
+    mutationFn: createPurchaseRequestDraft,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.purchaseRequest.createFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setCreateDirty(false)
+      setFeedback({ message: messages.purchaseRequest.createSuccess, tone: 'success' })
+      setSelectedRequestId(response.data.requestId)
+      setDetailDrawerOpen(true)
+      onCreateClose()
+      onRefresh()
+      void queryClient.invalidateQueries({ queryKey: ['purchase-request', response.data.requestId] })
+    },
+  })
+
+  const submitMutation = useMutation({
+    mutationFn: submitPurchaseRequest,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.purchaseRequest.submitFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setFeedback({ message: messages.purchaseRequest.submitSuccess, tone: 'success' })
+      setSelectedRequestId(response.data.requestId)
+      onRefresh()
+      void queryClient.invalidateQueries({ queryKey: ['purchase-request', response.data.requestId] })
+    },
+  })
+
+  const filteredBudgetAccounts = budgetAccounts.filter((account) => account.categoryId === form.categoryId && account.active)
+  const filteredSuppliers = suppliers.filter((supplier) =>
+    supplier.categories.some((category) => category.categoryId === form.categoryId),
+  )
+  const selectedDetail = detailQuery.data?.data
+  const drawerMode: PurchaseRequestDrawerMode | null = isCreateOpen ? 'create' : isDetailDrawerOpen ? 'detail' : null
+  const renderedDrawerMode = drawerMode ?? lastDrawerMode
+  const drawerTitle = renderedDrawerMode === 'create' ? messages.purchaseRequest.create : messages.purchaseRequest.detail
+  const totalAmount = roundAmount(form.lineItems.reduce((sum, line) => sum + lineAmountOf(line), 0))
+  const drawerExtra =
+    renderedDrawerMode === 'create' ? (
+      <button
+        className="primary-button"
+        disabled={createMutation.isPending}
+        form="purchase-request-create-form"
+        type="submit"
+      >
+        <FileAddOutlined />
+        <span>{messages.purchaseRequest.saveDraft}</span>
+      </button>
+    ) : selectedDetail?.status === 'DRAFT' ? (
+      <button
+        className="primary-button"
+        disabled={submitMutation.isPending}
+        onClick={() => submitMutation.mutate(selectedDetail.requestId)}
+        type="button"
+      >
+        <CheckCircleOutlined />
+        <span>{messages.purchaseRequest.submit}</span>
+      </button>
+    ) : null
+
+  const updateForm = <Key extends keyof PurchaseRequestFormState>(key: Key, value: PurchaseRequestFormState[Key]) => {
+    setCreateDirty(true)
+    setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const updateLineItem = <Key extends keyof Omit<PurchaseRequestFormLine, 'lineKey'>>(
+    lineKey: string,
+    key: Key,
+    value: PurchaseRequestFormLine[Key],
+  ) => {
+    setCreateDirty(true)
+    setForm((current) => ({
+      ...current,
+      lineItems: current.lineItems.map((line) => (line.lineKey === lineKey ? { ...line, [key]: value } : line)),
+    }))
+  }
+
+  const addLineItem = () => {
+    setCreateDirty(true)
+    setForm((current) => ({
+      ...current,
+      lineItems: [...current.lineItems, createPurchaseRequestFormLine()],
+    }))
+  }
+
+  const removeLineItem = (lineKey: string) => {
+    setCreateDirty(true)
+    setForm((current) => ({
+      ...current,
+      lineItems:
+        current.lineItems.length > 1 ? current.lineItems.filter((line) => line.lineKey !== lineKey) : current.lineItems,
+    }))
+  }
+
+  const handleRequesterChange = (requesterId: string) => {
+    setCreateDirty(true)
+    const requester = users.find((user) => user.userId === requesterId)
+    setForm((current) => ({
+      ...current,
+      departmentId: requester?.departmentId ?? current.departmentId,
+      requesterId,
+    }))
+  }
+
+  const handleCategoryChange = (categoryId: string) => {
+    setCreateDirty(true)
+    const budgetAccount =
+      budgetAccounts.find((account) => account.categoryId === categoryId && account.active) ?? budgetAccounts[0]
+    const supplier = preferredSupplierForCategory(categoryId, suppliers)
+    setForm((current) => ({
+      ...current,
+      budgetAccountId: budgetAccount?.budgetAccountId ?? '',
+      categoryId,
+      supplierId: supplier?.supplierId ?? '',
+    }))
+  }
+
+  const handleCreateDraft = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!form.companyId || !form.requesterId || !form.departmentId || !form.categoryId || !form.budgetAccountId) {
+      setFeedback({ message: messages.purchaseRequest.unavailable, tone: 'danger' })
+      return
+    }
+
+    createMutation.mutate({
+      budgetAccountId: form.budgetAccountId,
+      categoryId: form.categoryId,
+      companyId: form.companyId,
+      currency: 'CNY',
+      departmentId: form.departmentId,
+      description: form.description,
+      expectedDeliveryDate: form.expectedDeliveryDate,
+      requesterId: form.requesterId,
+      supplierId: form.supplierId || undefined,
+      title: form.title,
+      totalAmount,
+      lineItems: form.lineItems.map((line) => ({
+        estimatedAmount: lineAmountOf(line),
+        estimatedUnitPrice: line.estimatedUnitPrice,
+        itemName: line.itemName,
+        quantity: line.quantity,
+        specification: line.specification,
+        unit: line.unit,
+      })),
+    })
+  }
+
+  const handleRequestDetailOpen = (requestId: string) => {
+    setFeedback(null)
+    setLastDrawerMode('detail')
+    setSelectedRequestId(requestId)
+    setDetailDrawerOpen(true)
+  }
+
+  const closeCreateDrawer = () => {
+    setLastDrawerMode('create')
+    setCreateDirty(false)
+    setDetailDrawerOpen(false)
+    onCreateClose()
+  }
+
+  const handleDrawerClose = () => {
+    if (drawerMode === 'create') {
+      if (isCreateDirty) {
+        Modal.confirm({
+          mousePosition: getViewportCenter(),
+          centered: true,
+          cancelText: messages.purchaseRequest.continueEdit,
+          content: messages.purchaseRequest.discardContent,
+          focusable: { autoFocusButton: 'cancel' },
+          okType: 'danger',
+          okText: messages.purchaseRequest.discardConfirm,
+          onOk: closeCreateDrawer,
+          rootClassName: 'procure-confirm-modal',
+          title: messages.purchaseRequest.discardTitle,
+        })
+        return
+      }
+
+      closeCreateDrawer()
+      return
+    }
+
+    setDetailDrawerOpen(false)
+  }
+
+  return (
+    <>
+      <section className="request-grid">
+        <section className="panel request-list-panel">
+          <PanelTitle
+            icon={<FileAddOutlined />}
+            title={messages.purchaseRequest.list}
+            aside={selectedCompany.companyName}
+          />
+          {isError && <div className="data-alert">{messages.purchaseRequest.unavailable}</div>}
+          <div className="table-wrap">
+            <table className="request-table">
+              <thead>
+                <tr>
+                  <th>{messages.purchaseRequest.requestId}</th>
+                  <th>{messages.purchaseRequest.title}</th>
+                  <th>{messages.purchaseRequest.category}</th>
+                  <th>{messages.purchaseRequest.totalAmount}</th>
+                  <th>{messages.purchaseRequest.status}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchaseRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>{isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}</td>
+                  </tr>
+                ) : (
+	                  purchaseRequests.map((request) => (
+	                    <tr key={request.requestId}>
+	                      <td>
+                          <button
+                            aria-label={`${messages.purchaseRequest.requestId}: ${request.requestId}`}
+                            className={request.requestId === selectedRequestId ? 'row-link active' : 'row-link'}
+                            onClick={() => handleRequestDetailOpen(request.requestId)}
+                            type="button"
+                          >
+                            <TruncatedText text={request.requestId} />
+                          </button>
+	                      </td>
+	                      <td>
+	                        <TruncatedText text={request.title} />
+	                      </td>
+	                      <td>
+	                        <TruncatedText text={categoryNameOf(request.categoryId, categories)} />
+	                      </td>
+	                      <td>
+	                        {formatCurrency(request.totalAmount, request.currency, language)}
+	                      </td>
+	                      <td>
+	                        <span
+	                          className={`tag ${statusToneOf(request.status)}`}
+	                        >
+	                          {formatPurchaseRequestStatus(request.status, messages)}
+	                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </section>
+
+		      <Drawer
+		        className="request-drawer"
+		        destroyOnClose={false}
+		        keyboard
+		        maskClosable
+		        extra={drawerExtra}
+		        onClose={handleDrawerClose}
+	        open={drawerMode !== null}
+	        title={drawerTitle}
+	        width={760}
+	      >
+	        {renderedDrawerMode === 'create' ? (
+	        <form className="request-form" id="purchase-request-create-form" onSubmit={handleCreateDraft}>
+          <label>
+            <span>{messages.purchaseRequest.title}</span>
+            <input required value={form.title} onChange={(event) => updateForm('title', event.target.value)} />
+          </label>
+          <label>
+            <span>{messages.purchaseRequest.requester}</span>
+            <select required value={form.requesterId} onChange={(event) => handleRequesterChange(event.target.value)}>
+              {users.map((user) => (
+                <option key={user.userId} value={user.userId}>
+                  {user.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{messages.purchaseRequest.category}</span>
+            <select required value={form.categoryId} onChange={(event) => handleCategoryChange(event.target.value)}>
+              {categories.map((category) => (
+                <option key={category.categoryId} value={category.categoryId}>
+                  {category.categoryName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{messages.purchaseRequest.budgetAccount}</span>
+            <select required value={form.budgetAccountId} onChange={(event) => updateForm('budgetAccountId', event.target.value)}>
+              {filteredBudgetAccounts.map((account) => (
+                <option key={account.budgetAccountId} value={account.budgetAccountId}>
+                  {account.accountName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{messages.purchaseRequest.supplier}</span>
+            <select value={form.supplierId} onChange={(event) => updateForm('supplierId', event.target.value)}>
+              <option value="">{messages.purchaseRequest.noSupplier}</option>
+              {filteredSuppliers.map((supplier) => (
+                <option key={supplier.supplierId} value={supplier.supplierId}>
+                  {supplier.supplierName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{messages.purchaseRequest.expectedDeliveryDate}</span>
+            <input
+              required
+              type="date"
+              value={form.expectedDeliveryDate}
+              onChange={(event) => updateForm('expectedDeliveryDate', event.target.value)}
+            />
+          </label>
+          <label className="form-wide">
+            <span>{messages.purchaseRequest.description}</span>
+            <textarea value={form.description} onChange={(event) => updateForm('description', event.target.value)} />
+          </label>
+          <section className="line-items-card form-wide">
+            <div className="line-items-heading">
+              <span>{messages.purchaseRequest.lineItems}</span>
+              <button className="line-add-button" onClick={addLineItem} type="button">
+                <PlusOutlined />
+                <span>{messages.purchaseRequest.addLineItem}</span>
+              </button>
+            </div>
+            <div className="line-items-table-wrap">
+              <table className="line-items-table">
+                <thead>
+                  <tr>
+                    <th>{messages.purchaseRequest.itemName}</th>
+                    <th>{messages.purchaseRequest.specification}</th>
+                    <th>{messages.purchaseRequest.quantity}</th>
+                    <th>{messages.purchaseRequest.unit}</th>
+                    <th>{messages.purchaseRequest.estimatedUnitPrice}</th>
+                    <th>{messages.purchaseRequest.lineSubtotal}</th>
+                    <th aria-label={messages.purchaseRequest.removeLineItem} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.lineItems.map((line) => (
+                    <tr key={line.lineKey}>
+                      <td>
+	                        <input
+	                          aria-label={messages.purchaseRequest.itemName}
+	                          required
+	                          value={line.itemName}
+	                          onChange={(event) => updateLineItem(line.lineKey, 'itemName', event.target.value)}
+	                        />
+                      </td>
+                      <td>
+	                        <input
+	                          aria-label={messages.purchaseRequest.specification}
+	                          value={line.specification}
+	                          onChange={(event) => updateLineItem(line.lineKey, 'specification', event.target.value)}
+	                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={messages.purchaseRequest.quantity}
+                          min="0.01"
+                          required
+                          step="0.01"
+                          type="number"
+                          value={line.quantity}
+                          onChange={(event) => updateLineItem(line.lineKey, 'quantity', Number(event.target.value))}
+                        />
+                      </td>
+                      <td>
+	                        <input
+	                          aria-label={messages.purchaseRequest.unit}
+	                          required
+	                          value={line.unit}
+	                          onChange={(event) => updateLineItem(line.lineKey, 'unit', event.target.value)}
+	                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={messages.purchaseRequest.estimatedUnitPrice}
+                          min="0.01"
+                          required
+                          step="0.01"
+                          type="number"
+                          value={line.estimatedUnitPrice}
+                          onChange={(event) =>
+                            updateLineItem(line.lineKey, 'estimatedUnitPrice', Number(event.target.value))
+                          }
+                        />
+                      </td>
+	                      <td className="line-subtotal">
+                        {formatCurrency(lineAmountOf(line), 'CNY', language)}
+                      </td>
+                      <td>
+                        <Tooltip title={messages.purchaseRequest.removeLineItem}>
+                          <button
+                            aria-label={messages.purchaseRequest.removeLineItem}
+                            className="icon-button line-delete-button"
+                            disabled={form.lineItems.length === 1}
+                            onClick={() => removeLineItem(line.lineKey)}
+                            type="button"
+                          >
+                            <DeleteOutlined />
+                          </button>
+                        </Tooltip>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="line-items-total">
+              <span>{messages.purchaseRequest.totalAmount}</span>
+              <strong>{formatCurrency(totalAmount, 'CNY', language)}</strong>
+            </div>
+          </section>
+          {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+	        </form>
+	        ) : selectedDetail ? (
+		          <div className="request-detail">
+		            <div className="detail-heading">
+		              <div>
+		                <TruncatedText className="text-strong" text={selectedDetail.title} />
+		                <TruncatedText className="text-small" text={selectedDetail.requestId} />
+		              </div>
+		              <span
+		                className={`tag ${statusToneOf(selectedDetail.status)}`}
+		              >
+		                {formatPurchaseRequestStatus(selectedDetail.status, messages)}
+		              </span>
+	            </div>
+	            <dl className="detail-grid">
+		              <div>
+		                <dt>{messages.purchaseRequest.requester}</dt>
+		                <dd>
+		                  <TruncatedText text={userNameOf(selectedDetail.requesterId, users)} />
+		                </dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.category}</dt>
+		                <dd>
+		                  <TruncatedText text={categoryNameOf(selectedDetail.categoryId, categories)} />
+		                </dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.budgetAccount}</dt>
+		                <dd>
+		                  <TruncatedText text={budgetNameOf(selectedDetail.budgetAccountId, budgetAccounts)} />
+		                </dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.supplier}</dt>
+		                <dd>
+		                  <TruncatedText text={supplierNameOf(selectedDetail.supplierId, suppliers, messages)} />
+		                </dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.expectedDeliveryDate}</dt>
+		                <dd>{formatDate(selectedDetail.expectedDeliveryDate, language)}</dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.totalAmount}</dt>
+		                <dd>{formatCurrency(selectedDetail.totalAmount, selectedDetail.currency, language)}</dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.submittedAt}</dt>
+		                <dd>
+		                  {selectedDetail.submittedAt
+		                    ? formatDateTime(selectedDetail.submittedAt, language)
+		                    : messages.purchaseRequest.notSubmitted}
+		                </dd>
+		              </div>
+		              <div>
+		                <dt>{messages.purchaseRequest.currentStep}</dt>
+		                <dd>{currentStepOf(selectedDetail.status, messages)}</dd>
+		              </div>
+		            </dl>
+		            {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+		            <p className="detail-description">{selectedDetail.description}</p>
+	            <div className="table-wrap">
+	              <table className="request-table">
+	                <thead>
+	                  <tr>
+	                    <th>{messages.purchaseRequest.itemName}</th>
+	                    <th>{messages.purchaseRequest.quantity}</th>
+	                    <th>{messages.purchaseRequest.estimatedUnitPrice}</th>
+	                    <th>{messages.purchaseRequest.totalAmount}</th>
+	                  </tr>
+	                </thead>
+	                <tbody>
+	                  {selectedDetail.lineItems.map((line) => (
+	                    <tr key={line.lineNo}>
+	                      <td>
+	                        <TruncatedText className="text-strong" text={line.itemName} />
+	                        {line.specification && <TruncatedText className="text-small" text={line.specification} />}
+	                      </td>
+	                      <td>{`${line.quantity} ${line.unit}`}</td>
+	                      <td>
+	                        {formatCurrency(line.estimatedUnitPrice, selectedDetail.currency, language)}
+	                      </td>
+	                      <td>
+	                        {formatCurrency(line.estimatedAmount, selectedDetail.currency, language)}
+	                      </td>
+	                    </tr>
+	                  ))}
+	                </tbody>
+	              </table>
+	            </div>
+	          </div>
+	        ) : (
+	          <div className="empty-state">{isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}</div>
+	        )}
+	      </Drawer>
+    </>
   )
 }
 
@@ -1283,6 +2213,42 @@ function StatusPill({
   )
 }
 
+function TruncatedText({ className = '', text }: { className?: string; text: string }) {
+  const textRef = useRef<HTMLSpanElement>(null)
+  const [isTruncated, setTruncated] = useState(false)
+
+  useEffect(() => {
+    const element = textRef.current
+    if (!element) {
+      return
+    }
+
+    const updateTruncation = () => {
+      setTruncated(element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
+    }
+
+    updateTruncation()
+    if (typeof ResizeObserver === 'undefined') {
+      return
+    }
+
+    const resizeObserver = new ResizeObserver(updateTruncation)
+    resizeObserver.observe(element)
+
+    return () => resizeObserver.disconnect()
+  }, [text])
+
+  return (
+    <span
+      className={className ? `truncated-text ${className}` : 'truncated-text'}
+      ref={textRef}
+      title={isTruncated ? text : undefined}
+    >
+      {text}
+    </span>
+  )
+}
+
 function formatCurrency(value: number, currency: string, language: Language) {
   return new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
     currency,
@@ -1306,6 +2272,216 @@ function riskToneOf(riskLevel: string) {
   }
 
   return riskLevel === 'medium' ? 'warn' : ''
+}
+
+function createLineKey() {
+  return `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function getViewportCenter() {
+  return {
+    x: window.scrollX + window.innerWidth / 2,
+    y: window.scrollY + window.innerHeight / 2,
+  }
+}
+
+function createPurchaseRequestFormLine(
+  overrides: Partial<Omit<PurchaseRequestFormLine, 'lineKey'>> = {},
+): PurchaseRequestFormLine {
+  return {
+    estimatedUnitPrice: 0,
+    itemName: '',
+    lineKey: createLineKey(),
+    quantity: 1,
+    specification: '',
+    unit: '件',
+    ...overrides,
+  }
+}
+
+function lineAmountOf(line: PurchaseRequestFormLine) {
+  const quantity = Number.isFinite(line.quantity) ? line.quantity : 0
+  const unitPrice = Number.isFinite(line.estimatedUnitPrice) ? line.estimatedUnitPrice : 0
+
+  return roundAmount(quantity * unitPrice)
+}
+
+function buildPurchaseRequestFormDefaults(
+  selectedCompanyId: string,
+  users: UserSummary[],
+  categories: CategorySummary[],
+  budgetAccounts: BudgetAccountSummary[],
+  suppliers: SupplierSummary[],
+): PurchaseRequestFormState {
+  const requester =
+    users.find((user) => user.roles.some((role) => role.roleId === 'role-applicant')) ??
+    users.find((user) => user.active) ??
+    users[0]
+  const defaultCategory = categories[0]
+  const budgetAccount =
+    budgetAccounts.find((account) => account.categoryId === defaultCategory?.categoryId && account.active) ??
+    budgetAccounts.find((account) => account.active) ??
+    budgetAccounts[0]
+  const categoryId = budgetAccount?.categoryId ?? defaultCategory?.categoryId ?? ''
+  const supplier = preferredSupplierForCategory(categoryId, suppliers)
+
+  return {
+    budgetAccountId: budgetAccount?.budgetAccountId ?? '',
+    categoryId,
+    companyId: selectedCompanyId,
+    departmentId: requester?.departmentId ?? '',
+    description: '研发团队扩编使用',
+    expectedDeliveryDate: '2026-06-15',
+    lineItems: [
+      createPurchaseRequestFormLine({
+        estimatedUnitPrice: 9300,
+        itemName: '商务笔记本电脑',
+        quantity: 20,
+        specification: '14 英寸 / 32G / 1T SSD',
+        unit: '台',
+      }),
+    ],
+    requesterId: requester?.userId ?? '',
+    supplierId: supplier?.supplierId ?? '',
+    title: '20 台笔记本采购',
+  }
+}
+
+function getDashboardKpis(language: Language, requests: PurchaseRequestListItem[], supplierCount: number) {
+  const draftCount = requests.filter((request) => request.status === 'DRAFT').length
+  const submittedCount = requests.filter((request) => request.status === 'SUBMITTED').length
+  const totalAmount = requests.reduce((sum, request) => sum + Number(request.totalAmount), 0)
+
+  if (language === 'zh') {
+    return [
+      {
+        label: '采购申请',
+        value: String(requests.length),
+        note: '当前公司真实单据',
+        icon: <FileAddOutlined />,
+      },
+      {
+        label: '草稿待完善',
+        value: String(draftCount),
+        note: '申请人待提交',
+        icon: <ProfileOutlined />,
+        tone: draftCount > 0 ? 'warn' : 'success',
+      },
+      {
+        label: '已提交',
+        value: String(submittedCount),
+        note: '等待后续审批流',
+        icon: <AuditOutlined />,
+      },
+      {
+        label: '申请金额',
+        value: formatCurrency(totalAmount, 'CNY', language),
+        note: `供应商池 ${supplierCount}`,
+        icon: <ShoppingCartOutlined />,
+      },
+    ]
+  }
+
+  return [
+    {
+      label: 'Requests',
+      value: String(requests.length),
+      note: 'Backend records',
+      icon: <FileAddOutlined />,
+    },
+    {
+      label: 'Drafts',
+      value: String(draftCount),
+      note: 'Waiting for submit',
+      icon: <ProfileOutlined />,
+      tone: draftCount > 0 ? 'warn' : 'success',
+    },
+    {
+      label: 'Submitted',
+      value: String(submittedCount),
+      note: 'Ready for approval flow',
+      icon: <AuditOutlined />,
+    },
+    {
+      label: 'Request Amount',
+      value: formatCurrency(totalAmount, 'CNY', language),
+      note: `Supplier pool ${supplierCount}`,
+      icon: <ShoppingCartOutlined />,
+    },
+  ]
+}
+
+function formatPurchaseRequestStatus(status: PurchaseRequestStatus, messages: LocalizedMessages) {
+  return status === 'SUBMITTED' ? messages.purchaseRequest.submitted : messages.purchaseRequest.draft
+}
+
+function statusToneOf(status: PurchaseRequestStatus) {
+  return status === 'SUBMITTED' ? 'success' : 'warn'
+}
+
+function currentStepOf(status: PurchaseRequestStatus, messages: LocalizedMessages) {
+  return status === 'SUBMITTED' ? messages.purchaseRequest.waitingApproval : messages.purchaseRequest.intakeStep
+}
+
+function companyNameOf(companyId: string, companies: CompanyContext[]) {
+  return companies.find((company) => company.companyId === companyId)?.companyName ?? companyId
+}
+
+function categoryNameOf(categoryId: string, categories: CategorySummary[]) {
+  return categories.find((category) => category.categoryId === categoryId)?.categoryName ?? categoryId
+}
+
+function budgetNameOf(budgetAccountId: string, budgetAccounts: BudgetAccountSummary[]) {
+  return budgetAccounts.find((account) => account.budgetAccountId === budgetAccountId)?.accountName ?? budgetAccountId
+}
+
+function userNameOf(userId: string, users: UserSummary[]) {
+  return users.find((user) => user.userId === userId)?.displayName ?? userId
+}
+
+function supplierNameOf(supplierId: string | null, suppliers: SupplierSummary[], messages: LocalizedMessages) {
+  if (!supplierId) {
+    return messages.purchaseRequest.noSupplier
+  }
+
+  return suppliers.find((supplier) => supplier.supplierId === supplierId)?.supplierName ?? supplierId
+}
+
+function preferredSupplierForCategory(categoryId: string, suppliers: SupplierSummary[], currentSupplierId?: string) {
+  const supportsCategory = (supplier: SupplierSummary) =>
+    supplier.categories.some((category) => category.categoryId === categoryId)
+  const currentSupplier = suppliers.find((supplier) => supplier.supplierId === currentSupplierId && supportsCategory(supplier))
+  if (currentSupplier) {
+    return currentSupplier
+  }
+
+  if (categoryId === 'category-it-hardware') {
+    return suppliers.find((supplier) => supplier.supplierId === 'supplier-bluechip' && supportsCategory(supplier))
+  }
+
+  return suppliers.find(supportsCategory)
+}
+
+function formatDate(value: string, language: Language) {
+  return new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(`${value}T00:00:00`))
+}
+
+function formatDateTime(value: string, language: Language) {
+  return new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value))
+}
+
+function roundAmount(value: number) {
+  return Math.round(value * 100) / 100
 }
 
 function ProcureflowMark() {
@@ -1387,6 +2563,10 @@ function App() {
             />
             <Route
               path="/master-data"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/purchase-requests"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />

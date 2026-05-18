@@ -9,4 +9,6 @@ public interface DemoSupplierCategoryRepository extends JpaRepository<DemoSuppli
     List<DemoSupplierCategoryJpaEntity> findBySupplierIdIn(Collection<String> supplierIds);
 
     List<DemoSupplierCategoryJpaEntity> findByCategoryId(String categoryId);
+
+    boolean existsBySupplierIdAndCategoryId(String supplierId, String categoryId);
 }
