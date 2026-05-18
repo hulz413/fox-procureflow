@@ -1,6 +1,6 @@
 # Fox Procureflow
 
-Fox Procureflow 是面向集团内部采购场景的多公司采购协同平台。MVP 聚焦星河控股集团下两个公司主体的采购业务闭环，从采购申请、审批、询报价、采购订单、收货、发票到三单匹配。
+Fox Procureflow 是面向企业采购场景的多主体协同平台，覆盖采购申请、审批、询报价、采购订单、收货、发票与三单匹配等核心流程，帮助采购、财务、业务和供应商在统一工作台中协作推进采购履约。
 
 ## 快速启动
 
@@ -26,18 +26,3 @@ cp .env.example .env
 | MinIO Console | `http://localhost:9001` |
 
 更多本地开发说明见 [docs/dev/local-development.md](docs/dev/local-development.md)，当前环境验证记录见 [docs/dev/verification-notes.md](docs/dev/verification-notes.md)。
-
-## 项目结构
-
-```text
-frontend/   React + TypeScript + Vite 前端应用
-backend/    Java 21 + Spring Boot 后端服务
-infra/      MySQL、MongoDB、Redis、RabbitMQ、MinIO 本地编排
-scripts/    本地开发辅助脚本
-docs/       产品与开发文档
-openspec/   OpenSpec 变更与规格
-```
-
-## 当前骨架边界
-
-当前实现只提供工程底座、健康接口、Swagger UI、采购工作台外壳和 F「库采 SaaS」视觉基线。真实采购申请、审批、RFQ、PO、收货、发票、三单匹配、AI 助手和完整 JWT 登录将在后续 OpenSpec change 中实现。

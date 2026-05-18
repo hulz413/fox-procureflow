@@ -29,7 +29,7 @@ import zhCN from 'antd/locale/zh_CN'
 import ReactECharts from 'echarts-for-react'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 
 const { Header, Sider, Content } = Layout
@@ -85,16 +85,18 @@ const themeConfig: ThemeConfig = {
   },
 }
 
-type HealthEnvelope = {
+type ApiEnvelope<T> = {
   success: boolean
-  data: {
-    status: string
-    application: string
-    checkedAt: string
-    demoContext: DemoContext
-  }
+  data: T
   timestamp: string
 }
+
+type HealthEnvelope = ApiEnvelope<{
+  status: string
+  application: string
+  checkedAt: string
+  demoContext: DemoContext
+}>
 
 type DemoContext = {
   groupId: string
@@ -112,6 +114,61 @@ type CompanyContext = {
   companyId: string
   companyName: string
   businessScope: string
+  active: boolean
+}
+
+type DepartmentSummary = {
+  departmentId: string
+  companyId: string
+  departmentName: string
+  functionScope: string
+}
+
+type RoleSummary = {
+  roleId: string
+  roleName: string
+  roleType: string
+}
+
+type UserSummary = {
+  userId: string
+  companyId: string
+  departmentId: string
+  departmentName: string
+  displayName: string
+  email: string
+  positionTitle: string
+  active: boolean
+  roles: RoleSummary[]
+}
+
+type CategorySummary = {
+  categoryId: string
+  categoryName: string
+  businessScope: string
+  groupLevel: boolean
+}
+
+type SupplierSummary = {
+  supplierId: string
+  supplierName: string
+  serviceScope: string
+  location: string
+  status: string
+  riskLevel: string
+  sharedScope: string
+  categories: CategorySummary[]
+}
+
+type BudgetAccountSummary = {
+  budgetAccountId: string
+  companyId: string
+  accountName: string
+  categoryId: string
+  categoryName: string
+  annualBudgetAmount: number
+  availableAmount: number
+  currency: string
   active: boolean
 }
 
@@ -147,14 +204,51 @@ const demoContext: DemoContext = {
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
-async function fetchHealth(): Promise<HealthEnvelope> {
-  const response = await fetch(`${apiBaseUrl}/api/health`)
+async function fetchApi<T>(path: string): Promise<ApiEnvelope<T>> {
+  const response = await fetch(`${apiBaseUrl}${path}`)
 
   if (!response.ok) {
-    throw new Error(`Health check failed with ${response.status}`)
+    const errorBody = await response.json().catch(() => null)
+    const message =
+      errorBody && typeof errorBody.message === 'string'
+        ? errorBody.message
+        : `Request failed with ${response.status}`
+    throw new Error(message)
   }
 
-  return response.json() as Promise<HealthEnvelope>
+  return response.json() as Promise<ApiEnvelope<T>>
+}
+
+async function fetchHealth(): Promise<HealthEnvelope> {
+  return fetchApi('/api/health')
+}
+
+async function fetchMasterDataContext() {
+  return fetchApi<DemoContext>('/api/master-data/context')
+}
+
+async function fetchCompanies() {
+  return fetchApi<CompanyContext[]>('/api/master-data/companies')
+}
+
+async function fetchDepartments(companyId: string) {
+  return fetchApi<DepartmentSummary[]>(`/api/master-data/companies/${companyId}/departments`)
+}
+
+async function fetchUsers(companyId: string) {
+  return fetchApi<UserSummary[]>(`/api/master-data/companies/${companyId}/users`)
+}
+
+async function fetchSuppliers() {
+  return fetchApi<SupplierSummary[]>('/api/master-data/suppliers')
+}
+
+async function fetchCategories() {
+  return fetchApi<CategorySummary[]>('/api/master-data/categories')
+}
+
+async function fetchBudgetAccounts(companyId: string) {
+  return fetchApi<BudgetAccountSummary[]>(`/api/master-data/companies/${companyId}/budget-accounts`)
 }
 
 const localizedContent = {
@@ -170,6 +264,7 @@ const localizedContent = {
     },
     header: {
       title: '采购工作台',
+      foundationTitle: '组织与主数据',
     },
     actions: {
       newRequest: '新建申请',
@@ -206,14 +301,15 @@ const localizedContent = {
       status: '状态',
     },
     navItems: [
-      { label: '采购工作台', icon: <DashboardOutlined />, active: true, count: '12' },
-      { label: '采购申请', icon: <FileAddOutlined />, count: '8' },
-      { label: '审批中心', icon: <AuditOutlined />, count: '5' },
-      { label: '询报价', icon: <FileSearchOutlined />, count: '6' },
-      { label: '采购订单', icon: <ShoppingCartOutlined />, count: '18' },
-      { label: '收货发票', icon: <InboxOutlined />, count: '9' },
-      { label: '三单匹配', icon: <SwapOutlined />, count: '3' },
-      { label: '供应商池', icon: <TeamOutlined />, count: '42' },
+      { label: '采购工作台', icon: <DashboardOutlined />, path: '/' },
+      { label: '采购申请', icon: <FileAddOutlined /> },
+      { label: '审批中心', icon: <AuditOutlined /> },
+      { label: '询报价', icon: <FileSearchOutlined /> },
+      { label: '采购订单', icon: <ShoppingCartOutlined /> },
+      { label: '收货发票', icon: <InboxOutlined /> },
+      { label: '三单匹配', icon: <SwapOutlined /> },
+      { label: '供应商池', icon: <TeamOutlined />, count: '5' },
+      { label: '主数据', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
       {
@@ -300,6 +396,34 @@ const localizedContent = {
       groupShared: '集团共享',
       companyIsolated: '公司隔离',
     },
+    foundation: {
+      dataState: '后端基础数据',
+      loading: '加载中',
+      unavailable: '主数据暂不可用',
+      groupContext: '集团与公司上下文',
+      companySelector: '公司选择',
+      supplierPool: '集团共享供应商池',
+      categories: '采购品类',
+      departmentsUsers: '部门与用户角色',
+      budgetAccounts: '预算科目',
+      companyScoped: '公司级数据',
+      selectedCompany: '当前公司',
+      serviceScope: '服务范围',
+      location: '地区',
+      status: '状态',
+      risk: '风险',
+      category: '品类',
+      department: '部门',
+      user: '用户',
+      role: '角色',
+      account: '科目',
+      annualBudget: '年度预算',
+      availableBudget: '可用金额',
+      active: '启用',
+      inactive: '停用',
+      groupLevel: '集团级',
+      shared: '共享',
+    },
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
   },
   en: {
@@ -314,6 +438,7 @@ const localizedContent = {
     },
     header: {
       title: 'Procurement Workspace',
+      foundationTitle: 'Organization & Master Data',
     },
     actions: {
       newRequest: 'New Request',
@@ -350,14 +475,15 @@ const localizedContent = {
       status: 'Status',
     },
     navItems: [
-      { label: 'Dashboard', icon: <DashboardOutlined />, active: true, count: '12' },
-      { label: 'Requests', icon: <FileAddOutlined />, count: '8' },
-      { label: 'Approvals', icon: <AuditOutlined />, count: '5' },
-      { label: 'RFQ', icon: <FileSearchOutlined />, count: '6' },
-      { label: 'Purchase Orders', icon: <ShoppingCartOutlined />, count: '18' },
-      { label: 'Receiving & Invoices', icon: <InboxOutlined />, count: '9' },
-      { label: '3-Way Match', icon: <SwapOutlined />, count: '3' },
-      { label: 'Supplier Pool', icon: <TeamOutlined />, count: '42' },
+      { label: 'Dashboard', icon: <DashboardOutlined />, path: '/' },
+      { label: 'Requests', icon: <FileAddOutlined /> },
+      { label: 'Approvals', icon: <AuditOutlined /> },
+      { label: 'RFQ', icon: <FileSearchOutlined /> },
+      { label: 'Purchase Orders', icon: <ShoppingCartOutlined /> },
+      { label: 'Receiving & Invoices', icon: <InboxOutlined /> },
+      { label: '3-Way Match', icon: <SwapOutlined /> },
+      { label: 'Supplier Pool', icon: <TeamOutlined />, count: '5' },
+      { label: 'Master Data', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
       {
@@ -444,9 +570,39 @@ const localizedContent = {
       groupShared: 'Group Shared',
       companyIsolated: 'Company Isolated',
     },
+    foundation: {
+      dataState: 'Backend master data',
+      loading: 'Loading',
+      unavailable: 'Master data unavailable',
+      groupContext: 'Group & Company Context',
+      companySelector: 'Company Selector',
+      supplierPool: 'Group Shared Supplier Pool',
+      categories: 'Procurement Categories',
+      departmentsUsers: 'Departments & User Roles',
+      budgetAccounts: 'Budget Accounts',
+      companyScoped: 'Company Data',
+      selectedCompany: 'Selected Company',
+      serviceScope: 'Service Scope',
+      location: 'Location',
+      status: 'Status',
+      risk: 'Risk',
+      category: 'Category',
+      department: 'Department',
+      user: 'User',
+      role: 'Role',
+      account: 'Account',
+      annualBudget: 'Annual Budget',
+      availableBudget: 'Available',
+      active: 'Active',
+      inactive: 'Inactive',
+      groupLevel: 'Group Level',
+      shared: 'Shared',
+    },
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
 } as const
+
+type LocalizedMessages = (typeof localizedContent)[Language]
 
 const englishContext = {
   groupName: 'Xinghe Holdings Group',
@@ -494,10 +650,6 @@ function localizeContext(context: DemoContext, language: Language): DemoContext 
   }
 }
 
-function isActive(item: object) {
-  return 'active' in item && item.active === true
-}
-
 function toneOf(item: object) {
   return 'tone' in item && typeof item.tone === 'string' ? item.tone : 'success'
 }
@@ -513,15 +665,81 @@ function Workspace({
   language: Language
   onLanguageChange: () => void
 }) {
+  const location = useLocation()
+  const isFoundationRoute = location.pathname === '/master-data'
+  const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
     queryFn: fetchHealth,
     retry: 1,
   })
+  const masterContextQuery = useQuery({
+    queryKey: ['master-data', 'context'],
+    queryFn: fetchMasterDataContext,
+    retry: 1,
+  })
+  const companiesQuery = useQuery({
+    queryKey: ['master-data', 'companies'],
+    queryFn: fetchCompanies,
+    retry: 1,
+  })
+  const departmentsQuery = useQuery({
+    queryKey: ['master-data', 'departments', selectedCompanyId],
+    queryFn: () => fetchDepartments(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const usersQuery = useQuery({
+    queryKey: ['master-data', 'users', selectedCompanyId],
+    queryFn: () => fetchUsers(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const suppliersQuery = useQuery({
+    queryKey: ['master-data', 'suppliers'],
+    queryFn: fetchSuppliers,
+    retry: 1,
+  })
+  const categoriesQuery = useQuery({
+    queryKey: ['master-data', 'categories'],
+    queryFn: fetchCategories,
+    retry: 1,
+  })
+  const budgetAccountsQuery = useQuery({
+    queryKey: ['master-data', 'budget-accounts', selectedCompanyId],
+    queryFn: () => fetchBudgetAccounts(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
 
   const messages = localizedContent[language]
-  const context = localizeContext(data?.data.demoContext ?? demoContext, language)
+  const rawContext = masterContextQuery.data?.data ?? data?.data.demoContext ?? demoContext
+  const context = localizeContext(rawContext, language)
+  const companies = localizeContext(
+    {
+      ...rawContext,
+      companies: companiesQuery.data?.data ?? rawContext.companies,
+    },
+    language,
+  ).companies
+  const selectedCompany = companies.find((company) => company.companyId === selectedCompanyId) ?? context.activeCompany
   const healthStatus = data?.data.status ?? (isLoading ? 'CHECKING' : 'OFFLINE')
+  const foundationLoading =
+    masterContextQuery.isLoading ||
+    companiesQuery.isLoading ||
+    suppliersQuery.isLoading ||
+    categoriesQuery.isLoading ||
+    departmentsQuery.isLoading ||
+    usersQuery.isLoading ||
+    budgetAccountsQuery.isLoading
+  const foundationError =
+    masterContextQuery.isError ||
+    companiesQuery.isError ||
+    suppliersQuery.isError ||
+    categoriesQuery.isError ||
+    departmentsQuery.isError ||
+    usersQuery.isError ||
+    budgetAccountsQuery.isError
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'profile',
@@ -569,6 +787,16 @@ function Workspace({
     }
   }
 
+  useEffect(() => {
+    if (companies.length === 0) {
+      return
+    }
+
+    if (!companies.some((company) => company.companyId === selectedCompanyId)) {
+      setSelectedCompanyId(context.activeCompany.companyId)
+    }
+  }, [companies, context.activeCompany.companyId, selectedCompanyId])
+
   return (
     <Layout className="app-shell">
       <Sider className="sidebar" width={244}>
@@ -591,13 +819,26 @@ function Workspace({
         </div>
 
         <nav className="nav-list" aria-label={messages.aria.modules}>
-          {messages.navItems.map((item) => (
-            <div className={isActive(item) ? 'nav-item active' : 'nav-item'} key={item.label}>
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-              <strong>{item.count}</strong>
-            </div>
-          ))}
+          {messages.navItems.map((item) =>
+            'path' in item ? (
+              <NavLink
+                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+                end={item.path === '/'}
+                key={item.label}
+                to={item.path}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span>{item.label}</span>
+                {'count' in item && <strong>{String(item.count)}</strong>}
+              </NavLink>
+            ) : (
+              <div className="nav-item" key={item.label}>
+                <span className="nav-icon">{item.icon}</span>
+                <span>{item.label}</span>
+                {'count' in item && <strong>{String(item.count)}</strong>}
+              </div>
+            ),
+          )}
         </nav>
 
         <div className="boundary-note">
@@ -609,9 +850,9 @@ function Workspace({
       <Layout className="main-layout">
         <Header className="topbar">
           <div>
-            <h1>{messages.header.title}</h1>
+            <h1>{isFoundationRoute ? messages.header.foundationTitle : messages.header.title}</h1>
           </div>
-          <div className="top-actions">
+          <div className={isFoundationRoute ? 'top-actions compact' : 'top-actions'}>
             <Tooltip title={messages.aria.search} trigger={['hover', 'focus']}>
               <button type="button" className="icon-button" aria-label={messages.aria.search}>
                 <SearchOutlined />
@@ -622,12 +863,14 @@ function Workspace({
                 <BellOutlined />
               </button>
             </Tooltip>
-            <Tooltip title={messages.actions.newRequest} trigger={['hover', 'focus']}>
-              <button type="button" className="primary-button">
-                <FileAddOutlined />
-                <span>{messages.actions.newRequest}</span>
-              </button>
-            </Tooltip>
+            {!isFoundationRoute && (
+              <Tooltip title={messages.actions.newRequest} trigger={['hover', 'focus']}>
+                <button type="button" className="primary-button">
+                  <FileAddOutlined />
+                  <span>{messages.actions.newRequest}</span>
+                </button>
+              </Tooltip>
+            )}
             <Dropdown
               trigger={['click']}
               placement="bottomRight"
@@ -644,130 +887,380 @@ function Workspace({
 
         <Content className="workspace">
           <section className="status-strip" aria-label={messages.aria.serviceStatus}>
-            <StatusPill status={healthStatus} isError={isError} label={messages.status.backend} />
             <span>{context.groupName}</span>
             <span>{context.supplierPoolScope}</span>
             <span>{context.activeCompany.businessScope}</span>
+            <StatusPill status={healthStatus} isError={isError} label={messages.status.backend} />
           </section>
 
-          <section className="kpi-grid" aria-label={messages.aria.procurementMetrics}>
-            {messages.kpis.map((kpi) => (
-              <article className="panel kpi" key={kpi.label}>
-                <div>
-                  <span>{kpi.label}</span>
-                  {kpi.icon}
-                </div>
-                <strong>{kpi.value}</strong>
-                <small className={toneOf(kpi)}>{kpi.note}</small>
-              </article>
-            ))}
-          </section>
-
-          <section className="dashboard-grid">
-            <div className="left-column">
-              <section className="panel chart-panel">
-                <PanelTitle
-                  icon={<DashboardOutlined />}
-                  title={messages.panels.spendTrend}
-                  aside={messages.panels.companyView}
-                />
-                <ReactECharts option={getChartOption(messages.months)} style={{ height: 256 }} />
+          {isFoundationRoute ? (
+            <FoundationDataView
+              budgetAccounts={budgetAccountsQuery.data?.data ?? []}
+              categories={categoriesQuery.data?.data ?? []}
+              companies={companies}
+              context={context}
+              departments={departmentsQuery.data?.data ?? []}
+              isError={foundationError}
+              isLoading={foundationLoading}
+              language={language}
+              messages={messages}
+              onCompanyChange={setSelectedCompanyId}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
+              suppliers={suppliersQuery.data?.data ?? []}
+              users={usersQuery.data?.data ?? []}
+            />
+          ) : (
+            <>
+              <section className="kpi-grid" aria-label={messages.aria.procurementMetrics}>
+                {messages.kpis.map((kpi) => (
+                  <article className="panel kpi" key={kpi.label}>
+                    <div>
+                      <span>{kpi.label}</span>
+                      {kpi.icon}
+                    </div>
+                    <strong>{kpi.value}</strong>
+                    <small className={toneOf(kpi)}>{kpi.note}</small>
+                  </article>
+                ))}
               </section>
 
-              <section className="panel">
-                <PanelTitle
-                  icon={<ProfileOutlined />}
-                  title={messages.panels.recentRequests}
-                  aside={context.activeCompany.companyName}
-                />
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>{messages.table.request}</th>
-                        <th>{messages.table.category}</th>
-                        <th>{messages.table.company}</th>
-                        <th>{messages.table.amount}</th>
-                        <th>{messages.table.currentStep}</th>
-                        <th>{messages.table.status}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {messages.purchaseRows.map((row) => (
-                        <tr key={row.id}>
-                          <td>
-                            <strong>{row.id}</strong>
-                          </td>
-                          <td>{row.category}</td>
-                          <td>{row.company}</td>
-                          <td>{row.amount}</td>
-                          <td>{row.node}</td>
-                          <td>
-                            <span className={`tag ${row.tone}`}>{row.status}</span>
-                          </td>
-                        </tr>
+              <section className="dashboard-grid">
+                <div className="left-column">
+                  <section className="panel chart-panel">
+                    <PanelTitle
+                      icon={<DashboardOutlined />}
+                      title={messages.panels.spendTrend}
+                      aside={messages.panels.companyView}
+                    />
+                    <ReactECharts option={getChartOption(messages.months)} style={{ height: 256 }} />
+                  </section>
+
+                  <section className="panel">
+                    <PanelTitle
+                      icon={<ProfileOutlined />}
+                      title={messages.panels.recentRequests}
+                      aside={context.activeCompany.companyName}
+                    />
+                    <div className="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>{messages.table.request}</th>
+                            <th>{messages.table.category}</th>
+                            <th>{messages.table.company}</th>
+                            <th>{messages.table.amount}</th>
+                            <th>{messages.table.currentStep}</th>
+                            <th>{messages.table.status}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {messages.purchaseRows.map((row) => (
+                            <tr key={row.id}>
+                              <td>
+                                <strong>{row.id}</strong>
+                              </td>
+                              <td>{row.category}</td>
+                              <td>{row.company}</td>
+                              <td>{row.amount}</td>
+                              <td>{row.node}</td>
+                              <td>
+                                <span className={`tag ${row.tone}`}>{row.status}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                </div>
+
+                <aside className="right-column">
+                  <section className="panel">
+                    <PanelTitle icon={<NodeIndexOutlined />} title={messages.panels.procurementFlow} />
+                    <div className="flow-list">
+                      {messages.flowStages.map((stage, index) => (
+                        <div className="flow-item" key={stage.title}>
+                          <span className="stage-index">{index + 1}</span>
+                          <div>
+                            <strong>{stage.title}</strong>
+                            <small>{stage.description}</small>
+                          </div>
+                          <span className={`tag ${toneOf(stage)}`}>{stage.count}</span>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            </div>
-
-            <aside className="right-column">
-              <section className="panel">
-                <PanelTitle icon={<NodeIndexOutlined />} title={messages.panels.procurementFlow} aside="P0" />
-                <div className="flow-list">
-                  {messages.flowStages.map((stage, index) => (
-                    <div className="flow-item" key={stage.title}>
-                      <span className="stage-index">{index + 1}</span>
-                      <div>
-                        <strong>{stage.title}</strong>
-                        <small>{stage.description}</small>
-                      </div>
-                      <span className={`tag ${toneOf(stage)}`}>{stage.count}</span>
                     </div>
-                  ))}
-                </div>
-              </section>
+                  </section>
 
-              <section className="panel">
-                <PanelTitle icon={<AlertOutlined />} title={messages.panels.risks} aside={messages.panels.today} />
-                <div className="risk-list">
-                  {messages.riskItems.map((item) => (
-                    <div className="risk-item" key={item.title}>
-                      <span className="risk-icon">
-                        <SafetyCertificateOutlined />
-                      </span>
-                      <div>
-                        <strong>{item.title}</strong>
-                        <small>{item.detail}</small>
-                      </div>
-                      <span className={`tag ${item.tone}`}>
-                        {item.tone === 'danger' ? messages.riskAction.danger : messages.riskAction.review}
-                      </span>
+                  <section className="panel">
+                    <PanelTitle icon={<AlertOutlined />} title={messages.panels.risks} aside={messages.panels.today} />
+                    <div className="risk-list">
+                      {messages.riskItems.map((item) => (
+                        <div className="risk-item" key={item.title}>
+                          <span className="risk-icon">
+                            <SafetyCertificateOutlined />
+                          </span>
+                          <div>
+                            <strong>{item.title}</strong>
+                            <small>{item.detail}</small>
+                          </div>
+                          <span className={`tag ${item.tone}`}>
+                            {item.tone === 'danger' ? messages.riskAction.danger : messages.riskAction.review}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </section>
+                  </section>
 
-              <section className="panel boundary-panel">
-                <PanelTitle
-                  icon={<ApiOutlined />}
-                  title={messages.panels.dataBoundary}
-                  aside={messages.panels.skeletonRule}
-                />
-                <dl>
-                  <dt>{messages.boundary.groupShared}</dt>
-                  <dd>{context.dataBoundary.groupShared}</dd>
-                  <dt>{messages.boundary.companyIsolated}</dt>
-                  <dd>{context.dataBoundary.companyIsolated}</dd>
-                </dl>
+                  <section className="panel boundary-panel">
+                    <PanelTitle
+                      icon={<ApiOutlined />}
+                      title={messages.panels.dataBoundary}
+                      aside={messages.panels.skeletonRule}
+                    />
+                    <dl>
+                      <dt>{messages.boundary.groupShared}</dt>
+                      <dd>{context.dataBoundary.groupShared}</dd>
+                      <dt>{messages.boundary.companyIsolated}</dt>
+                      <dd>{context.dataBoundary.companyIsolated}</dd>
+                    </dl>
+                  </section>
+                </aside>
               </section>
-            </aside>
-          </section>
+            </>
+          )}
         </Content>
       </Layout>
     </Layout>
+  )
+}
+
+function FoundationDataView({
+  budgetAccounts,
+  categories,
+  companies,
+  context,
+  departments,
+  isError,
+  isLoading,
+  language,
+  messages,
+  onCompanyChange,
+  selectedCompany,
+  selectedCompanyId,
+  suppliers,
+  users,
+}: {
+  budgetAccounts: BudgetAccountSummary[]
+  categories: CategorySummary[]
+  companies: CompanyContext[]
+  context: DemoContext
+  departments: DepartmentSummary[]
+  isError: boolean
+  isLoading: boolean
+  language: Language
+  messages: LocalizedMessages
+  onCompanyChange: (companyId: string) => void
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  suppliers: SupplierSummary[]
+  users: UserSummary[]
+}) {
+  const emptyText = isLoading ? messages.foundation.loading : messages.foundation.unavailable
+
+  return (
+    <section className="foundation-grid">
+      <section className="panel foundation-overview">
+        <PanelTitle icon={<DatabaseOutlined />} title={messages.foundation.groupContext} aside={messages.foundation.dataState} />
+        <div className="foundation-summary">
+          <div className="summary-block">
+            <span>{messages.boundary.groupShared}</span>
+            <strong>{context.groupName}</strong>
+            <small>{context.supplierPoolScope}</small>
+          </div>
+          <div className="summary-block">
+            <span>{messages.foundation.selectedCompany}</span>
+            <strong>{selectedCompany.companyName}</strong>
+            <small>{selectedCompany.businessScope}</small>
+          </div>
+        </div>
+
+        <div className="company-switch" aria-label={messages.foundation.companySelector}>
+          {companies.map((company) => (
+            <button
+              className={company.companyId === selectedCompanyId ? 'company-option active' : 'company-option'}
+              key={company.companyId}
+              onClick={() => onCompanyChange(company.companyId)}
+              type="button"
+            >
+              <BankOutlined />
+              <span>
+                <strong>{company.companyName}</strong>
+                <small>{company.businessScope}</small>
+              </span>
+              <em>{company.active ? messages.foundation.active : messages.foundation.inactive}</em>
+            </button>
+          ))}
+        </div>
+
+        <div className="boundary-matrix">
+          <div>
+            <span>{messages.boundary.groupShared}</span>
+            <strong>{context.dataBoundary.groupShared}</strong>
+          </div>
+          <div>
+            <span>{messages.foundation.companyScoped}</span>
+            <strong>{context.dataBoundary.companyIsolated}</strong>
+          </div>
+        </div>
+        {isError && <div className="data-alert">{messages.foundation.unavailable}</div>}
+      </section>
+
+      <section className="panel supplier-panel">
+        <PanelTitle icon={<TeamOutlined />} title={messages.foundation.supplierPool} aside={messages.foundation.shared} />
+        <div className="table-wrap">
+          <table className="foundation-table">
+            <thead>
+              <tr>
+                <th>{messages.foundation.supplierPool}</th>
+                <th>{messages.foundation.serviceScope}</th>
+                <th>{messages.foundation.location}</th>
+                <th>{messages.foundation.risk}</th>
+                <th>{messages.foundation.category}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {suppliers.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>{emptyText}</td>
+                </tr>
+              ) : (
+                suppliers.map((supplier) => (
+                  <tr key={supplier.supplierId}>
+                    <td>
+                      <strong>{supplier.supplierName}</strong>
+                    </td>
+                    <td>{supplier.serviceScope}</td>
+                    <td>{supplier.location}</td>
+                    <td>
+                      <span className={`tag ${riskToneOf(supplier.riskLevel)}`}>
+                        {formatRiskLevel(supplier.riskLevel, language)}
+                      </span>
+                    </td>
+                    <td>{supplier.categories.map((category) => category.categoryName).join(' / ')}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <PanelTitle icon={<ProfileOutlined />} title={messages.foundation.departmentsUsers} aside={selectedCompany.companyName} />
+        <div className="foundation-columns">
+          <div className="reference-list">
+            {departments.length === 0 ? (
+              <div className="reference-row">{emptyText}</div>
+            ) : (
+              departments.map((department) => (
+                <div className="reference-row" key={department.departmentId}>
+                  <strong>{department.departmentName}</strong>
+                  <span>{department.functionScope}</span>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="table-wrap">
+            <table className="foundation-table">
+              <thead>
+                <tr>
+                  <th>{messages.foundation.user}</th>
+                  <th>{messages.foundation.department}</th>
+                  <th>{messages.foundation.role}</th>
+                  <th>{messages.foundation.status}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>{emptyText}</td>
+                  </tr>
+                ) : (
+                  users.map((user) => (
+                    <tr key={user.userId}>
+                      <td>
+                        <strong>{user.displayName}</strong>
+                        <small>{user.positionTitle}</small>
+                      </td>
+                      <td>{user.departmentName}</td>
+                      <td>{user.roles.map((role) => role.roleName).join(' / ')}</td>
+                      <td>
+                        <span className="tag">{user.active ? messages.foundation.active : messages.foundation.inactive}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel reference-panel">
+        <PanelTitle icon={<ApiOutlined />} title={messages.foundation.categories} aside={messages.foundation.groupLevel} />
+        <div className="reference-list category-list">
+          {categories.length === 0 ? (
+            <div className="reference-row">{emptyText}</div>
+          ) : (
+            categories.map((category) => (
+              <div className="reference-row" key={category.categoryId}>
+                <strong>{category.categoryName}</strong>
+                <span>{category.businessScope}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="panel budget-panel">
+        <PanelTitle icon={<SafetyCertificateOutlined />} title={messages.foundation.budgetAccounts} aside={messages.foundation.companyScoped} />
+        <div className="table-wrap">
+          <table className="foundation-table">
+            <thead>
+              <tr>
+                <th>{messages.foundation.account}</th>
+                <th>{messages.foundation.category}</th>
+                <th>{messages.foundation.annualBudget}</th>
+                <th>{messages.foundation.availableBudget}</th>
+                <th>{messages.foundation.status}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {budgetAccounts.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>{emptyText}</td>
+                </tr>
+              ) : (
+                budgetAccounts.map((account) => (
+                  <tr key={account.budgetAccountId}>
+                    <td>
+                      <strong>{account.accountName}</strong>
+                    </td>
+                    <td>{account.categoryName}</td>
+                    <td>{formatCurrency(account.annualBudgetAmount, account.currency, language)}</td>
+                    <td>{formatCurrency(account.availableAmount, account.currency, language)}</td>
+                    <td>
+                      <span className="tag">{account.active ? messages.foundation.active : messages.foundation.inactive}</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
   )
 }
 
@@ -790,6 +1283,31 @@ function StatusPill({
   )
 }
 
+function formatCurrency(value: number, currency: string, language: Language) {
+  return new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
+    currency,
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(value)
+}
+
+function formatRiskLevel(riskLevel: string, language: Language) {
+  const labels =
+    language === 'zh'
+      ? { high: '高', low: '低', medium: '中' }
+      : { high: 'High', low: 'Low', medium: 'Medium' }
+
+  return labels[riskLevel as keyof typeof labels] ?? riskLevel
+}
+
+function riskToneOf(riskLevel: string) {
+  if (riskLevel === 'high') {
+    return 'danger'
+  }
+
+  return riskLevel === 'medium' ? 'warn' : ''
+}
+
 function ProcureflowMark() {
   return (
     <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
@@ -807,7 +1325,7 @@ function PanelTitle({
 }: {
   icon: ReactNode
   title: string
-  aside: string
+  aside?: string
 }) {
   return (
     <div className="panel-title">
@@ -815,7 +1333,7 @@ function PanelTitle({
         {icon}
         {title}
       </strong>
-      <span>{aside}</span>
+      {aside && <span>{aside}</span>}
     </div>
   )
 }
@@ -865,6 +1383,10 @@ function App() {
           <Routes>
             <Route
               path="/"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/master-data"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
