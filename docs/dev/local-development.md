@@ -35,9 +35,32 @@ cp .env.example .env
 3. 启动 `frontend/` 中的 Vite 开发服务器。
 4. 输出前端、健康接口和 Swagger UI 地址。
 
+脚本会读取仓库根目录 `.env`，并把其中未被当前 shell 覆盖的变量传给 Docker Compose、后端和前端开发服务。
+
 当前采购申请和审批流切片的运行硬依赖是 MySQL。MongoDB、Redis、RabbitMQ 和 MinIO 已在 Compose 中预留，用于后段动态上下文/AI 审计、缓存/看板、事件化三单匹配和真实附件上传；前中期业务切片不应因为这些服务未被业务代码使用而扩大实现范围。
 
 如果本机缺少 Java 或 Docker Compose，脚本会给出下一步提示。也可以用下面的分步命令手动启动。
+
+## AI 采购助手配置
+
+AI 采购助手使用 OpenAI-compatible Chat Completions API，不提供生产路径 mock 内容。默认 `.env.example` 中 `OPENAI_COMPATIBLE_ENABLED=false`，因此未配置 API key 时，前端会显示 AI 不可用，但采购申请、审批、RFQ、PO、收货发票、三单匹配和看板仍可正常演示。当前默认供应商是 DeepSeek，体现在 `OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com` 和 `OPENAI_COMPATIBLE_MODEL=deepseek-v4-flash`。
+
+启用 AI 前需要本机 Compose 中的 MongoDB 可用，因为 AI 调用会先写入审计记录；如果 MongoDB 不可用，后端会在调用模型供应商前返回不可用错误，避免出现未审计的模型调用。
+
+```bash
+OPENAI_COMPATIBLE_ENABLED=true
+OPENAI_COMPATIBLE_API_KEY=your_key_here
+OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com
+OPENAI_COMPATIBLE_MODEL=deepseek-v4-flash
+OPENAI_COMPATIBLE_TIMEOUT=30s
+```
+
+四个演示入口：
+
+- 在“采购申请”新建抽屉中输入自然语言需求，生成可编辑采购草稿，确认后仍通过正式采购申请保存接口落为 `DRAFT`。
+- 在采购申请详情或审批详情中触发风险提示，AI 只给建议，不改变提交或审批状态。
+- 在 RFQ 详情中对至少两家有效报价触发报价解释，AI 不改变确定性推荐排序，也不创建 PO。
+- 在“三单匹配”异常详情中触发异常解释，AI 不追加处理记录，也不改变匹配状态。
 
 ## 分步启动
 

@@ -139,8 +139,7 @@ class ProcurementDashboardIntegrationTest {
         mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$['paths']['/api/procurement-dashboard']").exists())
-            .andExpect(content().string(containsString("Get group or company scoped procurement dashboard metrics")))
-            .andExpect(content().string(not(containsString("/api/ai"))));
+            .andExpect(content().string(containsString("Get group or company scoped procurement dashboard metrics")));
 
         assertThat(applicationContext.getBeanNamesForType(RabbitTemplate.class)).isEmpty();
         assertThat(applicationContext.getBeanNamesForType(MongoTemplate.class)).isEmpty();

@@ -926,6 +926,78 @@ type HandleMatchActionPayload = {
   note: string
 }
 
+type AiScenario =
+  | 'PURCHASE_REQUEST_DRAFT'
+  | 'PURCHASE_REQUEST_RISK'
+  | 'RFQ_QUOTE_EXPLANATION'
+  | 'THREE_WAY_MATCHING_EXPLANATION'
+
+type AiContextReference = {
+  type: string
+  id: string
+  label: string
+}
+
+type AiAssistantResponse = {
+  invocationId: string
+  scenario: AiScenario
+  model: string
+  result: Record<string, unknown>
+  sourceReferences: AiContextReference[]
+  generatedAt: string
+}
+
+type AiDraftLine = {
+  itemName?: string
+  specification?: string
+  quantity?: number
+  unit?: string
+  estimatedUnitPrice?: number
+  estimatedAmount?: number
+}
+
+type AiDraftPreviewResult = {
+  title?: string
+  businessPurpose?: string
+  requesterId?: string
+  departmentId?: string
+  categoryId?: string
+  budgetAccountId?: string
+  supplierId?: string
+  expectedDeliveryDate?: string
+  currency?: string
+  totalAmount?: number
+  lineItems?: AiDraftLine[]
+  missingFields?: string[]
+  confidenceNotes?: string[]
+}
+
+type AiRiskReviewResult = {
+  riskLevel?: string
+  riskItems?: Array<{ title?: string; evidence?: string; severity?: string }>
+  suggestedActions?: string[]
+  followUpQuestions?: string[]
+  continueRecommended?: boolean
+}
+
+type AiRfqExplanationResult = {
+  summary?: string
+  supplierInsights?: Array<{ supplierId?: string; assessment?: string; strengths?: string[]; risks?: string[] }>
+  keyDifferences?: string[]
+  riskNotes?: string[]
+  questionsToConfirm?: string[]
+  confidenceLevel?: string
+}
+
+type AiMatchingExplanationResult = {
+  summary?: string
+  differenceInsights?: Array<{ differenceId?: string; assessment?: string; suggestedManualAction?: string }>
+  likelyCauses?: string[]
+  suggestedActions?: string[]
+  requiredFollowUpData?: string[]
+  confidenceLevel?: string
+}
+
 const demoContext: DemoContext = {
   groupId: 'group-xinghe',
   groupName: '星河控股集团',
@@ -1158,6 +1230,22 @@ async function handleThreeWayMatchAction(matchId: string, payload: HandleMatchAc
   return postApi<ThreeWayMatchDetail>(`/api/three-way-matching/${encodeURIComponent(matchId)}/actions`, payload)
 }
 
+async function previewAiPurchaseRequestDraft(payload: { companyId: string; actorId: string; intent: string }) {
+  return postApi<AiAssistantResponse>('/api/ai-assistant/purchase-request-draft-preview', payload)
+}
+
+async function reviewAiPurchaseRequestRisk(payload: { companyId: string; actorId: string; requestId: string }) {
+  return postApi<AiAssistantResponse>('/api/ai-assistant/purchase-request-risk-review', payload)
+}
+
+async function explainAiRfqQuotes(payload: { companyId: string; actorId: string; rfqId: string }) {
+  return postApi<AiAssistantResponse>('/api/ai-assistant/rfq-quote-explanation', payload)
+}
+
+async function explainAiMatchingException(payload: { companyId: string; actorId: string; matchId: string }) {
+  return postApi<AiAssistantResponse>('/api/ai-assistant/three-way-matching-explanation', payload)
+}
+
 async function fetchProcurementDashboard(scope: ProcurementDashboardScope, companyId?: string) {
   const query = new URLSearchParams({ scope })
   if (scope === 'COMPANY' && companyId) {
@@ -1194,6 +1282,42 @@ const localizedContent = {
       newPo: '新建 PO',
       newReceipt: '登记收货',
       newInvoice: '登记发票',
+    },
+    ai: {
+      title: 'AI 采购助手',
+      dataState: 'AI 建议',
+      draftIntent: '自然语言需求',
+      draftPlaceholder: '例如：研发团队下月需要 20 台 14 英寸笔记本，预算约 18.6 万',
+      generateDraft: '生成草稿',
+      reviewRisk: '风险提示',
+      explainQuotes: '解释报价',
+      explainMatching: '解释异常',
+      generating: 'AI 生成中',
+      unavailable: 'AI 助手暂不可用',
+      disabledNoIntent: '先输入采购需求',
+      disabledNoActor: '当前公司没有可用用户',
+      disabledNeedQuotes: '至少两家有效报价后才能解释',
+      disabledExceptionOnly: '只有异常匹配结果需要 AI 解释',
+      result: 'AI 结果',
+      invocation: '调用编号',
+      model: '模型',
+      generatedAt: '生成时间',
+      confidence: '置信度',
+      riskLevel: '风险等级',
+      businessPurpose: '业务用途',
+      missingFields: '待补字段',
+      confidenceNotes: '置信说明',
+      riskItems: '风险项',
+      suggestedActions: '建议动作',
+      followUpQuestions: '待确认问题',
+      continueRecommended: '建议继续',
+      keyDifferences: '主要差异',
+      riskNotes: '风险说明',
+      supplierInsights: '供应商解读',
+      differenceInsights: '差异解读',
+      likelyCauses: '可能原因',
+      requiredFollowUpData: '需补充资料',
+      noAiResult: '暂无 AI 结果',
     },
     status: {
       backend: '后端',
@@ -1732,6 +1856,42 @@ const localizedContent = {
       newPo: 'New PO',
       newReceipt: 'Record Receipt',
       newInvoice: 'Record Invoice',
+    },
+    ai: {
+      title: 'AI Procurement Assistant',
+      dataState: 'AI advice',
+      draftIntent: 'Natural-language need',
+      draftPlaceholder: 'Example: R&D needs 20 14-inch laptops next month, budget around 186,000',
+      generateDraft: 'Generate Draft',
+      reviewRisk: 'Risk Review',
+      explainQuotes: 'Explain Quotes',
+      explainMatching: 'Explain Exception',
+      generating: 'AI is generating',
+      unavailable: 'AI assistant unavailable',
+      disabledNoIntent: 'Enter a procurement need first',
+      disabledNoActor: 'No available user in the current company',
+      disabledNeedQuotes: 'At least two valid quotes are required',
+      disabledExceptionOnly: 'Only exception matching results need AI explanation',
+      result: 'AI Result',
+      invocation: 'Invocation',
+      model: 'Model',
+      generatedAt: 'Generated',
+      confidence: 'Confidence',
+      riskLevel: 'Risk Level',
+      businessPurpose: 'Business Purpose',
+      missingFields: 'Missing Fields',
+      confidenceNotes: 'Confidence Notes',
+      riskItems: 'Risk Items',
+      suggestedActions: 'Suggested Actions',
+      followUpQuestions: 'Follow-up Questions',
+      continueRecommended: 'Continue Recommended',
+      keyDifferences: 'Key Differences',
+      riskNotes: 'Risk Notes',
+      supplierInsights: 'Supplier Insights',
+      differenceInsights: 'Difference Insights',
+      likelyCauses: 'Likely Causes',
+      requiredFollowUpData: 'Required Follow-up Data',
+      noAiResult: 'No AI result yet',
     },
     status: {
       backend: 'Backend',
@@ -3023,6 +3183,9 @@ function PurchaseRequestView({
   const [isCreateDirty, setCreateDirty] = useState(false)
   const [lastDrawerMode, setLastDrawerMode] = useState<PurchaseRequestDrawerMode>('detail')
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const [aiIntent, setAiIntent] = useState('')
+  const [aiDraftResponse, setAiDraftResponse] = useState<AiAssistantResponse | null>(null)
+  const [aiRiskResponse, setAiRiskResponse] = useState<AiAssistantResponse | null>(null)
   const [form, setForm] = useState<PurchaseRequestFormState>(() =>
     buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers),
   )
@@ -3048,6 +3211,9 @@ function PurchaseRequestView({
       setLastDrawerMode('create')
       setCreateDirty(false)
       setFeedback(null)
+      setAiIntent('')
+      setAiDraftResponse(null)
+      setAiRiskResponse(null)
       setDetailDrawerOpen(false)
       setForm(buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers))
     }
@@ -3141,6 +3307,57 @@ function PurchaseRequestView({
     },
   })
 
+  const aiDraftMutation = useMutation({
+    mutationFn: previewAiPurchaseRequestDraft,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.ai.unavailable}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      const draft = response.data.result as AiDraftPreviewResult
+      setAiDraftResponse(response.data)
+      setCreateDirty(true)
+      setForm((current) => ({
+        ...current,
+        budgetAccountId: draft.budgetAccountId || current.budgetAccountId,
+        categoryId: draft.categoryId || current.categoryId,
+        departmentId: draft.departmentId || current.departmentId,
+        description: draft.businessPurpose || current.description,
+        expectedDeliveryDate: draft.expectedDeliveryDate || current.expectedDeliveryDate,
+        requesterId: draft.requesterId || current.requesterId,
+        supplierId: draft.supplierId ?? current.supplierId,
+        title: draft.title || current.title,
+        lineItems:
+          draft.lineItems && draft.lineItems.length > 0
+            ? draft.lineItems.map((line) =>
+                createPurchaseRequestFormLine({
+                  estimatedUnitPrice: Number(line.estimatedUnitPrice ?? 0),
+                  itemName: line.itemName ?? '',
+                  quantity: Number(line.quantity ?? 1),
+                  specification: line.specification ?? '',
+                  unit: line.unit ?? '件',
+                }),
+              )
+            : current.lineItems,
+      }))
+    },
+  })
+
+  const aiRiskMutation = useMutation({
+    mutationFn: reviewAiPurchaseRequestRisk,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.ai.unavailable}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setAiRiskResponse(response.data)
+    },
+  })
+
   const filteredBudgetAccounts = budgetAccounts.filter((account) => account.categoryId === form.categoryId && account.active)
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.categories.some((category) => category.categoryId === form.categoryId),
@@ -3176,6 +3393,36 @@ function PurchaseRequestView({
   const updateForm = <Key extends keyof PurchaseRequestFormState>(key: Key, value: PurchaseRequestFormState[Key]) => {
     setCreateDirty(true)
     setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const aiDraftDisabledReason = aiDraftMutation.isPending
+    ? messages.ai.generating
+    : !aiIntent.trim()
+      ? messages.ai.disabledNoIntent
+      : !form.requesterId
+        ? messages.ai.disabledNoActor
+        : undefined
+
+  const requestAiDraft = () => {
+    if (aiDraftDisabledReason) {
+      return
+    }
+    aiDraftMutation.mutate({
+      actorId: form.requesterId,
+      companyId: selectedCompanyId,
+      intent: aiIntent,
+    })
+  }
+
+  const requestAiRisk = () => {
+    if (!selectedDetail) {
+      return
+    }
+    aiRiskMutation.mutate({
+      actorId: selectedDetail.approval?.currentApproverId ?? selectedDetail.requesterId,
+      companyId: selectedDetail.companyId,
+      requestId: selectedDetail.requestId,
+    })
   }
 
   const updateLineItem = <Key extends keyof Omit<PurchaseRequestFormLine, 'lineKey'>>(
@@ -3262,6 +3509,7 @@ function PurchaseRequestView({
 
   const handleRequestDetailOpen = (requestId: string) => {
     setFeedback(null)
+    setAiRiskResponse(null)
     setLastDrawerMode('detail')
     setSelectedRequestId(requestId)
     setDetailDrawerOpen(true)
@@ -3270,6 +3518,8 @@ function PurchaseRequestView({
   const closeCreateDrawer = () => {
     setLastDrawerMode('create')
     setCreateDirty(false)
+    setAiIntent('')
+    setAiDraftResponse(null)
     setDetailDrawerOpen(false)
     onCreateClose()
   }
@@ -3382,6 +3632,34 @@ function PurchaseRequestView({
 	      >
 	        {renderedDrawerMode === 'create' ? (
 	        <form className="request-form" id="purchase-request-create-form" onSubmit={handleCreateDraft}>
+          <section className="ai-card form-wide">
+            <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
+            <label className="form-wide">
+              <span>{messages.ai.draftIntent}</span>
+              <textarea
+                placeholder={messages.ai.draftPlaceholder}
+                value={aiIntent}
+                onChange={(event) => setAiIntent(event.target.value)}
+              />
+            </label>
+            <DisabledActionTooltip className="form-wide" title={aiDraftDisabledReason}>
+              <button
+                className="line-add-button"
+                disabled={Boolean(aiDraftDisabledReason)}
+                onClick={requestAiDraft}
+                type="button"
+              >
+                <ApiOutlined />
+                <span>{messages.ai.generateDraft}</span>
+              </button>
+            </DisabledActionTooltip>
+            <AiResultPanel
+              language={language}
+              messages={messages}
+              response={aiDraftResponse}
+              title={messages.ai.result}
+            />
+          </section>
           <label>
             <span>{messages.purchaseRequest.title}</span>
             <input required value={form.title} onChange={(event) => updateForm('title', event.target.value)} />
@@ -3620,6 +3898,26 @@ function PurchaseRequestView({
 		                <dd>{selectedDetail.approval?.matchedRuleId ?? messages.purchaseRequest.noApproval}</dd>
 		              </div>
 		            </dl>
+                <section className="ai-card">
+                  <div className="ai-action-row">
+                    <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
+                    <button
+                      className="line-add-button"
+                      disabled={aiRiskMutation.isPending}
+                      onClick={requestAiRisk}
+                      type="button"
+                    >
+                      <ApiOutlined />
+                      <span>{messages.ai.reviewRisk}</span>
+                    </button>
+                  </div>
+                  <AiResultPanel
+                    language={language}
+                    messages={messages}
+                    response={aiRiskResponse}
+                    title={messages.ai.reviewRisk}
+                  />
+                </section>
 		            {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
 		            <p className="detail-description">{selectedDetail.description}</p>
 	            <div className="table-wrap">
@@ -3720,6 +4018,7 @@ function ApprovalCenterView({
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [comment, setComment] = useState('')
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const [aiRiskResponse, setAiRiskResponse] = useState<AiAssistantResponse | null>(null)
 
   useEffect(() => {
     if (approvers.some((user) => user.userId === selectedApproverId)) {
@@ -3799,6 +4098,19 @@ function ApprovalCenterView({
     },
   })
 
+  const aiRiskMutation = useMutation({
+    mutationFn: reviewAiPurchaseRequestRisk,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.ai.unavailable}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setAiRiskResponse(response.data)
+    },
+  })
+
   const approveDisabledReason = actionMutation.isPending
     ? messages.approval.actionPendingReason
     : !canApprove
@@ -3828,18 +4140,31 @@ function ApprovalCenterView({
     })
   }
 
+  const requestAiRisk = () => {
+    if (!detail) {
+      return
+    }
+    aiRiskMutation.mutate({
+      actorId: selectedApproverId || detail.requesterId,
+      companyId: detail.companyId,
+      requestId: detail.requestId,
+    })
+  }
+
   const handleApproverChange = (approverId: string) => {
     setSelectedApproverId(approverId)
     setSelectedApprovalId(undefined)
     setDetailDrawerOpen(false)
     setComment('')
     setFeedback(null)
+    setAiRiskResponse(null)
   }
 
   const closeApprovalDrawer = () => {
     setDetailDrawerOpen(false)
     setComment('')
     setFeedback(null)
+    setAiRiskResponse(null)
   }
 
   const handleApprovalDrawerClose = () => {
@@ -3922,6 +4247,7 @@ function ApprovalCenterView({
                           setSelectedApprovalId(task.approvalId)
                           setDetailDrawerOpen(true)
                           setFeedback(null)
+                          setAiRiskResponse(null)
                         }}
                         type="button"
                       >
@@ -4010,6 +4336,27 @@ function ApprovalCenterView({
               <span>{contextText(detail.contextSnapshot, 'supplierId') || messages.purchaseRequest.noSupplier}</span>
               <span>{contextText(detail.contextSnapshot, 'expectedDeliveryDate')}</span>
             </div>
+          </section>
+
+          <section className="ai-card">
+            <div className="ai-action-row">
+              <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
+              <button
+                className="line-add-button"
+                disabled={aiRiskMutation.isPending}
+                onClick={requestAiRisk}
+                type="button"
+              >
+                <ApiOutlined />
+                <span>{messages.ai.reviewRisk}</span>
+              </button>
+            </div>
+            <AiResultPanel
+              language={language}
+              messages={messages}
+              response={aiRiskResponse}
+              title={messages.ai.reviewRisk}
+            />
           </section>
 
           <ApprovalPath messages={messages} nodes={detail.nodes} users={users} />
@@ -4107,6 +4454,7 @@ function RfqView({
   const [isCreateDirty, setCreateDirty] = useState(false)
   const [isQuoteDirty, setQuoteDirty] = useState(false)
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const [aiRfqResponse, setAiRfqResponse] = useState<AiAssistantResponse | null>(null)
   const approvedRequests = purchaseRequests.filter((request) => request.approval?.status === 'APPROVED')
   const buyers = users.filter(
     (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
@@ -4241,6 +4589,19 @@ function RfqView({
     },
   })
 
+  const aiRfqMutation = useMutation({
+    mutationFn: explainAiRfqQuotes,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.ai.unavailable}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setAiRfqResponse(response.data)
+    },
+  })
+
   const selectedCreateRequest = approvedRequests.find((request) => request.requestId === createForm.requestId)
   const selectableSuppliers = suppliersForCategory(selectedCreateRequest?.categoryId ?? '', suppliers)
   const quoteSupplier = detail?.suppliers.find((supplier) => supplier.supplierId === quoteForm.supplierId)
@@ -4248,6 +4609,13 @@ function RfqView({
   const drawerMode = isCreateOpen ? 'create' : isDetailDrawerOpen ? 'detail' : null
   const drawerTitle = drawerMode === 'create' ? messages.rfq.create : messages.rfq.detail
   const saveQuoteDisabledReason = quoteMutation.isPending ? messages.rfq.saveQuotePendingReason : undefined
+  const aiRfqDisabledReason = aiRfqMutation.isPending
+    ? messages.ai.generating
+    : comparisonRows.length < 2
+      ? messages.ai.disabledNeedQuotes
+      : !detail?.procurementUserId
+        ? messages.ai.disabledNoActor
+        : undefined
 
   const updateCreateForm = <Key extends keyof RfqCreateFormState>(key: Key, value: RfqCreateFormState[Key]) => {
     setCreateDirty(true)
@@ -4323,6 +4691,17 @@ function RfqView({
     })
   }
 
+  const requestAiRfqExplanation = () => {
+    if (!detail || aiRfqDisabledReason) {
+      return
+    }
+    aiRfqMutation.mutate({
+      actorId: detail.procurementUserId,
+      companyId: selectedCompanyId,
+      rfqId: detail.rfqId,
+    })
+  }
+
   const closeCreateDrawer = () => {
     setCreateDirty(false)
     onCreateClose()
@@ -4332,6 +4711,7 @@ function RfqView({
     setDetailDrawerOpen(false)
     setFeedback(null)
     setQuoteDirty(false)
+    setAiRfqResponse(null)
   }
 
   const confirmDiscardQuote = (onOk: () => void) => {
@@ -4383,6 +4763,7 @@ function RfqView({
     const openDetail = () => {
       if (rfqId !== selectedRfqId) {
         setQuoteDirty(false)
+        setAiRfqResponse(null)
       }
       setSelectedRfqId(rfqId)
       setDetailDrawerOpen(true)
@@ -4719,6 +5100,28 @@ function RfqView({
                   </tbody>
                 </table>
               </div>
+            </section>
+            <section className="ai-card">
+              <div className="ai-action-row">
+                <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
+                <DisabledActionTooltip title={aiRfqDisabledReason}>
+                  <button
+                    className="line-add-button"
+                    disabled={Boolean(aiRfqDisabledReason)}
+                    onClick={requestAiRfqExplanation}
+                    type="button"
+                  >
+                    <ApiOutlined />
+                    <span>{messages.ai.explainQuotes}</span>
+                  </button>
+                </DisabledActionTooltip>
+              </div>
+              <AiResultPanel
+                language={language}
+                messages={messages}
+                response={aiRfqResponse}
+                title={messages.ai.explainQuotes}
+              />
             </section>
             {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
           </div>
@@ -5515,6 +5918,7 @@ function ThreeWayMatchingView({
   const [actionNote, setActionNote] = useState('')
   const [isActionDirty, setActionDirty] = useState(false)
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const [aiMatchingResponse, setAiMatchingResponse] = useState<AiAssistantResponse | null>(null)
   const activeUsers = users.filter((user) => user.active)
   const financeUsers = activeUsers.filter((user) => user.roles.some((role) => role.roleId === 'role-finance'))
   const actionActor = financeUsers[0] ?? activeUsers[0]
@@ -5599,6 +6003,19 @@ function ThreeWayMatchingView({
     },
   })
 
+  const aiMatchingMutation = useMutation({
+    mutationFn: explainAiMatchingException,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.ai.unavailable}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setAiMatchingResponse(response.data)
+    },
+  })
+
   const discardActionInput = (next: () => void) => {
     if (!isActionDirty) {
       next()
@@ -5625,6 +6042,9 @@ function ThreeWayMatchingView({
 
   const openMatchDetail = (matchId: string) => {
     discardActionInput(() => {
+      if (matchId !== selectedMatchId) {
+        setAiMatchingResponse(null)
+      }
       setSelectedMatchId(matchId)
       setDetailDrawerOpen(true)
       setFeedback(null)
@@ -5635,6 +6055,7 @@ function ThreeWayMatchingView({
     discardActionInput(() => {
       setDetailDrawerOpen(false)
       setFeedback(null)
+      setAiMatchingResponse(null)
     })
   }
 
@@ -5677,6 +6098,25 @@ function ThreeWayMatchingView({
       actorId: actionActor.userId,
       companyId: selectedCompanyId,
       poId: detail.sourcePo.poId,
+    })
+  }
+
+  const aiMatchingDisabledReason = aiMatchingMutation.isPending
+    ? messages.ai.generating
+    : !actionActor
+      ? messages.matching.noActor
+      : detail?.status !== 'EXCEPTION'
+        ? messages.ai.disabledExceptionOnly
+        : undefined
+
+  const requestAiMatchingExplanation = () => {
+    if (!detail || !actionActor || aiMatchingDisabledReason) {
+      return
+    }
+    aiMatchingMutation.mutate({
+      actorId: actionActor.userId,
+      companyId: selectedCompanyId,
+      matchId: detail.matchId,
     })
   }
 
@@ -5841,6 +6281,29 @@ function ThreeWayMatchingView({
                 <dd>{`${detail.invoiceSummary.invoiceCount} · ${detail.invoiceSummary.invoicedQuantity}`}</dd>
               </div>
             </dl>
+
+            <section className="ai-card">
+              <div className="ai-action-row">
+                <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
+                <DisabledActionTooltip title={aiMatchingDisabledReason}>
+                  <button
+                    className="line-add-button"
+                    disabled={Boolean(aiMatchingDisabledReason)}
+                    onClick={requestAiMatchingExplanation}
+                    type="button"
+                  >
+                    <ApiOutlined />
+                    <span>{messages.ai.explainMatching}</span>
+                  </button>
+                </DisabledActionTooltip>
+              </div>
+              <AiResultPanel
+                language={language}
+                messages={messages}
+                response={aiMatchingResponse}
+                title={messages.ai.explainMatching}
+              />
+            </section>
 
             <PanelTitle icon={<NodeIndexOutlined />} title={messages.receiptInvoice.lineFulfillment} aside={messages.matching.dataState} />
             <div className="table-wrap compact-detail-table">
@@ -7279,6 +7742,182 @@ function DisabledActionTooltip({
       <span className={className ? `disabled-tooltip-wrap ${className}` : 'disabled-tooltip-wrap'}>{children}</span>
     </Tooltip>
   )
+}
+
+function AiResultPanel({
+  language,
+  messages,
+  response,
+  title,
+}: {
+  language: Language
+  messages: LocalizedMessages
+  response: AiAssistantResponse | null
+  title?: string
+}) {
+  if (!response) {
+    return null
+  }
+
+  return (
+    <section className="ai-result-panel">
+      <PanelTitle icon={<ApiOutlined />} title={title ?? messages.ai.result} aside={messages.ai.dataState} />
+      <dl className="ai-meta">
+        <div>
+          <dt>{messages.ai.invocation}</dt>
+          <dd>{response.invocationId}</dd>
+        </div>
+        <div>
+          <dt>{messages.ai.model}</dt>
+          <dd>{response.model}</dd>
+        </div>
+        <div>
+          <dt>{messages.ai.generatedAt}</dt>
+          <dd>{formatDateTime(response.generatedAt, language)}</dd>
+        </div>
+      </dl>
+      <AiResultBody language={language} messages={messages} response={response} />
+    </section>
+  )
+}
+
+function AiResultBody({
+  language,
+  messages,
+  response,
+}: {
+  language: Language
+  messages: LocalizedMessages
+  response: AiAssistantResponse
+}) {
+  if (response.scenario === 'PURCHASE_REQUEST_DRAFT') {
+    const result = response.result as AiDraftPreviewResult
+    return (
+      <div className="ai-result-content">
+        <AiSummaryLine label={messages.purchaseRequest.title} value={result.title} />
+        <AiSummaryLine label={messages.ai.businessPurpose} value={result.businessPurpose} />
+        <AiSummaryLine label={messages.purchaseRequest.totalAmount} value={formatOptionalCurrency(result.totalAmount, result.currency, language)} />
+        <AiListBlock title={messages.ai.missingFields} values={result.missingFields} />
+        <AiListBlock title={messages.ai.confidenceNotes} values={result.confidenceNotes} />
+      </div>
+    )
+  }
+
+  if (response.scenario === 'PURCHASE_REQUEST_RISK') {
+    const result = response.result as AiRiskReviewResult
+    return (
+      <div className="ai-result-content">
+        <AiSummaryLine label={messages.ai.riskLevel} value={result.riskLevel} />
+        <AiSummaryLine
+          label={messages.ai.continueRecommended}
+          value={typeof result.continueRecommended === 'boolean' ? String(result.continueRecommended) : undefined}
+        />
+        <AiObjectListBlock
+          title={messages.ai.riskItems}
+          values={result.riskItems?.map((item) => ({
+            title: item.title ?? item.severity ?? '',
+            description: item.evidence ?? '',
+          }))}
+        />
+        <AiListBlock title={messages.ai.suggestedActions} values={result.suggestedActions} />
+        <AiListBlock title={messages.ai.followUpQuestions} values={result.followUpQuestions} />
+      </div>
+    )
+  }
+
+  if (response.scenario === 'RFQ_QUOTE_EXPLANATION') {
+    const result = response.result as AiRfqExplanationResult
+    return (
+      <div className="ai-result-content">
+        <AiSummaryLine label={messages.ai.result} value={result.summary} />
+        <AiSummaryLine label={messages.ai.confidence} value={result.confidenceLevel} />
+        <AiObjectListBlock
+          title={messages.ai.supplierInsights}
+          values={result.supplierInsights?.map((item) => ({
+            title: item.supplierId ?? '',
+            description: item.assessment ?? '',
+          }))}
+        />
+        <AiListBlock title={messages.ai.keyDifferences} values={result.keyDifferences} />
+        <AiListBlock title={messages.ai.riskNotes} values={result.riskNotes} />
+        <AiListBlock title={messages.ai.followUpQuestions} values={result.questionsToConfirm} />
+      </div>
+    )
+  }
+
+  const result = response.result as AiMatchingExplanationResult
+  return (
+    <div className="ai-result-content">
+      <AiSummaryLine label={messages.ai.result} value={result.summary} />
+      <AiSummaryLine label={messages.ai.confidence} value={result.confidenceLevel} />
+      <AiObjectListBlock
+        title={messages.ai.differenceInsights}
+        values={result.differenceInsights?.map((item) => ({
+          title: item.differenceId ?? '',
+          description: item.assessment ?? item.suggestedManualAction ?? '',
+        }))}
+      />
+      <AiListBlock title={messages.ai.likelyCauses} values={result.likelyCauses} />
+      <AiListBlock title={messages.ai.suggestedActions} values={result.suggestedActions} />
+      <AiListBlock title={messages.ai.requiredFollowUpData} values={result.requiredFollowUpData} />
+    </div>
+  )
+}
+
+function AiSummaryLine({ label, value }: { label: string; value?: string }) {
+  if (!value) {
+    return null
+  }
+
+  return (
+    <div className="ai-summary-line">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function AiListBlock({ title, values }: { title: string; values?: string[] }) {
+  const visible = values?.filter(Boolean) ?? []
+  if (visible.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="ai-list-block">
+      <strong>{title}</strong>
+      <ul>
+        {visible.map((value, index) => (
+          <li key={`${title}-${index}`}>{value}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function AiObjectListBlock({ title, values }: { title: string; values?: Array<{ title: string; description: string }> }) {
+  const visible = values?.filter((value) => value.title || value.description) ?? []
+  if (visible.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="ai-list-block">
+      <strong>{title}</strong>
+      <ul>
+        {visible.map((value, index) => (
+          <li key={`${title}-${index}`}>
+            {value.title && <b>{value.title}</b>}
+            {value.description && <span>{value.title ? `: ${value.description}` : value.description}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function formatOptionalCurrency(value: number | undefined, currency: string | undefined, language: Language) {
+  return typeof value === 'number' ? formatCurrency(value, currency ?? 'CNY', language) : undefined
 }
 
 function dashboardMetricsInOrder(metrics: DashboardMetric[]) {

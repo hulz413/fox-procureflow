@@ -114,6 +114,58 @@
   - Java 使用 Homebrew `openjdk@21`，`JAVA_HOME` 必须指向 `libexec/openjdk.jdk/Contents/Home`。
   - 前端构建需要 Node `>=20.19`；本机 `/opt/homebrew/bin/node` 为 `v25.9.0`，满足 Vite 要求。
 
+## implement-ai-procurement-assistant 验证记录
+
+- OpenSpec 严格校验通过：
+
+  ```bash
+  openspec validate "implement-ai-procurement-assistant" --strict
+  ```
+
+- AI 助手后端专项测试通过，覆盖 OpenAI-compatible provider adapter 映射、结构化输出校验、上下文脱敏、审计不可用、provider 不可用、跨公司拒绝、无业务状态变更和四类 AI 场景：
+
+  ```bash
+  cd backend
+  JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home" PATH="$(brew --prefix openjdk@21)/bin:$PATH" ./gradlew test --tests 'com.foxprocureflow.ai.*' --no-daemon
+  ```
+
+- 后端完整测试通过：
+
+  ```bash
+  cd backend
+  JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home" PATH="$(brew --prefix openjdk@21)/bin:$PATH" ./gradlew test --no-daemon
+  ```
+
+- 前端 lint 通过；当前仍有 4 条既有 `react-hooks/exhaustive-deps` warning，无 error：
+
+  ```bash
+  cd frontend
+  PATH="/opt/homebrew/bin:$PATH" npm run lint
+  ```
+
+- 前端生产构建通过；Vite 仍提示主 chunk 大于 500 kB：
+
+  ```bash
+  cd frontend
+  PATH="/opt/homebrew/bin:$PATH" npm run build
+  ```
+
+- 本地服务启动与 smoke check 通过：
+
+  ```bash
+  JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home" PATH="/opt/homebrew/bin:$(brew --prefix openjdk@21)/bin:$PATH" ./scripts/launch.sh
+  curl http://localhost:8080/api/health
+  curl -I http://localhost:5173/
+  curl http://localhost:8080/v3/api-docs
+  ```
+
+  验证结果：后端健康接口返回 `status: "UP"`，前端首页返回 `200 OK`，OpenAPI JSON 包含四个 `/api/ai-assistant/*` endpoint。
+
+- 运行环境备注：
+  - `OPENAI_COMPATIBLE_ENABLED` 默认 `false`，本次自动化验证未使用真实 provider key。
+  - 生产/演示启用 AI 时必须提供 `OPENAI_COMPATIBLE_API_KEY`，并保持 MongoDB 可用以写入 AI 调用审计。
+  - AI 助手不提供前端静态 mock；provider、审计或结构化输出异常会返回真实不可用/失败状态。
+
 ## 当前环境未完成验证
 
 - 无。

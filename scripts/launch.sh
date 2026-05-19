@@ -6,6 +6,27 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_DIR="$ROOT_DIR/backend"
 INFRA_DIR="$ROOT_DIR/infra"
 
+load_root_env() {
+  local env_file="$ROOT_DIR/.env"
+  local line key value
+
+  [[ -f "$env_file" ]] || return
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    [[ "${!key+x}" == "x" ]] && continue
+    export "$key=$value"
+  done < "$env_file"
+}
+
+load_root_env
+
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 BACKEND_PORT="${FOX_BACKEND_PORT:-8080}"
 
