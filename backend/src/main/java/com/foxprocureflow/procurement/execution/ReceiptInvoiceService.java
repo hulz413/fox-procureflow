@@ -3,6 +3,7 @@ package com.foxprocureflow.procurement.execution;
 import com.foxprocureflow.identity.persistence.DemoCompanyMasterRepository;
 import com.foxprocureflow.identity.persistence.DemoUserJpaEntity;
 import com.foxprocureflow.identity.persistence.DemoUserRepository;
+import com.foxprocureflow.matching.ThreeWayMatchingService;
 import com.foxprocureflow.procurement.execution.ReceiptInvoiceDtos.AttachmentMetadataRequest;
 import com.foxprocureflow.procurement.execution.ReceiptInvoiceDtos.AttachmentMetadataResponse;
 import com.foxprocureflow.procurement.execution.ReceiptInvoiceDtos.CreateInvoiceLineRequest;
@@ -57,6 +58,7 @@ public class ReceiptInvoiceService {
     private final PurchaseOrderLineRepository purchaseOrderLineRepository;
     private final DemoCompanyMasterRepository companyRepository;
     private final DemoUserRepository userRepository;
+    private final ThreeWayMatchingService matchingService;
 
     public ReceiptInvoiceService(
         PurchaseReceiptRepository receiptRepository,
@@ -68,7 +70,8 @@ public class ReceiptInvoiceService {
         PurchaseOrderRepository purchaseOrderRepository,
         PurchaseOrderLineRepository purchaseOrderLineRepository,
         DemoCompanyMasterRepository companyRepository,
-        DemoUserRepository userRepository
+        DemoUserRepository userRepository,
+        ThreeWayMatchingService matchingService
     ) {
         this.receiptRepository = receiptRepository;
         this.receiptLineRepository = receiptLineRepository;
@@ -80,6 +83,7 @@ public class ReceiptInvoiceService {
         this.purchaseOrderLineRepository = purchaseOrderLineRepository;
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
+        this.matchingService = matchingService;
     }
 
     @Transactional(readOnly = true)
@@ -137,6 +141,7 @@ public class ReceiptInvoiceService {
             .map(line -> toReceiptLine(receiptId, purchaseOrder.getPoId(), line, lineById.get(line.poLineId())))
             .toList());
         List<PurchaseReceiptAttachmentJpaEntity> attachments = receiptAttachmentRepository.saveAll(toReceiptAttachments(receiptId, request.attachments()));
+        matchingService.recalculateForPo(request.companyId(), purchaseOrder.getPoId());
         return toDetailResponse(receipt, purchaseOrder, receiptLines, attachments);
     }
 
@@ -212,6 +217,7 @@ public class ReceiptInvoiceService {
             .map(line -> toInvoiceLine(invoiceId, purchaseOrder, line, lineById.get(line.poLineId())))
             .toList());
         List<SupplierInvoiceAttachmentJpaEntity> attachments = invoiceAttachmentRepository.saveAll(toInvoiceAttachments(invoiceId, request.attachments()));
+        matchingService.recalculateForPo(request.companyId(), purchaseOrder.getPoId());
         return toDetailResponse(invoice, purchaseOrder, invoiceLines, attachments);
     }
 

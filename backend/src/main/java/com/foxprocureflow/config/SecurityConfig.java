@@ -41,6 +41,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/invoices/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/invoices/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/receipts-invoices/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/three-way-matching/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/three-way-matching/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated())
             .build();

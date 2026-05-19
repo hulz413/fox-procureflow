@@ -1121,6 +1121,11 @@ tbody tr:last-child td {
   padding: 18px;
 }
 
+.ant-drawer-right.ant-drawer-open > .ant-drawer-content-wrapper {
+  max-width: calc(100vw - 24px);
+  transform: translateX(0) !important;
+}
+
 .request-drawer .ant-drawer-extra .primary-button {
   min-height: 32px;
   height: 32px;
@@ -1359,6 +1364,79 @@ tbody tr:last-child td {
   grid-template-columns: auto minmax(180px, 1fr) auto;
   gap: 10px;
   padding: 12px;
+}
+
+.matching-tabs,
+.matching-action-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+}
+
+.matching-tabs .secondary-button.active {
+  border-color: var(--pf-primary);
+  color: #fff;
+  background: var(--pf-primary);
+}
+
+.matching-detail .panel-title {
+  margin-top: 14px;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px 8px 0 0;
+}
+
+.compact-detail-table {
+  border-right: 1px solid var(--pf-border);
+  border-bottom: 1px solid var(--pf-border);
+  border-left: 1px solid var(--pf-border);
+  border-radius: 0 0 8px 8px;
+}
+
+.matching-actions-list {
+  min-height: 0;
+  border: 1px solid var(--pf-border);
+  border-radius: 0 0 8px 8px;
+}
+
+.matching-actions-list .empty-state {
+  min-height: 86px;
+}
+
+.matching-note {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.matching-note textarea {
+  width: 100%;
+  min-height: 86px;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--pf-text);
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.matching-action-bar {
+  justify-content: flex-start;
+  padding: 12px 0 0;
+}
+
+.matching-action-bar .secondary-button,
+.matching-action-bar .primary-button {
+  min-width: 112px;
 }
 
 .inline-input {

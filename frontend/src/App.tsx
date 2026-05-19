@@ -566,6 +566,16 @@ type InvoiceAmountStatus = 'NOT_INVOICED' | 'MATCHED' | 'VARIANCE'
 type PurchaseReceiptStatus = 'RECORDED'
 type SupplierInvoiceStatus = 'RECORDED'
 type ReceiptInvoiceCreateMode = 'receipt' | 'invoice'
+type ThreeWayMatchStatus = 'PENDING_INPUT' | 'MATCHED' | 'EXCEPTION' | 'RESOLVED'
+type ThreeWayMatchSeverity = 'LOW' | 'MEDIUM' | 'HIGH'
+type ThreeWayMatchDifferenceType =
+  | 'MISSING_RECEIPT'
+  | 'MISSING_INVOICE'
+  | 'RECEIPT_QUANTITY_SHORT'
+  | 'INVOICE_QUANTITY_OVER_RECEIPT'
+  | 'INVOICE_AMOUNT_MISMATCH'
+type ThreeWayMatchActionType = 'ACKNOWLEDGE' | 'MARK_IN_PROGRESS' | 'RESOLVE' | 'REOPEN'
+type ThreeWayMatchTab = 'all' | 'exceptions' | 'resolved'
 
 type ReceiptInvoiceAttachment = {
   attachmentId: string
@@ -724,6 +734,127 @@ type InvoiceCreateFormState = {
 }
 
 type InvoiceEditableLineKey = 'invoicedQuantity' | 'untaxedAmount' | 'taxRate' | 'taxAmount' | 'totalAmount'
+
+type ThreeWayMatchListItem = {
+  matchId: string
+  companyId: string
+  poId: string
+  poTitle: string
+  supplierId: string
+  supplierName: string
+  status: ThreeWayMatchStatus
+  poTotalAmount: number
+  invoiceTotalAmount: number
+  invoiceVarianceAmount: number
+  currency: string
+  differenceCount: number
+  highestSeverity: ThreeWayMatchSeverity | null
+  lastCalculatedAt: string
+  updatedAt: string
+}
+
+type ThreeWayMatchPoSummary = {
+  poId: string
+  companyId: string
+  title: string
+  status: PurchaseOrderStatus
+  supplierId: string
+  supplierName: string
+  totalAmount: number
+  currency: string
+  expectedDeliveryDate: string
+  issuedAt: string | null
+}
+
+type ThreeWayMatchReceiptSummary = {
+  receiptCount: number
+  receivedQuantity: number
+  latestReceiptAt: string | null
+}
+
+type ThreeWayMatchInvoiceSummary = {
+  invoiceCount: number
+  invoicedQuantity: number
+  invoiceTotalAmount: number
+  invoiceVarianceAmount: number
+  latestInvoiceAt: string | null
+}
+
+type ThreeWayMatchLine = {
+  poLineId: string
+  lineNo: number
+  itemName: string
+  specification: string | null
+  orderedQuantity: number
+  receivedQuantity: number
+  invoicedQuantity: number
+  unit: string
+}
+
+type ThreeWayMatchDifference = {
+  differenceId: string
+  differenceType: ThreeWayMatchDifferenceType
+  severity: ThreeWayMatchSeverity
+  poLineId: string | null
+  lineNo: number | null
+  itemName: string | null
+  specification: string | null
+  orderedQuantity: number | null
+  receivedQuantity: number | null
+  invoicedQuantity: number | null
+  unit: string | null
+  poAmount: number | null
+  invoiceAmount: number | null
+  differenceAmount: number | null
+  currency: string
+  description: string
+  createdAt: string
+}
+
+type ThreeWayMatchActionRecord = {
+  actionId: string
+  actionType: ThreeWayMatchActionType
+  actorId: string
+  note: string
+  createdAt: string
+}
+
+type ThreeWayMatchDetail = {
+  matchId: string
+  companyId: string
+  status: ThreeWayMatchStatus
+  sourcePo: ThreeWayMatchPoSummary
+  receiptSummary: ThreeWayMatchReceiptSummary
+  invoiceSummary: ThreeWayMatchInvoiceSummary
+  orderedTotalQuantity: number
+  receivedTotalQuantity: number
+  invoicedTotalQuantity: number
+  poTotalAmount: number
+  invoiceTotalAmount: number
+  invoiceVarianceAmount: number
+  currency: string
+  differenceCount: number
+  highestSeverity: ThreeWayMatchSeverity | null
+  lines: ThreeWayMatchLine[]
+  differences: ThreeWayMatchDifference[]
+  actions: ThreeWayMatchActionRecord[]
+  lastCalculatedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+type RecalculateMatchPayload = {
+  companyId: string
+  poId: string
+  actorId: string
+}
+
+type HandleMatchActionPayload = {
+  companyId: string
+  actorId: string
+  actionType: ThreeWayMatchActionType
+  note: string
+}
 
 const demoContext: DemoContext = {
   groupId: 'group-xinghe',
@@ -934,6 +1065,29 @@ async function createInvoice(payload: CreateInvoicePayload) {
   return postApi<unknown>('/api/invoices', payload)
 }
 
+async function fetchThreeWayMatches(companyId: string, status?: ThreeWayMatchStatus) {
+  const statusQuery = status ? `&status=${encodeURIComponent(status)}` : ''
+  return fetchApi<ThreeWayMatchListItem[]>(`/api/three-way-matching?companyId=${encodeURIComponent(companyId)}${statusQuery}`)
+}
+
+async function fetchThreeWayMatchExceptions(companyId: string) {
+  return fetchApi<ThreeWayMatchListItem[]>(`/api/three-way-matching/exceptions?companyId=${encodeURIComponent(companyId)}`)
+}
+
+async function fetchThreeWayMatchDetail(matchId: string, companyId: string) {
+  return fetchApi<ThreeWayMatchDetail>(
+    `/api/three-way-matching/${encodeURIComponent(matchId)}?companyId=${encodeURIComponent(companyId)}`,
+  )
+}
+
+async function recalculateThreeWayMatch(payload: RecalculateMatchPayload) {
+  return postApi<ThreeWayMatchDetail>('/api/three-way-matching/recalculate', payload)
+}
+
+async function handleThreeWayMatchAction(matchId: string, payload: HandleMatchActionPayload) {
+  return postApi<ThreeWayMatchDetail>(`/api/three-way-matching/${encodeURIComponent(matchId)}/actions`, payload)
+}
+
 const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -953,6 +1107,7 @@ const localizedContent = {
       rfqTitle: '询报价',
       purchaseOrdersTitle: '采购订单',
       receiptInvoiceTitle: '收货发票',
+      matchingTitle: '三单匹配',
     },
     actions: {
       newRequest: '新建申请',
@@ -999,7 +1154,7 @@ const localizedContent = {
       { label: '询报价', icon: <FileSearchOutlined />, path: '/rfqs' },
       { label: '采购订单', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: '收货发票', icon: <InboxOutlined />, path: '/receipts-invoices' },
-      { label: '三单匹配', icon: <SwapOutlined /> },
+      { label: '三单匹配', icon: <SwapOutlined />, path: '/three-way-matching' },
       { label: '供应商池', icon: <TeamOutlined />, count: '5' },
       { label: '主数据', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
@@ -1377,7 +1532,64 @@ const localizedContent = {
       discardTitle: '放弃本次收货/发票编辑？',
       discardContent: '当前单据还没有保存，关闭后本次输入会丢失。',
       discardConfirm: '放弃输入',
-      boundary: '只记录收货和发票，不创建三单匹配结果',
+      boundary: '收货和发票保存后会同步刷新三单匹配结果',
+    },
+    matching: {
+      dataState: '后端匹配数据',
+      unavailable: '三单匹配暂不可用',
+      loading: '加载中',
+      empty: '暂无三单匹配记录',
+      list: '匹配结果',
+      exceptions: '异常队列',
+      resolvedList: '已处理',
+      detail: '匹配详情',
+      allTab: '全部',
+      exceptionsTab: '异常',
+      resolvedTab: '已处理',
+      matched: '匹配正常',
+      pendingInput: '待补齐',
+      exception: '异常',
+      resolved: '已关闭',
+      status: '匹配状态',
+      severity: '严重度',
+      high: '高',
+      medium: '中',
+      low: '低',
+      differences: '差异项',
+      handlingRecords: '处理记录',
+      actionNote: '处理备注',
+      acknowledge: '确认异常',
+      markInProgress: '标记处理中',
+      resolve: '关闭异常',
+      reopen: '重新打开',
+      recalculate: '重新计算',
+      actionSuccess: '处理记录已保存',
+      recalculateSuccess: '匹配结果已刷新',
+      actionFailed: '操作失败',
+      noActor: '当前公司没有可用处理人',
+      noteRequired: '填写处理备注后才能提交',
+      exceptionOnly: '只有异常状态可以执行该操作',
+      resolvedOnly: '只有已关闭异常可以重新打开',
+      pendingAction: '操作提交中',
+      discardTitle: '放弃本次匹配处理输入？',
+      discardContent: '当前处理备注尚未提交，关闭或切换后本次输入会丢失。',
+      discardConfirm: '放弃输入',
+      poAmount: 'PO 金额',
+      invoiceAmount: '发票金额',
+      invoiceVariance: '金额差异',
+      ordered: '订购',
+      received: '收货',
+      invoiced: '开票',
+      lastCalculated: '最近计算',
+      receiptSummary: '收货汇总',
+      invoiceSummary: '发票汇总',
+      missingReceipt: '缺收货',
+      missingInvoice: '缺发票',
+      receiptShort: '收货不足',
+      invoiceOverReceipt: '开票超收货',
+      amountMismatch: '金额不一致',
+      noDifferences: '暂无差异',
+      noActions: '暂无处理记录',
     },
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
   },
@@ -1399,6 +1611,7 @@ const localizedContent = {
       rfqTitle: 'RFQ',
       purchaseOrdersTitle: 'Purchase Orders',
       receiptInvoiceTitle: 'Receiving & Invoices',
+      matchingTitle: 'Three-Way Matching',
     },
     actions: {
       newRequest: 'New Request',
@@ -1445,7 +1658,7 @@ const localizedContent = {
       { label: 'RFQ', icon: <FileSearchOutlined />, path: '/rfqs' },
       { label: 'Purchase Orders', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: 'Receiving & Invoices', icon: <InboxOutlined />, path: '/receipts-invoices' },
-      { label: '3-Way Match', icon: <SwapOutlined /> },
+      { label: '3-Way Match', icon: <SwapOutlined />, path: '/three-way-matching' },
       { label: 'Supplier Pool', icon: <TeamOutlined />, count: '5' },
       { label: 'Master Data', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
@@ -1823,7 +2036,64 @@ const localizedContent = {
       discardTitle: 'Discard receiving/invoice edits?',
       discardContent: 'This document has not been saved. Closing will discard your input.',
       discardConfirm: 'Discard input',
-      boundary: 'Records receipts and invoices only; no three-way matching result is created',
+      boundary: 'Saving receipts or invoices refreshes three-way matching synchronously',
+    },
+    matching: {
+      dataState: 'Backend matching data',
+      unavailable: 'Three-way matching unavailable',
+      loading: 'Loading',
+      empty: 'No matching records',
+      list: 'Matching Results',
+      exceptions: 'Exception Queue',
+      resolvedList: 'Resolved',
+      detail: 'Matching Detail',
+      allTab: 'All',
+      exceptionsTab: 'Exceptions',
+      resolvedTab: 'Resolved',
+      matched: 'Matched',
+      pendingInput: 'Pending Input',
+      exception: 'Exception',
+      resolved: 'Resolved',
+      status: 'Status',
+      severity: 'Severity',
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low',
+      differences: 'Differences',
+      handlingRecords: 'Handling Records',
+      actionNote: 'Handling Note',
+      acknowledge: 'Acknowledge',
+      markInProgress: 'Mark In Progress',
+      resolve: 'Resolve',
+      reopen: 'Reopen',
+      recalculate: 'Recalculate',
+      actionSuccess: 'Handling record saved',
+      recalculateSuccess: 'Matching result refreshed',
+      actionFailed: 'Action failed',
+      noActor: 'No available actor for this company',
+      noteRequired: 'Enter a handling note first',
+      exceptionOnly: 'Only exception results allow this action',
+      resolvedOnly: 'Only resolved exceptions can be reopened',
+      pendingAction: 'Submitting',
+      discardTitle: 'Discard matching action input?',
+      discardContent: 'The handling note has not been submitted. Closing or switching rows will discard it.',
+      discardConfirm: 'Discard input',
+      poAmount: 'PO Amount',
+      invoiceAmount: 'Invoice Amount',
+      invoiceVariance: 'Variance',
+      ordered: 'Ordered',
+      received: 'Received',
+      invoiced: 'Invoiced',
+      lastCalculated: 'Last Calculated',
+      receiptSummary: 'Receipt Summary',
+      invoiceSummary: 'Invoice Summary',
+      missingReceipt: 'Missing Receipt',
+      missingInvoice: 'Missing Invoice',
+      receiptShort: 'Receipt Short',
+      invoiceOverReceipt: 'Invoice Over Receipt',
+      amountMismatch: 'Amount Mismatch',
+      noDifferences: 'No differences',
+      noActions: 'No handling records',
     },
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
@@ -1901,6 +2171,7 @@ function Workspace({
   const isRfqRoute = location.pathname === '/rfqs'
   const isPurchaseOrderRoute = location.pathname === '/purchase-orders'
   const isReceiptInvoiceRoute = location.pathname === '/receipts-invoices'
+  const isThreeWayMatchingRoute = location.pathname === '/three-way-matching'
   const [isCreateDrawerOpen, setCreateDrawerOpen] = useState(false)
   const [isRfqCreateDrawerOpen, setRfqCreateDrawerOpen] = useState(false)
   const [isPoCreateDrawerOpen, setPoCreateDrawerOpen] = useState(false)
@@ -2206,6 +2477,8 @@ function Workspace({
                         ? messages.header.purchaseOrdersTitle
                         : isReceiptInvoiceRoute
                           ? messages.header.receiptInvoiceTitle
+                          : isThreeWayMatchingRoute
+                            ? messages.header.matchingTitle
                           : messages.header.title}
             </h1>
           </div>
@@ -2220,7 +2493,7 @@ function Workspace({
                 <BellOutlined />
               </button>
             </Tooltip>
-            {!isFoundationRoute && (
+            {!isFoundationRoute && !isThreeWayMatchingRoute && (
               <button className="primary-button" onClick={handleNewRequestClick} type="button">
                 {primaryActionIcon}
                 <span>{primaryActionLabel}</span>
@@ -2338,6 +2611,14 @@ function Workspace({
               language={language}
               messages={messages}
               onCreateModeChange={setReceiptInvoiceCreateMode}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
+              users={usersQuery.data?.data ?? []}
+            />
+          ) : isThreeWayMatchingRoute ? (
+            <ThreeWayMatchingView
+              language={language}
+              messages={messages}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               users={usersQuery.data?.data ?? []}
@@ -4993,6 +5274,475 @@ function PurchaseOrderView({
   )
 }
 
+function ThreeWayMatchingView({
+  language,
+  messages,
+  selectedCompany,
+  selectedCompanyId,
+  users,
+}: {
+  language: Language
+  messages: LocalizedMessages
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  users: UserSummary[]
+}) {
+  const queryClient = useQueryClient()
+  const [modal, modalContextHolder] = Modal.useModal()
+  const [activeTab, setActiveTab] = useState<ThreeWayMatchTab>('all')
+  const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>()
+  const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [actionNote, setActionNote] = useState('')
+  const [isActionDirty, setActionDirty] = useState(false)
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const activeUsers = users.filter((user) => user.active)
+  const financeUsers = activeUsers.filter((user) => user.roles.some((role) => role.roleId === 'role-finance'))
+  const actionActor = financeUsers[0] ?? activeUsers[0]
+  const matchesQuery = useQuery({
+    queryKey: ['three-way-matching', selectedCompanyId],
+    queryFn: () => fetchThreeWayMatches(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const exceptionsQuery = useQuery({
+    queryKey: ['three-way-matching', 'exceptions', selectedCompanyId],
+    queryFn: () => fetchThreeWayMatchExceptions(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const detailQuery = useQuery({
+    queryKey: ['three-way-matching', 'detail', selectedCompanyId, selectedMatchId],
+    queryFn: () => fetchThreeWayMatchDetail(selectedMatchId ?? '', selectedCompanyId),
+    enabled: Boolean(selectedMatchId) && selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const matchingRows = matchesQuery.data?.data ?? []
+  const exceptionRows = exceptionsQuery.data?.data ?? []
+  const resolvedRows = matchingRows.filter((row) => row.status === 'RESOLVED')
+  const tabRows =
+    activeTab === 'exceptions'
+      ? exceptionRows
+      : activeTab === 'resolved'
+        ? resolvedRows
+        : matchingRows
+  const detail = detailQuery.data?.data
+  const isError = matchesQuery.isError || exceptionsQuery.isError || detailQuery.isError
+  const isLoading = matchesQuery.isLoading || exceptionsQuery.isLoading
+  const totals = {
+    exception: matchingRows.filter((row) => row.status === 'EXCEPTION').length,
+    matched: matchingRows.filter((row) => row.status === 'MATCHED').length,
+    pending: matchingRows.filter((row) => row.status === 'PENDING_INPUT').length,
+    resolved: matchingRows.filter((row) => row.status === 'RESOLVED').length,
+  }
+
+  useEffect(() => {
+    if (selectedMatchId && !matchingRows.some((row) => row.matchId === selectedMatchId)) {
+      setSelectedMatchId(undefined)
+      setDetailDrawerOpen(false)
+      setActionDirty(false)
+      setActionNote('')
+    }
+  }, [matchingRows, selectedMatchId])
+
+  const refreshMatchingQueries = () => {
+    void queryClient.invalidateQueries({ queryKey: ['three-way-matching'] })
+  }
+
+  const actionMutation = useMutation({
+    mutationFn: ({ matchId, payload }: { matchId: string; payload: HandleMatchActionPayload }) =>
+      handleThreeWayMatchAction(matchId, payload),
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.matching.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: () => {
+      setActionDirty(false)
+      setActionNote('')
+      setFeedback({ message: messages.matching.actionSuccess, tone: 'success' })
+      refreshMatchingQueries()
+    },
+  })
+
+  const recalculateMutation = useMutation({
+    mutationFn: recalculateThreeWayMatch,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.matching.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: () => {
+      setFeedback({ message: messages.matching.recalculateSuccess, tone: 'success' })
+      refreshMatchingQueries()
+    },
+  })
+
+  const discardActionInput = (next: () => void) => {
+    if (!isActionDirty) {
+      next()
+      return
+    }
+
+    modal.confirm({
+      mousePosition: getViewportCenter(),
+      centered: true,
+      cancelText: messages.purchaseRequest.continueEdit,
+      content: messages.matching.discardContent,
+      focusable: { autoFocusButton: 'cancel' },
+      okType: 'danger',
+      okText: messages.matching.discardConfirm,
+      onOk: () => {
+        setActionDirty(false)
+        setActionNote('')
+        next()
+      },
+      rootClassName: 'procure-confirm-modal',
+      title: messages.matching.discardTitle,
+    })
+  }
+
+  const openMatchDetail = (matchId: string) => {
+    discardActionInput(() => {
+      setSelectedMatchId(matchId)
+      setDetailDrawerOpen(true)
+      setFeedback(null)
+    })
+  }
+
+  const handleDrawerClose = () => {
+    discardActionInput(() => {
+      setDetailDrawerOpen(false)
+      setFeedback(null)
+    })
+  }
+
+  const disabledActionReason = (actionType: ThreeWayMatchActionType) => {
+    if (!actionActor) {
+      return messages.matching.noActor
+    }
+    if (actionMutation.isPending) {
+      return messages.matching.pendingAction
+    }
+    if (!actionNote.trim()) {
+      return messages.matching.noteRequired
+    }
+    if (actionType === 'REOPEN') {
+      return detail?.status === 'RESOLVED' ? undefined : messages.matching.resolvedOnly
+    }
+    return detail?.status === 'EXCEPTION' ? undefined : messages.matching.exceptionOnly
+  }
+
+  const submitAction = (actionType: ThreeWayMatchActionType) => {
+    if (!selectedMatchId || !actionActor || disabledActionReason(actionType)) {
+      return
+    }
+    actionMutation.mutate({
+      matchId: selectedMatchId,
+      payload: {
+        actionType,
+        actorId: actionActor.userId,
+        companyId: selectedCompanyId,
+        note: actionNote,
+      },
+    })
+  }
+
+  const recalculateSelected = () => {
+    if (!detail || !actionActor || recalculateMutation.isPending) {
+      return
+    }
+    recalculateMutation.mutate({
+      actorId: actionActor.userId,
+      companyId: selectedCompanyId,
+      poId: detail.sourcePo.poId,
+    })
+  }
+
+  return (
+    <>
+      {modalContextHolder}
+      <section className="kpi-grid matching-kpis" aria-label={messages.matching.dataState}>
+        <article className="panel kpi">
+          <div>
+            <span>{messages.matching.matched}</span>
+            <CheckCircleOutlined />
+          </div>
+          <strong>{totals.matched}</strong>
+          <small>{selectedCompany.companyName}</small>
+        </article>
+        <article className="panel kpi">
+          <div>
+            <span>{messages.matching.pendingInput}</span>
+            <InboxOutlined />
+          </div>
+          <strong>{totals.pending}</strong>
+          <small className="warn">{messages.matching.receiptSummary}</small>
+        </article>
+        <article className="panel kpi">
+          <div>
+            <span>{messages.matching.exception}</span>
+            <AlertOutlined />
+          </div>
+          <strong>{totals.exception}</strong>
+          <small className="danger">{messages.matching.exceptions}</small>
+        </article>
+        <article className="panel kpi">
+          <div>
+            <span>{messages.matching.resolved}</span>
+            <AuditOutlined />
+          </div>
+          <strong>{totals.resolved}</strong>
+          <small>{messages.matching.handlingRecords}</small>
+        </article>
+      </section>
+
+      <section className="request-grid rfq-grid">
+        <section className="panel request-list-panel">
+          <PanelTitle icon={<SwapOutlined />} title={messages.matching.list} aside={selectedCompany.companyName} />
+          {isError && <div className="data-alert">{messages.matching.unavailable}</div>}
+          {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+          <div className="matching-tabs">
+            {([
+              ['all', messages.matching.allTab],
+              ['exceptions', messages.matching.exceptionsTab],
+              ['resolved', messages.matching.resolvedTab],
+            ] as const).map(([key, label]) => (
+              <button
+                className={activeTab === key ? 'secondary-button active' : 'secondary-button'}
+                key={key}
+                onClick={() => setActiveTab(key)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="table-wrap">
+            <table className="request-table matching-table">
+              <thead>
+                <tr>
+                  <th>PO</th>
+                  <th>{messages.purchaseOrder.supplier}</th>
+                  <th>{messages.matching.status}</th>
+                  <th>{messages.matching.severity}</th>
+                  <th>{messages.matching.poAmount}</th>
+                  <th>{messages.matching.invoiceVariance}</th>
+                  <th>{messages.matching.lastCalculated}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tabRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7}>{isLoading ? messages.matching.loading : messages.matching.empty}</td>
+                  </tr>
+                ) : (
+                  tabRows.map((row) => (
+                    <tr key={row.matchId}>
+                      <td>
+                        <button
+                          className={row.matchId === selectedMatchId ? 'row-link active' : 'row-link'}
+                          onClick={() => openMatchDetail(row.matchId)}
+                          type="button"
+                        >
+                          <TruncatedText text={row.poId} />
+                        </button>
+                      </td>
+                      <td><TruncatedText text={row.supplierName} /></td>
+                      <td><span className={`tag ${matchStatusToneOf(row.status)}`}>{formatMatchStatus(row.status, messages)}</span></td>
+                      <td>
+                        {row.highestSeverity ? (
+                          <span className={`tag ${severityToneOf(row.highestSeverity)}`}>
+                            {formatMatchSeverity(row.highestSeverity, messages)}
+                          </span>
+                        ) : (
+                          <span className="tag neutral">-</span>
+                        )}
+                      </td>
+                      <td>{formatCurrency(row.poTotalAmount, row.currency, language)}</td>
+                      <td className={row.invoiceVarianceAmount !== 0 ? 'amount-danger' : undefined}>
+                        {formatCurrency(row.invoiceVarianceAmount, row.currency, language)}
+                      </td>
+                      <td>{formatDateTime(row.lastCalculatedAt, language)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <Drawer
+        className="request-drawer rfq-drawer"
+        destroyOnClose={false}
+        keyboard
+        maskClosable
+        onClose={handleDrawerClose}
+        open={isDetailDrawerOpen}
+        title={messages.matching.detail}
+        size={980}
+      >
+        {detail ? (
+          <section className="request-detail matching-detail">
+            <div className="detail-heading">
+              <div>
+                <strong>{detail.sourcePo.poId}</strong>
+                <span>{detail.sourcePo.title}</span>
+              </div>
+              <span className={`tag ${matchStatusToneOf(detail.status)}`}>{formatMatchStatus(detail.status, messages)}</span>
+            </div>
+            <dl className="detail-grid">
+              <div>
+                <dt>{messages.purchaseOrder.supplier}</dt>
+                <dd>{detail.sourcePo.supplierName}</dd>
+              </div>
+              <div>
+                <dt>{messages.matching.poAmount}</dt>
+                <dd>{formatCurrency(detail.poTotalAmount, detail.currency, language)}</dd>
+              </div>
+              <div>
+                <dt>{messages.matching.invoiceAmount}</dt>
+                <dd>{formatCurrency(detail.invoiceTotalAmount, detail.currency, language)}</dd>
+              </div>
+              <div>
+                <dt>{messages.matching.invoiceVariance}</dt>
+                <dd className={detail.invoiceVarianceAmount !== 0 ? 'amount-danger' : undefined}>
+                  {formatCurrency(detail.invoiceVarianceAmount, detail.currency, language)}
+                </dd>
+              </div>
+              <div>
+                <dt>{messages.matching.receiptSummary}</dt>
+                <dd>{`${detail.receiptSummary.receiptCount} · ${detail.receiptSummary.receivedQuantity}`}</dd>
+              </div>
+              <div>
+                <dt>{messages.matching.invoiceSummary}</dt>
+                <dd>{`${detail.invoiceSummary.invoiceCount} · ${detail.invoiceSummary.invoicedQuantity}`}</dd>
+              </div>
+            </dl>
+
+            <PanelTitle icon={<NodeIndexOutlined />} title={messages.receiptInvoice.lineFulfillment} aside={messages.matching.dataState} />
+            <div className="table-wrap compact-detail-table">
+              <table className="request-table">
+                <thead>
+                  <tr>
+                    <th>{messages.receiptInvoice.lineFulfillment}</th>
+                    <th>{messages.matching.ordered}</th>
+                    <th>{messages.matching.received}</th>
+                    <th>{messages.matching.invoiced}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.lines.map((line) => (
+                    <tr key={line.poLineId}>
+                      <td><TruncatedText text={`${line.lineNo}. ${line.itemName}`} /></td>
+                      <td>{`${line.orderedQuantity} ${line.unit}`}</td>
+                      <td>{`${line.receivedQuantity} ${line.unit}`}</td>
+                      <td>{`${line.invoicedQuantity} ${line.unit}`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <PanelTitle icon={<AlertOutlined />} title={messages.matching.differences} />
+            <div className="table-wrap compact-detail-table">
+              <table className="request-table">
+                <thead>
+                  <tr>
+                    <th>{messages.matching.differences}</th>
+                    <th>{messages.matching.severity}</th>
+                    <th>{messages.matching.received}</th>
+                    <th>{messages.matching.invoiced}</th>
+                    <th>{messages.matching.invoiceVariance}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.differences.length === 0 ? (
+                    <tr><td colSpan={5}>{messages.matching.noDifferences}</td></tr>
+                  ) : (
+                    detail.differences.map((difference) => (
+                      <tr key={difference.differenceId}>
+                        <td><TruncatedText text={`${formatDifferenceType(difference.differenceType, messages)} · ${difference.description}`} /></td>
+                        <td><span className={`tag ${severityToneOf(difference.severity)}`}>{formatMatchSeverity(difference.severity, messages)}</span></td>
+                        <td>{difference.receivedQuantity ?? '-'}</td>
+                        <td>{difference.invoicedQuantity ?? '-'}</td>
+                        <td>{difference.differenceAmount === null ? '-' : formatCurrency(difference.differenceAmount, difference.currency, language)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <PanelTitle icon={<AuditOutlined />} title={messages.matching.handlingRecords} />
+            <div className="timeline-list matching-actions-list">
+              {detail.actions.length === 0 ? (
+                <div className="empty-state">{messages.matching.noActions}</div>
+              ) : (
+                detail.actions.map((action) => (
+                  <article className="timeline-item" key={action.actionId}>
+                    <strong>{formatMatchAction(action.actionType, messages)}</strong>
+                    <span>{userNameOf(action.actorId, users)} · {formatDateTime(action.createdAt, language)}</span>
+                    <p>{action.note}</p>
+                  </article>
+                ))
+              )}
+            </div>
+
+            <label className="form-wide matching-note">
+              <span>{messages.matching.actionNote}</span>
+              <textarea
+                value={actionNote}
+                onChange={(event) => {
+                  setActionDirty(true)
+                  setActionNote(event.target.value)
+                }}
+              />
+            </label>
+            <div className="matching-action-bar">
+              {([
+                ['ACKNOWLEDGE', messages.matching.acknowledge],
+                ['MARK_IN_PROGRESS', messages.matching.markInProgress],
+                ['RESOLVE', messages.matching.resolve],
+                ['REOPEN', messages.matching.reopen],
+              ] as const).map(([actionType, label]) => {
+                const disabledReason = disabledActionReason(actionType)
+                return (
+                  <DisabledActionTooltip key={actionType} title={disabledReason}>
+                    <button
+                      className={actionType === 'RESOLVE' ? 'secondary-button danger' : 'secondary-button'}
+                      disabled={Boolean(disabledReason)}
+                      onClick={() => submitAction(actionType)}
+                      type="button"
+                    >
+                      {label}
+                    </button>
+                  </DisabledActionTooltip>
+                )
+              })}
+              <DisabledActionTooltip title={!actionActor ? messages.matching.noActor : undefined}>
+                <button
+                  className="primary-button"
+                  disabled={!actionActor || recalculateMutation.isPending}
+                  onClick={recalculateSelected}
+                  type="button"
+                >
+                  <SwapOutlined />
+                  <span>{messages.matching.recalculate}</span>
+                </button>
+              </DisabledActionTooltip>
+            </div>
+          </section>
+        ) : (
+          <div className="empty-state">{detailQuery.isLoading ? messages.matching.loading : messages.matching.empty}</div>
+        )}
+      </Drawer>
+    </>
+  )
+}
+
 function ReceiptsInvoicesView({
   createMode,
   language,
@@ -6882,6 +7632,73 @@ function invoiceAmountToneOf(status: InvoiceAmountStatus) {
   return 'neutral'
 }
 
+function formatMatchStatus(status: ThreeWayMatchStatus, messages: LocalizedMessages) {
+  const labels = {
+    EXCEPTION: messages.matching.exception,
+    MATCHED: messages.matching.matched,
+    PENDING_INPUT: messages.matching.pendingInput,
+    RESOLVED: messages.matching.resolved,
+  }
+
+  return labels[status] ?? status
+}
+
+function matchStatusToneOf(status: ThreeWayMatchStatus) {
+  if (status === 'MATCHED') {
+    return 'success'
+  }
+  if (status === 'EXCEPTION') {
+    return 'danger'
+  }
+  if (status === 'PENDING_INPUT') {
+    return 'warn'
+  }
+  return 'neutral'
+}
+
+function formatMatchSeverity(severity: ThreeWayMatchSeverity, messages: LocalizedMessages) {
+  const labels = {
+    HIGH: messages.matching.high,
+    LOW: messages.matching.low,
+    MEDIUM: messages.matching.medium,
+  }
+
+  return labels[severity] ?? severity
+}
+
+function severityToneOf(severity: ThreeWayMatchSeverity) {
+  if (severity === 'HIGH') {
+    return 'danger'
+  }
+  if (severity === 'MEDIUM') {
+    return 'warn'
+  }
+  return 'neutral'
+}
+
+function formatDifferenceType(type: ThreeWayMatchDifferenceType, messages: LocalizedMessages) {
+  const labels = {
+    INVOICE_AMOUNT_MISMATCH: messages.matching.amountMismatch,
+    INVOICE_QUANTITY_OVER_RECEIPT: messages.matching.invoiceOverReceipt,
+    MISSING_INVOICE: messages.matching.missingInvoice,
+    MISSING_RECEIPT: messages.matching.missingReceipt,
+    RECEIPT_QUANTITY_SHORT: messages.matching.receiptShort,
+  }
+
+  return labels[type] ?? type
+}
+
+function formatMatchAction(action: ThreeWayMatchActionType, messages: LocalizedMessages) {
+  const labels = {
+    ACKNOWLEDGE: messages.matching.acknowledge,
+    MARK_IN_PROGRESS: messages.matching.markInProgress,
+    REOPEN: messages.matching.reopen,
+    RESOLVE: messages.matching.resolve,
+  }
+
+  return labels[action] ?? action
+}
+
 function formatDate(value: string, language: Language) {
   return new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
     day: '2-digit',
@@ -7003,6 +7820,10 @@ function App() {
             />
             <Route
               path="/receipts-invoices"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/three-way-matching"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />

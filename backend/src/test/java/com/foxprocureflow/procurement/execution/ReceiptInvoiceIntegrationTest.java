@@ -194,7 +194,7 @@ class ReceiptInvoiceIntegrationTest {
     }
 
     @Test
-    void documentsReceiptAndInvoiceEndpointsAndKeepsMatchingOutOfScope() throws Exception {
+    void documentsReceiptAndInvoiceEndpointsAndCompanyIsolation() throws Exception {
         mockMvc.perform(get("/api/receipts").param("companyId", "company-manufacturing"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[*].companyId", not(hasItem("company-digital"))));
@@ -216,8 +216,7 @@ class ReceiptInvoiceIntegrationTest {
             .andExpect(jsonPath("$['paths']['/api/invoices/{invoiceId}']").exists())
             .andExpect(jsonPath("$['paths']['/api/receipts-invoices/purchase-orders']").exists())
             .andExpect(content().string(containsString("Create a purchase receipt from an issued purchase order")))
-            .andExpect(content().string(containsString("Create a supplier invoice from an issued purchase order")))
-            .andExpect(content().string(not(containsString("/api/matching"))));
+            .andExpect(content().string(containsString("Create a supplier invoice from an issued purchase order")));
     }
 
     private Map<String, Object> receiptPayload(Map<String, Object> overrides) {

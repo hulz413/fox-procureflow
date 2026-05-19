@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @Configuration
 @EnableJpaRepositories(basePackages = {
     "com.foxprocureflow.identity.persistence",
+    "com.foxprocureflow.matching",
     "com.foxprocureflow.procurement.approval",
     "com.foxprocureflow.procurement.execution",
     "com.foxprocureflow.procurement.order",
