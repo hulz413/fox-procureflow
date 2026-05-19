@@ -255,6 +255,7 @@ class ApprovalWorkflowIntegrationTest {
         String requestId = createDraft(manufacturingSpareDraft());
         String approvalId = submitAndReadApprovalId(requestId);
         int initialRfqCount = rowCount("rfqs");
+        int initialPurchaseOrderCount = rowCount("purchase_orders");
 
         mockMvc.perform(post("/api/approvals/{approvalId}/approve", approvalId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -264,7 +265,7 @@ class ApprovalWorkflowIntegrationTest {
 
         assertThat(rowCount("rfqs")).isEqualTo(initialRfqCount);
         assertThat(rfqCountForRequest(requestId)).isZero();
-        assertThat(tableExists("purchase_orders")).isFalse();
+        assertThat(rowCount("purchase_orders")).isEqualTo(initialPurchaseOrderCount);
         assertThat(tableExists("receipts")).isFalse();
         assertThat(tableExists("invoices")).isFalse();
         assertThat(tableExists("matching_records")).isFalse();

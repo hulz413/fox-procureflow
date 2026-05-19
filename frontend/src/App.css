@@ -267,6 +267,21 @@ h1 {
   opacity: 0.56;
 }
 
+.disabled-tooltip-wrap {
+  display: inline-flex;
+  width: fit-content;
+}
+
+.disabled-tooltip-wrap > button {
+  width: 100%;
+}
+
+.disabled-tooltip-wrap.form-wide {
+  display: inline-flex;
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
 .procure-confirm-modal .ant-modal {
   top: 0;
 }
@@ -1332,6 +1347,60 @@ tbody tr:last-child td {
   height: 38px;
   padding: 0 15px;
   font-size: 14px;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  gap: 10px;
+  padding: 12px;
+}
+
+.inline-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--pf-border);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--pf-text);
+  background: #fff;
+}
+
+.secondary-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #bfd0c5;
+  border-radius: 7px;
+  padding: 0 14px;
+  color: var(--pf-primary);
+  background: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.secondary-button.danger {
+  border-color: #e1cbc9;
+  color: var(--pf-danger);
+}
+
+.secondary-button:hover,
+.secondary-button:focus-visible {
+  background: var(--pf-primary-soft);
+}
+
+.secondary-button.danger:hover,
+.secondary-button.danger:focus-visible {
+  background: #f6eeee;
+}
+
+.secondary-button:disabled,
+.inline-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 
 .approval-actions .line-add-button span {

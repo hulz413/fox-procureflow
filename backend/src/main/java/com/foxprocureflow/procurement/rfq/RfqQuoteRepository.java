@@ -11,5 +11,7 @@ public interface RfqQuoteRepository extends JpaRepository<RfqQuoteJpaEntity, Lon
 
     List<RfqQuoteJpaEntity> findByRfqIdIn(Collection<String> rfqIds);
 
+    Optional<RfqQuoteJpaEntity> findByQuoteId(String quoteId);
+
     Optional<RfqQuoteJpaEntity> findByRfqIdAndSupplierId(String rfqId, String supplierId);
 }

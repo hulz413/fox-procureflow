@@ -180,6 +180,8 @@ type ApprovalInstanceStatus = 'IN_PROGRESS' | 'APPROVED' | 'REJECTED' | 'WITHDRA
 type ApprovalNodeStatus = 'PENDING' | 'ACTIVE' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 type ApprovalAction = 'CREATED' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
 type RfqStatus = 'ISSUED' | 'QUOTING' | 'COMPARISON_READY'
+type PurchaseOrderStatus = 'DRAFT' | 'ISSUED' | 'CANCELLED'
+type PurchaseOrderAction = 'CREATED' | 'PUBLISHED' | 'CANCELLED'
 
 type ApprovalRecord = {
   recordId: string
@@ -449,6 +451,115 @@ type RfqQuoteFormState = {
   fileDescription: string
 }
 
+type PurchaseOrderLine = {
+  lineId: string
+  lineNo: number
+  itemName: string
+  specification: string | null
+  quantity: number
+  unit: string
+  categoryId: string | null
+  estimatedUnitPrice: number
+  estimatedAmount: number
+  confirmedUnitPrice: number
+  confirmedAmount: number
+}
+
+type PurchaseOrderDeliverySchedule = {
+  scheduleId: string
+  plannedDeliveryDate: string
+  deliveryLocation: string
+  contactPerson: string
+  contactPhone: string
+  deliveryNote: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type PurchaseOrderStatusRecord = {
+  recordId: string
+  actorId: string
+  action: PurchaseOrderAction
+  fromStatus: PurchaseOrderStatus | null
+  toStatus: PurchaseOrderStatus
+  comment: string | null
+  createdAt: string
+}
+
+type PurchaseOrderListItem = {
+  poId: string
+  companyId: string
+  rfqId: string
+  quoteId: string
+  requestId: string
+  approvalId: string
+  title: string
+  status: PurchaseOrderStatus
+  supplierId: string
+  supplierName: string
+  procurementUserId: string
+  categoryId: string
+  quoteAmount: number
+  taxAmount: number
+  totalAmount: number
+  currency: string
+  expectedDeliveryDate: string
+  plannedDeliveryDate: string
+  createdAt: string
+  updatedAt: string
+  issuedAt: string | null
+  cancelledAt: string | null
+}
+
+type PurchaseOrderDetail = PurchaseOrderListItem & {
+  requesterId: string
+  supplierServiceScope: string
+  supplierRiskLevel: string
+  budgetAccountId: string
+  taxRate: number
+  quoteDeliveryDate: string
+  quoteUpdatedAt: string
+  upstreamSnapshot: Record<string, unknown>
+  lines: PurchaseOrderLine[]
+  deliverySchedule: PurchaseOrderDeliverySchedule
+  statusRecords: PurchaseOrderStatusRecord[]
+}
+
+type CreatePurchaseOrderPayload = {
+  companyId: string
+  rfqId: string
+  quoteId: string
+  procurementUserId: string
+  plannedDeliveryDate: string
+  deliveryLocation: string
+  contactPerson: string
+  contactPhone: string
+  deliveryNote?: string
+}
+
+type PurchaseOrderActionPayload = {
+  companyId: string
+  actorId: string
+  comment?: string
+}
+
+type CancelPurchaseOrderPayload = {
+  companyId: string
+  actorId: string
+  reason: string
+}
+
+type PurchaseOrderCreateFormState = {
+  rfqId: string
+  quoteId: string
+  procurementUserId: string
+  plannedDeliveryDate: string
+  deliveryLocation: string
+  contactPerson: string
+  contactPhone: string
+  deliveryNote: string
+}
+
 const demoContext: DemoContext = {
   groupId: 'group-xinghe',
   groupName: '星河控股集团',
@@ -615,6 +726,27 @@ async function fetchRfqComparison(rfqId: string, companyId?: string) {
   return fetchApi<RfqComparisonRow[]>(`/api/rfqs/${encodeURIComponent(rfqId)}/comparison${query}`)
 }
 
+async function fetchPurchaseOrders(companyId: string) {
+  return fetchApi<PurchaseOrderListItem[]>(`/api/purchase-orders?companyId=${encodeURIComponent(companyId)}`)
+}
+
+async function fetchPurchaseOrderDetail(poId: string, companyId?: string) {
+  const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
+  return fetchApi<PurchaseOrderDetail>(`/api/purchase-orders/${encodeURIComponent(poId)}${query}`)
+}
+
+async function createPurchaseOrder(payload: CreatePurchaseOrderPayload) {
+  return postApi<PurchaseOrderDetail>('/api/purchase-orders', payload)
+}
+
+async function publishPurchaseOrder(poId: string, payload: PurchaseOrderActionPayload) {
+  return postApi<PurchaseOrderDetail>(`/api/purchase-orders/${encodeURIComponent(poId)}/publish`, payload)
+}
+
+async function cancelPurchaseOrder(poId: string, payload: CancelPurchaseOrderPayload) {
+  return postApi<PurchaseOrderDetail>(`/api/purchase-orders/${encodeURIComponent(poId)}/cancel`, payload)
+}
+
 const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -632,10 +764,12 @@ const localizedContent = {
       purchaseRequestsTitle: '采购申请',
       approvalsTitle: '审批中心',
       rfqTitle: '询报价',
+      purchaseOrdersTitle: '采购订单',
     },
     actions: {
       newRequest: '新建申请',
       newRfq: '新建 RFQ',
+      newPo: '新建 PO',
     },
     status: {
       backend: '后端',
@@ -673,7 +807,7 @@ const localizedContent = {
       { label: '采购申请', icon: <FileAddOutlined />, path: '/purchase-requests' },
       { label: '审批中心', icon: <AuditOutlined />, path: '/approvals' },
       { label: '询报价', icon: <FileSearchOutlined />, path: '/rfqs' },
-      { label: '采购订单', icon: <ShoppingCartOutlined /> },
+      { label: '采购订单', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: '收货发票', icon: <InboxOutlined /> },
       { label: '三单匹配', icon: <SwapOutlined /> },
       { label: '供应商池', icon: <TeamOutlined />, count: '5' },
@@ -883,6 +1017,10 @@ const localizedContent = {
       discardTitle: '放弃本次审批意见？',
       discardContent: '当前审批意见还没有提交，关闭后本次输入会丢失。',
       discardConfirm: '放弃意见',
+      approveDisabledReason: '当前审批人或状态不允许通过',
+      rejectDisabledReason: '当前审批人或状态不允许驳回',
+      withdrawDisabledReason: '当前审批已结束，不能撤回',
+      actionPendingReason: '审批操作提交中',
       noDetail: '请选择审批任务',
       terminal: '已结束',
       inProgress: '审批中',
@@ -936,10 +1074,68 @@ const localizedContent = {
       comparisonReady: '可比价',
       noQuote: '未报价',
       noComparison: '至少两家报价后显示推荐排序',
-      noPo: '本切片只做比价，不生成 PO',
+      noPo: '在采购订单页生成 PO',
       discardTitle: '放弃本次 RFQ 编辑？',
       discardContent: '当前 RFQ 还没有保存，关闭后本次修改会丢失。',
       discardConfirm: '放弃 RFQ',
+      discardDetailTitle: '放弃本次报价编辑？',
+      discardDetailContent: '当前报价内容还没有保存，关闭后本次输入会丢失。',
+      discardDetailConfirm: '放弃报价',
+      saveQuotePendingReason: '报价保存中',
+    },
+    purchaseOrder: {
+      dataState: '后端 PO 数据',
+      unavailable: '采购订单暂不可用',
+      loading: '加载中',
+      empty: '暂无采购订单',
+      list: '采购订单列表',
+      detail: '采购订单详情',
+      create: '新建采购订单',
+      createSuccess: '采购订单已创建',
+      createFailed: '创建失败',
+      publishSuccess: '采购订单已发布',
+      cancelSuccess: '采购订单已取消',
+      actionFailed: '操作失败',
+      eligibleRfq: '可下单 RFQ',
+      selectedQuote: '选定报价',
+      noEligibleRfq: '暂无可下单 RFQ',
+      buyer: '采购员',
+      plannedDeliveryDate: '计划交付日期',
+      deliveryLocation: '交付地点',
+      contactPerson: '联系人',
+      contactPhone: '联系电话',
+      deliveryNote: '交付备注',
+      sourceRfq: '来源 RFQ',
+      supplier: '供应商',
+      quoteSnapshot: '报价快照',
+      deliverySchedule: '交付计划',
+      statusRecords: '状态记录',
+      lineSnapshot: '明细快照',
+      publish: '发布 PO',
+      cancel: '取消 PO',
+      cancelReason: '取消原因',
+      cancelPlaceholder: '填写取消原因',
+      draft: '草稿',
+      issued: '已发布',
+      cancelled: '已取消',
+      createdAction: '创建',
+      publishedAction: '发布',
+      cancelledAction: '取消',
+      noQuote: '请选择有效报价',
+      noRecords: '暂无状态记录',
+      downstreamBoundary: '发布后不创建收货、发票或三单匹配记录',
+      discardTitle: '放弃本次 PO 编辑？',
+      discardContent: '当前采购订单还没有保存，关闭后本次修改会丢失。',
+      discardConfirm: '放弃 PO',
+      discardDetailTitle: '放弃本次 PO 操作输入？',
+      discardDetailContent: '当前详情抽屉中有未提交的取消原因，关闭后本次输入会丢失。',
+      discardDetailConfirm: '放弃输入',
+      publishDisabledIssuedReason: '已发布的 PO 不能再次发布',
+      publishDisabledCancelledReason: '已取消的 PO 不能发布',
+      publishPendingReason: 'PO 发布中',
+      cancelRequiresReason: '填写取消原因后才能取消 PO',
+      cancelDisabledCancelledReason: '已取消的 PO 不能重复取消',
+      cancelPendingReason: 'PO 取消中',
     },
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
   },
@@ -959,10 +1155,12 @@ const localizedContent = {
       purchaseRequestsTitle: 'Purchase Requests',
       approvalsTitle: 'Approval Center',
       rfqTitle: 'RFQ',
+      purchaseOrdersTitle: 'Purchase Orders',
     },
     actions: {
       newRequest: 'New Request',
       newRfq: 'New RFQ',
+      newPo: 'New PO',
     },
     status: {
       backend: 'Backend',
@@ -1000,7 +1198,7 @@ const localizedContent = {
       { label: 'Requests', icon: <FileAddOutlined />, path: '/purchase-requests' },
       { label: 'Approvals', icon: <AuditOutlined />, path: '/approvals' },
       { label: 'RFQ', icon: <FileSearchOutlined />, path: '/rfqs' },
-      { label: 'Purchase Orders', icon: <ShoppingCartOutlined /> },
+      { label: 'Purchase Orders', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: 'Receiving & Invoices', icon: <InboxOutlined /> },
       { label: '3-Way Match', icon: <SwapOutlined /> },
       { label: 'Supplier Pool', icon: <TeamOutlined />, count: '5' },
@@ -1210,6 +1408,10 @@ const localizedContent = {
       discardTitle: 'Discard approval comment?',
       discardContent: 'This approval comment has not been submitted. Closing will discard it.',
       discardConfirm: 'Discard comment',
+      approveDisabledReason: 'Current approver or status cannot approve',
+      rejectDisabledReason: 'Current approver or status cannot reject',
+      withdrawDisabledReason: 'This approval is closed and cannot be withdrawn',
+      actionPendingReason: 'Approval action is submitting',
       noDetail: 'Select an approval task',
       terminal: 'Closed',
       inProgress: 'In Progress',
@@ -1263,10 +1465,68 @@ const localizedContent = {
       comparisonReady: 'Comparison Ready',
       noQuote: 'No quote',
       noComparison: 'At least two quotes are needed for ranking',
-      noPo: 'This slice compares quotes only; no PO is created',
+      noPo: 'Create PO in Purchase Orders',
       discardTitle: 'Discard RFQ edits?',
       discardContent: 'This RFQ has not been saved. Closing will discard it.',
       discardConfirm: 'Discard RFQ',
+      discardDetailTitle: 'Discard quote edits?',
+      discardDetailContent: 'This quote has unsaved changes. Closing will discard your input.',
+      discardDetailConfirm: 'Discard quote',
+      saveQuotePendingReason: 'Saving quote',
+    },
+    purchaseOrder: {
+      dataState: 'Backend POs',
+      unavailable: 'Purchase orders unavailable',
+      loading: 'Loading',
+      empty: 'No purchase orders',
+      list: 'Purchase Order List',
+      detail: 'Purchase Order Detail',
+      create: 'New Purchase Order',
+      createSuccess: 'Purchase order created',
+      createFailed: 'Create failed',
+      publishSuccess: 'Purchase order issued',
+      cancelSuccess: 'Purchase order cancelled',
+      actionFailed: 'Action failed',
+      eligibleRfq: 'Eligible RFQ',
+      selectedQuote: 'Selected Quote',
+      noEligibleRfq: 'No eligible RFQs',
+      buyer: 'Buyer',
+      plannedDeliveryDate: 'Planned Delivery',
+      deliveryLocation: 'Delivery Location',
+      contactPerson: 'Contact Person',
+      contactPhone: 'Contact Phone',
+      deliveryNote: 'Delivery Note',
+      sourceRfq: 'Source RFQ',
+      supplier: 'Supplier',
+      quoteSnapshot: 'Quote Snapshot',
+      deliverySchedule: 'Delivery Schedule',
+      statusRecords: 'Status Records',
+      lineSnapshot: 'Line Snapshot',
+      publish: 'Issue PO',
+      cancel: 'Cancel PO',
+      cancelReason: 'Cancellation Reason',
+      cancelPlaceholder: 'Enter cancellation reason',
+      draft: 'Draft',
+      issued: 'Issued',
+      cancelled: 'Cancelled',
+      createdAction: 'Created',
+      publishedAction: 'Issued',
+      cancelledAction: 'Cancelled',
+      noQuote: 'Select a valid quote',
+      noRecords: 'No status records',
+      downstreamBoundary: 'Issuing does not create receipts, invoices, or matching records',
+      discardTitle: 'Discard PO edits?',
+      discardContent: 'This purchase order has not been saved. Closing will discard your edits.',
+      discardConfirm: 'Discard PO',
+      discardDetailTitle: 'Discard PO action input?',
+      discardDetailContent: 'The detail drawer has an unsubmitted cancellation reason. Closing will discard it.',
+      discardDetailConfirm: 'Discard input',
+      publishDisabledIssuedReason: 'Issued POs cannot be issued again',
+      publishDisabledCancelledReason: 'Cancelled P.O.s cannot be issued',
+      publishPendingReason: 'Issuing PO',
+      cancelRequiresReason: 'Enter a cancellation reason before cancelling',
+      cancelDisabledCancelledReason: 'Cancelled POs cannot be cancelled again',
+      cancelPendingReason: 'Cancelling PO',
     },
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
@@ -1342,8 +1602,10 @@ function Workspace({
   const isPurchaseRequestRoute = location.pathname === '/purchase-requests'
   const isApprovalRoute = location.pathname === '/approvals'
   const isRfqRoute = location.pathname === '/rfqs'
+  const isPurchaseOrderRoute = location.pathname === '/purchase-orders'
   const [isCreateDrawerOpen, setCreateDrawerOpen] = useState(false)
   const [isRfqCreateDrawerOpen, setRfqCreateDrawerOpen] = useState(false)
+  const [isPoCreateDrawerOpen, setPoCreateDrawerOpen] = useState(false)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
@@ -1397,6 +1659,12 @@ function Workspace({
   const rfqsQuery = useQuery({
     queryKey: ['rfqs', selectedCompanyId],
     queryFn: () => fetchRfqs(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const purchaseOrdersQuery = useQuery({
+    queryKey: ['purchase-orders', selectedCompanyId],
+    queryFn: () => fetchPurchaseOrders(selectedCompanyId),
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
@@ -1480,6 +1748,11 @@ function Workspace({
   }
 
   const handleNewRequestClick = () => {
+    if (isPurchaseOrderRoute) {
+      setPoCreateDrawerOpen(true)
+      return
+    }
+
     if (isRfqRoute) {
       setRfqCreateDrawerOpen(true)
       return
@@ -1524,6 +1797,24 @@ function Workspace({
       navigate('/rfqs', { replace: true })
     }
   }, [isRfqRoute, location.search, navigate])
+
+  useEffect(() => {
+    if (!isPurchaseOrderRoute) {
+      return
+    }
+
+    if (new URLSearchParams(location.search).get('new') === '1') {
+      setPoCreateDrawerOpen(true)
+      navigate('/purchase-orders', { replace: true })
+    }
+  }, [isPurchaseOrderRoute, location.search, navigate])
+
+  const primaryActionIcon = isPurchaseOrderRoute ? <ShoppingCartOutlined /> : isRfqRoute ? <FileSearchOutlined /> : <FileAddOutlined />
+  const primaryActionLabel = isPurchaseOrderRoute
+    ? messages.actions.newPo
+    : isRfqRoute
+      ? messages.actions.newRfq
+      : messages.actions.newRequest
 
   return (
     <Layout className="app-shell">
@@ -1587,6 +1878,8 @@ function Workspace({
                     ? messages.header.approvalsTitle
                     : isRfqRoute
                       ? messages.header.rfqTitle
+                      : isPurchaseOrderRoute
+                        ? messages.header.purchaseOrdersTitle
                     : messages.header.title}
             </h1>
           </div>
@@ -1603,8 +1896,8 @@ function Workspace({
             </Tooltip>
             {!isFoundationRoute && (
               <button className="primary-button" onClick={handleNewRequestClick} type="button">
-                {isRfqRoute ? <FileSearchOutlined /> : <FileAddOutlined />}
-                <span>{isRfqRoute ? messages.actions.newRfq : messages.actions.newRequest}</span>
+                {primaryActionIcon}
+                <span>{primaryActionLabel}</span>
               </button>
             )}
             <Dropdown
@@ -1693,6 +1986,24 @@ function Workspace({
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               suppliers={suppliersQuery.data?.data ?? []}
+              users={usersQuery.data?.data ?? []}
+            />
+          ) : isPurchaseOrderRoute ? (
+            <PurchaseOrderView
+              categories={categoriesQuery.data?.data ?? []}
+              isCreateOpen={isPoCreateDrawerOpen}
+              isError={purchaseOrdersQuery.isError || rfqsQuery.isError}
+              isLoading={purchaseOrdersQuery.isLoading}
+              language={language}
+              messages={messages}
+              onCreateClose={() => setPoCreateDrawerOpen(false)}
+              onRefresh={() => {
+                void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+              }}
+              purchaseOrders={purchaseOrdersQuery.data?.data ?? []}
+              rfqs={rfqsQuery.data?.data ?? []}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
               users={usersQuery.data?.data ?? []}
             />
           ) : (
@@ -2651,6 +2962,22 @@ function ApprovalCenterView({
     },
   })
 
+  const approveDisabledReason = actionMutation.isPending
+    ? messages.approval.actionPendingReason
+    : !canApprove
+      ? messages.approval.approveDisabledReason
+      : undefined
+  const rejectDisabledReason = actionMutation.isPending
+    ? messages.approval.actionPendingReason
+    : !canApprove
+      ? messages.approval.rejectDisabledReason
+      : undefined
+  const withdrawDisabledReason = actionMutation.isPending
+    ? messages.approval.actionPendingReason
+    : !canWithdraw
+      ? messages.approval.withdrawDisabledReason
+      : undefined
+
   const runApprovalAction = (action: 'approve' | 'reject' | 'withdraw') => {
     if (!detail) {
       return
@@ -2861,33 +3188,39 @@ function ApprovalCenterView({
               />
             </label>
             <div>
-              <button
-                className="primary-button"
-                disabled={!canApprove || actionMutation.isPending}
-                onClick={() => runApprovalAction('approve')}
-                type="button"
-              >
-                <CheckCircleOutlined />
-                <span>{messages.approval.approve}</span>
-              </button>
-              <button
-                className="line-add-button danger-action"
-                disabled={!canApprove || actionMutation.isPending}
-                onClick={() => runApprovalAction('reject')}
-                type="button"
-              >
-                <AlertOutlined />
-                <span>{messages.approval.reject}</span>
-              </button>
-              <button
-                className="line-add-button"
-                disabled={!canWithdraw || actionMutation.isPending}
-                onClick={() => runApprovalAction('withdraw')}
-                type="button"
-              >
-                <SwapOutlined />
-                <span>{messages.approval.withdraw}</span>
-              </button>
+              <DisabledActionTooltip title={approveDisabledReason}>
+                <button
+                  className="primary-button"
+                  disabled={Boolean(approveDisabledReason)}
+                  onClick={() => runApprovalAction('approve')}
+                  type="button"
+                >
+                  <CheckCircleOutlined />
+                  <span>{messages.approval.approve}</span>
+                </button>
+              </DisabledActionTooltip>
+              <DisabledActionTooltip title={rejectDisabledReason}>
+                <button
+                  className="line-add-button danger-action"
+                  disabled={Boolean(rejectDisabledReason)}
+                  onClick={() => runApprovalAction('reject')}
+                  type="button"
+                >
+                  <AlertOutlined />
+                  <span>{messages.approval.reject}</span>
+                </button>
+              </DisabledActionTooltip>
+              <DisabledActionTooltip title={withdrawDisabledReason}>
+                <button
+                  className="line-add-button"
+                  disabled={Boolean(withdrawDisabledReason)}
+                  onClick={() => runApprovalAction('withdraw')}
+                  type="button"
+                >
+                  <SwapOutlined />
+                  <span>{messages.approval.withdraw}</span>
+                </button>
+              </DisabledActionTooltip>
             </div>
           </div>
           {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
@@ -2935,6 +3268,7 @@ function RfqView({
   const [selectedRfqId, setSelectedRfqId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [isCreateDirty, setCreateDirty] = useState(false)
+  const [isQuoteDirty, setQuoteDirty] = useState(false)
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
   const approvedRequests = purchaseRequests.filter((request) => request.approval?.status === 'APPROVED')
   const buyers = users.filter(
@@ -3018,10 +3352,12 @@ function RfqView({
   useEffect(() => {
     if (!detail) {
       setQuoteForm(buildRfqQuoteFormDefaults())
+      setQuoteDirty(false)
       return
     }
 
     setQuoteForm((current) => buildRfqQuoteFormDefaults(detail, current.supplierId))
+    setQuoteDirty(false)
   }, [detail])
 
   const createMutation = useMutation({
@@ -3060,6 +3396,7 @@ function RfqView({
       })
     },
     onSuccess: (_response, variables) => {
+      setQuoteDirty(false)
       setFeedback({ message: messages.rfq.quoteSuccess, tone: 'success' })
       void queryClient.invalidateQueries({ queryKey: ['rfqs'] })
       void queryClient.invalidateQueries({ queryKey: ['rfq-detail', variables.rfqId] })
@@ -3073,6 +3410,7 @@ function RfqView({
   const quoteBySupplier = new Map(detail?.quotes.map((quote) => [quote.supplierId, quote]) ?? [])
   const drawerMode = isCreateOpen ? 'create' : isDetailDrawerOpen ? 'detail' : null
   const drawerTitle = drawerMode === 'create' ? messages.rfq.create : messages.rfq.detail
+  const saveQuoteDisabledReason = quoteMutation.isPending ? messages.rfq.saveQuotePendingReason : undefined
 
   const updateCreateForm = <Key extends keyof RfqCreateFormState>(key: Key, value: RfqCreateFormState[Key]) => {
     setCreateDirty(true)
@@ -3109,9 +3447,11 @@ function RfqView({
 
   const handleQuoteSupplierChange = (supplierId: string) => {
     setQuoteForm(buildRfqQuoteFormDefaults(detail, supplierId))
+    setQuoteDirty(false)
   }
 
   const updateQuoteForm = <Key extends keyof RfqQuoteFormState>(key: Key, value: RfqQuoteFormState[Key]) => {
+    setQuoteDirty(true)
     setQuoteForm((current) => ({ ...current, [key]: value }))
   }
 
@@ -3151,6 +3491,27 @@ function RfqView({
     onCreateClose()
   }
 
+  const closeDetailDrawer = () => {
+    setDetailDrawerOpen(false)
+    setFeedback(null)
+    setQuoteDirty(false)
+  }
+
+  const confirmDiscardQuote = (onOk: () => void) => {
+    modal.confirm({
+      mousePosition: getViewportCenter(),
+      centered: true,
+      cancelText: messages.purchaseRequest.continueEdit,
+      content: messages.rfq.discardDetailContent,
+      focusable: { autoFocusButton: 'cancel' },
+      okType: 'danger',
+      okText: messages.rfq.discardDetailConfirm,
+      onOk,
+      rootClassName: 'procure-confirm-modal',
+      title: messages.rfq.discardDetailTitle,
+    })
+  }
+
   const handleDrawerClose = () => {
     if (drawerMode === 'create' && isCreateDirty) {
       modal.confirm({
@@ -3173,8 +3534,30 @@ function RfqView({
       return
     }
 
-    setDetailDrawerOpen(false)
-    setFeedback(null)
+    if (drawerMode === 'detail' && isQuoteDirty) {
+      confirmDiscardQuote(closeDetailDrawer)
+      return
+    }
+
+    closeDetailDrawer()
+  }
+
+  const handleRfqDetailOpen = (rfqId: string) => {
+    const openDetail = () => {
+      if (rfqId !== selectedRfqId) {
+        setQuoteDirty(false)
+      }
+      setSelectedRfqId(rfqId)
+      setDetailDrawerOpen(true)
+      setFeedback(null)
+    }
+
+    if (isDetailDrawerOpen && isQuoteDirty && rfqId !== selectedRfqId) {
+      confirmDiscardQuote(openDetail)
+      return
+    }
+
+    openDetail()
   }
 
   return (
@@ -3207,11 +3590,7 @@ function RfqView({
                       <td>
                         <button
                           className={rfq.rfqId === selectedRfqId ? 'row-link active' : 'row-link'}
-                          onClick={() => {
-                            setSelectedRfqId(rfq.rfqId)
-                            setDetailDrawerOpen(true)
-                            setFeedback(null)
-                          }}
+                          onClick={() => handleRfqDetailOpen(rfq.rfqId)}
                           type="button"
                         >
                           <TruncatedText text={rfq.rfqId} />
@@ -3451,10 +3830,12 @@ function RfqView({
                     onChange={(event) => updateQuoteForm('fileDescription', event.target.value)}
                   />
                 </label>
-                <button className="primary-button form-wide" disabled={quoteMutation.isPending} type="submit">
-                  <CheckCircleOutlined />
-                  <span>{messages.rfq.saveQuote}</span>
-                </button>
+                <DisabledActionTooltip className="form-wide" title={saveQuoteDisabledReason}>
+                  <button className="primary-button form-wide" disabled={Boolean(saveQuoteDisabledReason)} type="submit">
+                    <CheckCircleOutlined />
+                    <span>{messages.rfq.saveQuote}</span>
+                  </button>
+                </DisabledActionTooltip>
               </form>
             </section>
 
@@ -3506,6 +3887,770 @@ function RfqView({
           </div>
         ) : (
           <div className="empty-state">{detailQuery.isLoading ? messages.rfq.loading : messages.rfq.empty}</div>
+        )}
+      </Drawer>
+    </>
+  )
+}
+
+function PurchaseOrderView({
+  categories,
+  isCreateOpen,
+  isError,
+  isLoading,
+  language,
+  messages,
+  onCreateClose,
+  onRefresh,
+  purchaseOrders,
+  rfqs,
+  selectedCompany,
+  selectedCompanyId,
+  users,
+}: {
+  categories: CategorySummary[]
+  isCreateOpen: boolean
+  isError: boolean
+  isLoading: boolean
+  language: Language
+  messages: LocalizedMessages
+  onCreateClose: () => void
+  onRefresh: () => void
+  purchaseOrders: PurchaseOrderListItem[]
+  rfqs: RfqListItem[]
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  users: UserSummary[]
+}) {
+  const queryClient = useQueryClient()
+  const [modal, modalContextHolder] = Modal.useModal()
+  const wasCreateOpen = useRef(false)
+  const [selectedPoId, setSelectedPoId] = useState<string | undefined>()
+  const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [isCreateDirty, setCreateDirty] = useState(false)
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const buyers = users.filter(
+    (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
+  )
+  const orderedRfqIds = new Set(purchaseOrders.map((purchaseOrder) => purchaseOrder.rfqId))
+  const eligibleRfqs = rfqs.filter((rfq) => rfq.status === 'COMPARISON_READY' && !orderedRfqIds.has(rfq.rfqId))
+  const [createForm, setCreateForm] = useState<PurchaseOrderCreateFormState>(() =>
+    buildPurchaseOrderCreateFormDefaults(selectedCompanyId, eligibleRfqs, buyers),
+  )
+
+  useEffect(() => {
+    if (purchaseOrders.length === 0) {
+      setSelectedPoId(undefined)
+      setDetailDrawerOpen(false)
+      return
+    }
+
+    if (selectedPoId && !purchaseOrders.some((purchaseOrder) => purchaseOrder.poId === selectedPoId)) {
+      setSelectedPoId(undefined)
+      setDetailDrawerOpen(false)
+    }
+  }, [purchaseOrders, selectedPoId])
+
+  useEffect(() => {
+    const didOpenCreateDrawer = isCreateOpen && !wasCreateOpen.current
+    wasCreateOpen.current = isCreateOpen
+    if (!didOpenCreateDrawer) {
+      return
+    }
+
+    setCreateDirty(false)
+    setFeedback(null)
+    setDetailDrawerOpen(false)
+    setCreateForm(buildPurchaseOrderCreateFormDefaults(selectedCompanyId, eligibleRfqs, buyers))
+  }, [buyers, eligibleRfqs, isCreateOpen, selectedCompanyId])
+
+  useEffect(() => {
+    setCreateForm((current) => {
+      const selectedRfq = eligibleRfqs.find((rfq) => rfq.rfqId === current.rfqId) ?? eligibleRfqs[0]
+      const buyer =
+        buyers.find((item) => item.userId === current.procurementUserId) ??
+        buyers.find((item) => item.companyId === selectedCompanyId) ??
+        buyers[0]
+      const next = {
+        ...current,
+        procurementUserId: buyer?.userId ?? '',
+        rfqId: selectedRfq?.rfqId ?? '',
+      }
+      if (next.procurementUserId === current.procurementUserId && next.rfqId === current.rfqId) {
+        return current
+      }
+      return next
+    })
+  }, [buyers, eligibleRfqs, selectedCompanyId])
+
+  const detailQuery = useQuery({
+    queryKey: ['purchase-order-detail', selectedPoId, selectedCompanyId],
+    queryFn: () => fetchPurchaseOrderDetail(selectedPoId ?? '', selectedCompanyId),
+    enabled: Boolean(selectedPoId),
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
+  const detail = detailQuery.data?.data
+
+  const createRfqDetailQuery = useQuery({
+    queryKey: ['rfq-detail-for-po', createForm.rfqId, selectedCompanyId],
+    queryFn: () => fetchRfqDetail(createForm.rfqId, selectedCompanyId),
+    enabled: isCreateOpen && createForm.rfqId.length > 0,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
+  const createRfqDetail = createRfqDetailQuery.data?.data
+  const createRfqComparisonQuery = useQuery({
+    queryKey: ['rfq-comparison-for-po', createForm.rfqId, selectedCompanyId],
+    queryFn: () => fetchRfqComparison(createForm.rfqId, selectedCompanyId),
+    enabled: isCreateOpen && createForm.rfqId.length > 0,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
+  const createRfqComparisonRows = createRfqComparisonQuery.data?.data ?? []
+  const createQuoteBySupplier = new Map(createRfqDetail?.quotes.map((quote) => [quote.supplierId, quote]) ?? [])
+  const createSupplierById = new Map(createRfqDetail?.suppliers.map((supplier) => [supplier.supplierId, supplier]) ?? [])
+  const quoteOptions = createRfqComparisonRows.length > 0
+    ? createRfqComparisonRows
+        .map((row) => createQuoteBySupplier.get(row.supplierId))
+        .filter((quote): quote is RfqQuote => Boolean(quote))
+    : createRfqDetail?.quotes ?? []
+
+  useEffect(() => {
+    if (!createRfqDetail) {
+      return
+    }
+
+    setCreateForm((current) => {
+      if (quoteOptions.some((quote) => quote.quoteId === current.quoteId)) {
+        return current
+      }
+      return {
+        ...current,
+        quoteId: quoteOptions[0]?.quoteId ?? '',
+        plannedDeliveryDate: quoteOptions[0]?.deliveryDate ?? current.plannedDeliveryDate,
+      }
+    })
+  }, [createRfqDetail, quoteOptions])
+
+  const createMutation = useMutation({
+    mutationFn: createPurchaseOrder,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.purchaseOrder.createFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setCreateDirty(false)
+      setFeedback({ message: messages.purchaseOrder.createSuccess, tone: 'success' })
+      setSelectedPoId(response.data.poId)
+      setDetailDrawerOpen(true)
+      onCreateClose()
+      onRefresh()
+      void queryClient.invalidateQueries({ queryKey: ['purchase-order-detail', response.data.poId] })
+      void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+    },
+  })
+
+  const publishMutation = useMutation({
+    mutationFn: ({ poId, payload }: { poId: string; payload: PurchaseOrderActionPayload }) =>
+      publishPurchaseOrder(poId, payload),
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.purchaseOrder.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (_response, variables) => {
+      setFeedback({ message: messages.purchaseOrder.publishSuccess, tone: 'success' })
+      void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+      void queryClient.invalidateQueries({ queryKey: ['purchase-order-detail', variables.poId] })
+    },
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ poId, payload }: { poId: string; payload: CancelPurchaseOrderPayload }) =>
+      cancelPurchaseOrder(poId, payload),
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.purchaseOrder.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (_response, variables) => {
+      setCancelReason('')
+      setFeedback({ message: messages.purchaseOrder.cancelSuccess, tone: 'success' })
+      void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+      void queryClient.invalidateQueries({ queryKey: ['purchase-order-detail', variables.poId] })
+    },
+  })
+
+  const selectedCreateRfq = eligibleRfqs.find((rfq) => rfq.rfqId === createForm.rfqId)
+  const selectedCreateQuote = quoteOptions.find((quote) => quote.quoteId === createForm.quoteId)
+  const drawerMode = isCreateOpen ? 'create' : isDetailDrawerOpen ? 'detail' : null
+  const drawerTitle = drawerMode === 'create' ? messages.purchaseOrder.create : messages.purchaseOrder.detail
+  const publishDisabledReason = detail
+    ? publishMutation.isPending
+      ? messages.purchaseOrder.publishPendingReason
+      : detail.status === 'ISSUED'
+        ? messages.purchaseOrder.publishDisabledIssuedReason
+        : detail.status === 'CANCELLED'
+          ? messages.purchaseOrder.publishDisabledCancelledReason
+          : undefined
+    : undefined
+  const cancelDisabledReason = detail
+    ? cancelMutation.isPending
+      ? messages.purchaseOrder.cancelPendingReason
+      : detail.status === 'CANCELLED'
+        ? messages.purchaseOrder.cancelDisabledCancelledReason
+        : !cancelReason.trim()
+          ? messages.purchaseOrder.cancelRequiresReason
+          : undefined
+    : undefined
+
+  const updateCreateForm = <Key extends keyof PurchaseOrderCreateFormState>(
+    key: Key,
+    value: PurchaseOrderCreateFormState[Key],
+  ) => {
+    setCreateDirty(true)
+    setCreateForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const handleCreateRfqChange = (rfqId: string) => {
+    setCreateDirty(true)
+    setCreateForm((current) => ({
+      ...current,
+      plannedDeliveryDate: nextDate(14),
+      quoteId: '',
+      rfqId,
+    }))
+  }
+
+  const handleCreatePurchaseOrder = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!createForm.rfqId || !createForm.quoteId || !createForm.procurementUserId) {
+      setFeedback({ message: messages.purchaseOrder.noQuote, tone: 'danger' })
+      return
+    }
+
+    createMutation.mutate({
+      companyId: selectedCompanyId,
+      deliveryLocation: createForm.deliveryLocation,
+      deliveryNote: createForm.deliveryNote,
+      contactPerson: createForm.contactPerson,
+      contactPhone: createForm.contactPhone,
+      plannedDeliveryDate: createForm.plannedDeliveryDate,
+      procurementUserId: createForm.procurementUserId,
+      quoteId: createForm.quoteId,
+      rfqId: createForm.rfqId,
+    })
+  }
+
+  const handlePublish = () => {
+    if (!detail) {
+      return
+    }
+
+    publishMutation.mutate({
+      poId: detail.poId,
+      payload: {
+        actorId: detail.procurementUserId,
+        comment: messages.purchaseOrder.publish,
+        companyId: selectedCompanyId,
+      },
+    })
+  }
+
+  const handleCancel = () => {
+    if (!detail || !cancelReason.trim()) {
+      return
+    }
+
+    cancelMutation.mutate({
+      poId: detail.poId,
+      payload: {
+        actorId: detail.procurementUserId,
+        companyId: selectedCompanyId,
+        reason: cancelReason,
+      },
+    })
+  }
+
+  const closeCreateDrawer = () => {
+    setCreateDirty(false)
+    onCreateClose()
+  }
+
+  const closeDetailDrawer = () => {
+    setDetailDrawerOpen(false)
+    setFeedback(null)
+    setCancelReason('')
+  }
+
+  const confirmDiscardDetailInput = (onOk: () => void) => {
+    modal.confirm({
+      mousePosition: getViewportCenter(),
+      centered: true,
+      cancelText: messages.purchaseRequest.continueEdit,
+      content: messages.purchaseOrder.discardDetailContent,
+      focusable: { autoFocusButton: 'cancel' },
+      okType: 'danger',
+      okText: messages.purchaseOrder.discardDetailConfirm,
+      onOk,
+      rootClassName: 'procure-confirm-modal',
+      title: messages.purchaseOrder.discardDetailTitle,
+    })
+  }
+
+  const handleDrawerClose = () => {
+    if (drawerMode === 'create' && isCreateDirty) {
+      modal.confirm({
+        mousePosition: getViewportCenter(),
+        centered: true,
+        cancelText: messages.purchaseRequest.continueEdit,
+        content: messages.purchaseOrder.discardContent,
+        focusable: { autoFocusButton: 'cancel' },
+        okType: 'danger',
+        okText: messages.purchaseOrder.discardConfirm,
+        onOk: closeCreateDrawer,
+        rootClassName: 'procure-confirm-modal',
+        title: messages.purchaseOrder.discardTitle,
+      })
+      return
+    }
+
+    if (drawerMode === 'create') {
+      closeCreateDrawer()
+      return
+    }
+
+    if (drawerMode === 'detail' && cancelReason.trim()) {
+      confirmDiscardDetailInput(closeDetailDrawer)
+      return
+    }
+
+    closeDetailDrawer()
+  }
+
+  const handlePurchaseOrderDetailOpen = (poId: string) => {
+    const openDetail = () => {
+      if (poId !== selectedPoId) {
+        setCancelReason('')
+      }
+      setSelectedPoId(poId)
+      setDetailDrawerOpen(true)
+      setFeedback(null)
+    }
+
+    if (isDetailDrawerOpen && cancelReason.trim() && poId !== selectedPoId) {
+      confirmDiscardDetailInput(openDetail)
+      return
+    }
+
+    openDetail()
+  }
+
+  return (
+    <>
+      {modalContextHolder}
+      <section className="request-grid rfq-grid">
+        <section className="panel request-list-panel">
+          <PanelTitle icon={<ShoppingCartOutlined />} title={messages.purchaseOrder.list} aside={selectedCompany.companyName} />
+          {isError && <div className="data-alert">{messages.purchaseOrder.unavailable}</div>}
+          <div className="table-wrap">
+            <table className="request-table">
+              <thead>
+                <tr>
+                  <th>PO</th>
+                  <th>{messages.purchaseOrder.sourceRfq}</th>
+                  <th>{messages.purchaseOrder.supplier}</th>
+                  <th>{messages.rfq.totalAmount}</th>
+                  <th>{messages.purchaseOrder.plannedDeliveryDate}</th>
+                  <th>{messages.purchaseRequest.status}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchaseOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>{isLoading ? messages.purchaseOrder.loading : messages.purchaseOrder.empty}</td>
+                  </tr>
+                ) : (
+                  purchaseOrders.map((purchaseOrder) => (
+                    <tr key={purchaseOrder.poId}>
+                      <td>
+                        <button
+                          className={purchaseOrder.poId === selectedPoId ? 'row-link active' : 'row-link'}
+                          onClick={() => handlePurchaseOrderDetailOpen(purchaseOrder.poId)}
+                          type="button"
+                        >
+                          <TruncatedText text={purchaseOrder.poId} />
+                        </button>
+                      </td>
+                      <td>
+                        <TruncatedText text={purchaseOrder.rfqId} />
+                      </td>
+                      <td>
+                        <TruncatedText text={purchaseOrder.supplierName} />
+                      </td>
+                      <td>{formatCurrency(purchaseOrder.totalAmount, purchaseOrder.currency, language)}</td>
+                      <td>{formatDate(purchaseOrder.plannedDeliveryDate, language)}</td>
+                      <td>
+                        <span className={`tag ${purchaseOrderStatusToneOf(purchaseOrder.status)}`}>
+                          {formatPurchaseOrderStatus(purchaseOrder.status, messages)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <Drawer
+        className="request-drawer rfq-drawer"
+        destroyOnClose={false}
+        keyboard
+        maskClosable
+        onClose={handleDrawerClose}
+        open={drawerMode !== null}
+        title={drawerTitle}
+        size={900}
+      >
+        {drawerMode === 'create' ? (
+          <form className="request-form rfq-form" onSubmit={handleCreatePurchaseOrder}>
+            <label className="form-wide">
+              <span>{messages.purchaseOrder.eligibleRfq}</span>
+              <select
+                disabled={eligibleRfqs.length === 0}
+                required
+                value={createForm.rfqId}
+                onChange={(event) => handleCreateRfqChange(event.target.value)}
+              >
+                {eligibleRfqs.length === 0 ? (
+                  <option value="">{messages.purchaseOrder.noEligibleRfq}</option>
+                ) : (
+                  eligibleRfqs.map((rfq) => (
+                    <option key={rfq.rfqId} value={rfq.rfqId}>
+                      {rfq.rfqId} · {rfq.title}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+            <label className="form-wide">
+              <span>{messages.purchaseOrder.selectedQuote}</span>
+              <select
+                disabled={quoteOptions.length === 0}
+                required
+                value={createForm.quoteId}
+                onChange={(event) => updateCreateForm('quoteId', event.target.value)}
+              >
+                {quoteOptions.length === 0 ? (
+                  <option value="">{messages.purchaseOrder.noQuote}</option>
+                ) : (
+                  quoteOptions.map((quote) => {
+                    const supplier = createSupplierById.get(quote.supplierId)
+                    return (
+                      <option key={quote.quoteId} value={quote.quoteId}>
+                        {supplier?.supplierName ?? quote.supplierId} · {formatCurrency(quote.totalAmount, selectedCreateRfq?.currency ?? 'CNY', language)}
+                      </option>
+                    )
+                  })
+                )}
+              </select>
+            </label>
+            <label>
+              <span>{messages.purchaseOrder.buyer}</span>
+              <select
+                required
+                value={createForm.procurementUserId}
+                onChange={(event) => updateCreateForm('procurementUserId', event.target.value)}
+              >
+                {buyers.map((buyer) => (
+                  <option key={buyer.userId} value={buyer.userId}>
+                    {buyer.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>{messages.purchaseOrder.plannedDeliveryDate}</span>
+              <input
+                required
+                type="date"
+                value={createForm.plannedDeliveryDate}
+                onChange={(event) => updateCreateForm('plannedDeliveryDate', event.target.value)}
+              />
+            </label>
+            <label className="form-wide">
+              <span>{messages.purchaseOrder.deliveryLocation}</span>
+              <input
+                required
+                value={createForm.deliveryLocation}
+                onChange={(event) => updateCreateForm('deliveryLocation', event.target.value)}
+              />
+            </label>
+            <label>
+              <span>{messages.purchaseOrder.contactPerson}</span>
+              <input
+                required
+                value={createForm.contactPerson}
+                onChange={(event) => updateCreateForm('contactPerson', event.target.value)}
+              />
+            </label>
+            <label>
+              <span>{messages.purchaseOrder.contactPhone}</span>
+              <input
+                required
+                value={createForm.contactPhone}
+                onChange={(event) => updateCreateForm('contactPhone', event.target.value)}
+              />
+            </label>
+            <label className="form-wide">
+              <span>{messages.purchaseOrder.deliveryNote}</span>
+              <textarea
+                value={createForm.deliveryNote}
+                onChange={(event) => updateCreateForm('deliveryNote', event.target.value)}
+              />
+            </label>
+            {selectedCreateRfq && selectedCreateQuote && (
+              <dl className="detail-grid form-wide">
+                <div>
+                  <dt>{messages.purchaseOrder.sourceRfq}</dt>
+                  <dd>{selectedCreateRfq.rfqId}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseRequest.category}</dt>
+                  <dd>{categoryNameOf(selectedCreateRfq.categoryId, categories)}</dd>
+                </div>
+                <div>
+                  <dt>{messages.rfq.totalAmount}</dt>
+                  <dd>{formatCurrency(selectedCreateQuote.totalAmount, selectedCreateRfq.currency, language)}</dd>
+                </div>
+                <div>
+                  <dt>{messages.rfq.deliveryDate}</dt>
+                  <dd>{formatDate(selectedCreateQuote.deliveryDate, language)}</dd>
+                </div>
+              </dl>
+            )}
+            {createRfqDetail && (
+              <section className="approval-section form-wide">
+                <PanelTitle icon={<NodeIndexOutlined />} title={messages.rfq.comparison} aside={messages.purchaseOrder.downstreamBoundary} />
+                <div className="table-wrap">
+                  <table className="request-table">
+                    <thead>
+                      <tr>
+                        <th>{messages.rfq.rank}</th>
+                        <th>{messages.purchaseOrder.supplier}</th>
+                        <th>{messages.rfq.totalAmount}</th>
+                        <th>{messages.rfq.deliveryDate}</th>
+                        <th>{messages.foundation.risk}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {createRfqComparisonRows.map((row) => (
+                        <tr key={row.supplierId}>
+                          <td>
+                            <span className={row.rank === 1 ? 'tag success' : 'tag'}>{row.rank}</span>
+                          </td>
+                          <td>{row.supplierName}</td>
+                          <td>{formatCurrency(row.totalAmount, createRfqDetail.currency, language)}</td>
+                          <td>{formatDate(row.deliveryDate, language)}</td>
+                          <td>
+                            <span className={`tag ${riskToneOf(row.riskLevel)}`}>
+                              {formatRiskLevel(row.riskLevel, language)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+            <button className="primary-button form-wide" disabled={createMutation.isPending} type="submit">
+              <ShoppingCartOutlined />
+              <span>{messages.purchaseOrder.create}</span>
+            </button>
+            {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+          </form>
+        ) : detail ? (
+          <div className="request-detail rfq-detail">
+            <div className="detail-heading">
+              <div>
+                <TruncatedText className="text-strong" text={detail.title} />
+                <TruncatedText className="text-small" text={`${detail.poId} · ${detail.rfqId} · ${detail.quoteId}`} />
+              </div>
+              <span className={`tag ${purchaseOrderStatusToneOf(detail.status)}`}>
+                {formatPurchaseOrderStatus(detail.status, messages)}
+              </span>
+            </div>
+            <dl className="detail-grid">
+              <div>
+                <dt>{messages.purchaseOrder.supplier}</dt>
+                <dd>{detail.supplierName}</dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseOrder.buyer}</dt>
+                <dd>{userNameOf(detail.procurementUserId, users)}</dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseRequest.category}</dt>
+                <dd>{categoryNameOf(detail.categoryId, categories)}</dd>
+              </div>
+              <div>
+                <dt>{messages.rfq.totalAmount}</dt>
+                <dd>{formatCurrency(detail.totalAmount, detail.currency, language)}</dd>
+              </div>
+              <div>
+                <dt>{messages.rfq.taxAmount}</dt>
+                <dd>{formatCurrency(detail.taxAmount, detail.currency, language)}</dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseOrder.plannedDeliveryDate}</dt>
+                <dd>{formatDate(detail.deliverySchedule.plannedDeliveryDate, language)}</dd>
+              </div>
+            </dl>
+
+            <section className="approval-section">
+              <PanelTitle icon={<ShoppingCartOutlined />} title={messages.purchaseOrder.quoteSnapshot} aside={messages.purchaseOrder.downstreamBoundary} />
+              <dl className="detail-grid">
+                <div>
+                  <dt>{messages.purchaseOrder.sourceRfq}</dt>
+                  <dd>{detail.rfqId}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseOrder.selectedQuote}</dt>
+                  <dd>{detail.quoteId}</dd>
+                </div>
+                <div>
+                  <dt>{messages.rfq.quoteAmount}</dt>
+                  <dd>{formatCurrency(detail.quoteAmount, detail.currency, language)}</dd>
+                </div>
+                <div>
+                  <dt>{messages.rfq.taxRate}</dt>
+                  <dd>{`${(detail.taxRate * 100).toFixed(2)}%`}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="approval-section">
+              <PanelTitle icon={<InboxOutlined />} title={messages.purchaseOrder.deliverySchedule} />
+              <dl className="detail-grid">
+                <div>
+                  <dt>{messages.purchaseOrder.deliveryLocation}</dt>
+                  <dd>{detail.deliverySchedule.deliveryLocation}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseOrder.contactPerson}</dt>
+                  <dd>{detail.deliverySchedule.contactPerson}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseOrder.contactPhone}</dt>
+                  <dd>{detail.deliverySchedule.contactPhone}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseOrder.deliveryNote}</dt>
+                  <dd>{detail.deliverySchedule.deliveryNote ?? '-'}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="approval-section">
+              <PanelTitle icon={<ProfileOutlined />} title={messages.purchaseOrder.lineSnapshot} />
+              <div className="table-wrap">
+                <table className="request-table">
+                  <thead>
+                    <tr>
+                      <th>{messages.purchaseRequest.itemName}</th>
+                      <th>{messages.purchaseRequest.quantity}</th>
+                      <th>{messages.purchaseRequest.unit}</th>
+                      <th>{messages.purchaseRequest.estimatedUnitPrice}</th>
+                      <th>{messages.purchaseRequest.totalAmount}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.lines.map((line) => (
+                      <tr key={line.lineId}>
+                        <td>
+                          <TruncatedText className="text-strong" text={line.itemName} />
+                          {line.specification && <TruncatedText className="text-small" text={line.specification} />}
+                        </td>
+                        <td>{line.quantity}</td>
+                        <td>{line.unit}</td>
+                        <td>{formatCurrency(line.confirmedUnitPrice, detail.currency, language)}</td>
+                        <td>{formatCurrency(line.confirmedAmount, detail.currency, language)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="approval-section">
+              <PanelTitle icon={<NodeIndexOutlined />} title={messages.purchaseOrder.statusRecords} />
+              <div className="timeline">
+                {detail.statusRecords.length === 0 ? (
+                  <div className="empty-state">{messages.purchaseOrder.noRecords}</div>
+                ) : (
+                  detail.statusRecords.map((record) => (
+                    <article className="timeline-item" key={record.recordId}>
+                      <span className={`tag ${purchaseOrderStatusToneOf(record.toStatus)}`}>
+                        {formatPurchaseOrderAction(record.action, messages)}
+                      </span>
+                      <div>
+                        <strong>{userNameOf(record.actorId, users)}</strong>
+                        <small>{formatDateTime(record.createdAt, language)}</small>
+                        {record.comment && <p>{record.comment}</p>}
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="approval-section">
+              <PanelTitle icon={<CheckCircleOutlined />} title={messages.purchaseRequest.status} />
+              <div className="action-row">
+                <DisabledActionTooltip title={publishDisabledReason}>
+                  <button
+                    className="primary-button"
+                    disabled={Boolean(publishDisabledReason)}
+                    onClick={handlePublish}
+                    type="button"
+                  >
+                    <CheckCircleOutlined />
+                    <span>{messages.purchaseOrder.publish}</span>
+                  </button>
+                </DisabledActionTooltip>
+                <input
+                  className="inline-input"
+                  disabled={detail.status === 'CANCELLED'}
+                  placeholder={messages.purchaseOrder.cancelPlaceholder}
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                />
+                <DisabledActionTooltip title={cancelDisabledReason}>
+                  <button
+                    className="secondary-button danger"
+                    disabled={Boolean(cancelDisabledReason)}
+                    onClick={handleCancel}
+                    type="button"
+                  >
+                    <DeleteOutlined />
+                    <span>{messages.purchaseOrder.cancel}</span>
+                  </button>
+                </DisabledActionTooltip>
+              </div>
+            </section>
+            {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+          </div>
+        ) : (
+          <div className="empty-state">{detailQuery.isLoading ? messages.purchaseOrder.loading : messages.purchaseOrder.empty}</div>
         )}
       </Drawer>
     </>
@@ -3855,6 +5000,26 @@ function TruncatedText({ className = '', text }: { className?: string; text: str
     >
       {text}
     </span>
+  )
+}
+
+function DisabledActionTooltip({
+  children,
+  className = '',
+  title,
+}: {
+  children: ReactNode
+  className?: string
+  title?: string
+}) {
+  if (!title) {
+    return <>{children}</>
+  }
+
+  return (
+    <Tooltip title={title} trigger={['hover', 'focus']}>
+      <span className={className ? `disabled-tooltip-wrap ${className}` : 'disabled-tooltip-wrap'}>{children}</span>
+    </Tooltip>
   )
 }
 
@@ -4222,6 +5387,28 @@ function buildRfqQuoteFormDefaults(detail?: RfqDetail, preferredSupplierId?: str
   }
 }
 
+function buildPurchaseOrderCreateFormDefaults(
+  selectedCompanyId: string,
+  eligibleRfqs: RfqListItem[],
+  buyers: UserSummary[],
+): PurchaseOrderCreateFormState {
+  const rfq = eligibleRfqs.find((item) => item.companyId === selectedCompanyId) ?? eligibleRfqs[0]
+  const buyer =
+    buyers.find((user) => user.companyId === selectedCompanyId) ??
+    buyers[0]
+
+  return {
+    contactPerson: buyer?.displayName ?? '',
+    contactPhone: '138-0000-0000',
+    deliveryLocation: selectedCompanyId === 'company-manufacturing' ? '星河智能制造华东仓' : '星河数字科技研发中心',
+    deliveryNote: '',
+    plannedDeliveryDate: rfq?.expectedDeliveryDate ?? nextDate(14),
+    procurementUserId: buyer?.userId ?? '',
+    quoteId: '',
+    rfqId: rfq?.rfqId ?? '',
+  }
+}
+
 function nextDate(days: number) {
   const date = new Date()
   date.setDate(date.getDate() + days)
@@ -4246,6 +5433,36 @@ function rfqStatusToneOf(status: RfqStatus) {
     return 'warn'
   }
   return 'neutral'
+}
+
+function formatPurchaseOrderStatus(status: PurchaseOrderStatus, messages: LocalizedMessages) {
+  const labels = {
+    CANCELLED: messages.purchaseOrder.cancelled,
+    DRAFT: messages.purchaseOrder.draft,
+    ISSUED: messages.purchaseOrder.issued,
+  }
+
+  return labels[status] ?? status
+}
+
+function purchaseOrderStatusToneOf(status: PurchaseOrderStatus) {
+  if (status === 'ISSUED') {
+    return 'success'
+  }
+  if (status === 'CANCELLED') {
+    return 'danger'
+  }
+  return 'neutral'
+}
+
+function formatPurchaseOrderAction(action: PurchaseOrderAction, messages: LocalizedMessages) {
+  const labels = {
+    CANCELLED: messages.purchaseOrder.cancelledAction,
+    CREATED: messages.purchaseOrder.createdAction,
+    PUBLISHED: messages.purchaseOrder.publishedAction,
+  }
+
+  return labels[action] ?? action
 }
 
 function formatDate(value: string, language: Language) {
@@ -4361,6 +5578,10 @@ function App() {
             />
             <Route
               path="/rfqs"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/purchase-orders"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
