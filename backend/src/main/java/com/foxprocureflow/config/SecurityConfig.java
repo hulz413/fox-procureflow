@@ -31,6 +31,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/purchase-requests/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/approvals/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/approvals/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/rfqs/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/rfqs/**").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/rfqs/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated())
             .build();

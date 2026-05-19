@@ -179,6 +179,7 @@ type PurchaseRequestDrawerMode = 'create' | 'detail'
 type ApprovalInstanceStatus = 'IN_PROGRESS' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
 type ApprovalNodeStatus = 'PENDING' | 'ACTIVE' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 type ApprovalAction = 'CREATED' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
+type RfqStatus = 'ISSUED' | 'QUOTING' | 'COMPARISON_READY'
 
 type ApprovalRecord = {
   recordId: string
@@ -325,6 +326,129 @@ type PurchaseRequestFormLine = {
   estimatedUnitPrice: number
 }
 
+type RfqSupplier = {
+  supplierId: string
+  supplierName: string
+  serviceScope: string
+  location: string
+  riskLevel: string
+  sharedScope: string
+  status: 'INVITED'
+  categoryCoverage: string[]
+  createdAt: string
+}
+
+type RfqQuoteAttachment = {
+  attachmentId: string
+  fileName: string
+  description: string | null
+  contentType: string | null
+  sizeBytes: number | null
+  storageObjectKey: string | null
+  createdAt: string
+}
+
+type RfqQuote = {
+  quoteId: string
+  rfqId: string
+  supplierId: string
+  quoteAmount: number
+  taxRate: number
+  taxAmount: number
+  totalAmount: number
+  deliveryDate: string
+  supplierScore: number
+  riskNote: string | null
+  attachments: RfqQuoteAttachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+type RfqListItem = {
+  rfqId: string
+  companyId: string
+  requestId: string
+  approvalId: string
+  title: string
+  status: RfqStatus
+  requestTotalAmount: number
+  currency: string
+  expectedDeliveryDate: string
+  requesterId: string
+  procurementUserId: string
+  categoryId: string
+  supplierCount: number
+  quoteCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+type RfqDetail = RfqListItem & {
+  budgetAccountId: string
+  requestSnapshot: Record<string, unknown>
+  suppliers: RfqSupplier[]
+  quotes: RfqQuote[]
+}
+
+type RfqComparisonRow = {
+  rank: number
+  recommendationScore: number
+  supplierId: string
+  supplierName: string
+  serviceScope: string
+  riskLevel: string
+  quoteAmount: number
+  taxRate: number
+  taxAmount: number
+  totalAmount: number
+  deliveryDate: string
+  supplierScore: number
+  riskNote: string | null
+  attachments: RfqQuoteAttachment[]
+}
+
+type CreateRfqPayload = {
+  companyId: string
+  requestId: string
+  procurementUserId: string
+  title?: string
+  supplierIds: string[]
+}
+
+type UpsertRfqQuotePayload = {
+  companyId: string
+  procurementUserId: string
+  quoteAmount: number
+  taxRate: number
+  deliveryDate: string
+  supplierScore: number
+  riskNote?: string
+  attachments?: Array<{
+    fileName: string
+    description?: string
+    contentType?: string
+    sizeBytes?: number
+  }>
+}
+
+type RfqCreateFormState = {
+  procurementUserId: string
+  requestId: string
+  supplierIds: string[]
+  title: string
+}
+
+type RfqQuoteFormState = {
+  supplierId: string
+  quoteAmount: number
+  taxRate: number
+  deliveryDate: string
+  supplierScore: number
+  riskNote: string
+  fileName: string
+  fileDescription: string
+}
+
 const demoContext: DemoContext = {
   groupId: 'group-xinghe',
   groupName: '星河控股集团',
@@ -383,6 +507,13 @@ async function postApi<T>(path: string, body?: unknown): Promise<ApiEnvelope<T>>
   return requestApi<T>(path, {
     body: body === undefined ? undefined : JSON.stringify(body),
     method: 'POST',
+  })
+}
+
+async function putApi<T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> {
+  return requestApi<T>(path, {
+    body: body === undefined ? undefined : JSON.stringify(body),
+    method: 'PUT',
   })
 }
 
@@ -462,6 +593,28 @@ async function withdrawApproval(approvalId: string, payload: ApprovalActionPaylo
   return postApi<ApprovalDetail>(`/api/approvals/${encodeURIComponent(approvalId)}/withdraw`, payload)
 }
 
+async function fetchRfqs(companyId: string) {
+  return fetchApi<RfqListItem[]>(`/api/rfqs?companyId=${encodeURIComponent(companyId)}`)
+}
+
+async function fetchRfqDetail(rfqId: string, companyId?: string) {
+  const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
+  return fetchApi<RfqDetail>(`/api/rfqs/${encodeURIComponent(rfqId)}${query}`)
+}
+
+async function createRfq(payload: CreateRfqPayload) {
+  return postApi<RfqDetail>('/api/rfqs', payload)
+}
+
+async function upsertRfqQuote(rfqId: string, supplierId: string, payload: UpsertRfqQuotePayload) {
+  return putApi<RfqQuote>(`/api/rfqs/${encodeURIComponent(rfqId)}/quotes/${encodeURIComponent(supplierId)}`, payload)
+}
+
+async function fetchRfqComparison(rfqId: string, companyId?: string) {
+  const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
+  return fetchApi<RfqComparisonRow[]>(`/api/rfqs/${encodeURIComponent(rfqId)}/comparison${query}`)
+}
+
 const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -478,9 +631,11 @@ const localizedContent = {
       foundationTitle: '组织与主数据',
       purchaseRequestsTitle: '采购申请',
       approvalsTitle: '审批中心',
+      rfqTitle: '询报价',
     },
     actions: {
       newRequest: '新建申请',
+      newRfq: '新建 RFQ',
     },
     status: {
       backend: '后端',
@@ -517,7 +672,7 @@ const localizedContent = {
       { label: '采购工作台', icon: <DashboardOutlined />, path: '/' },
       { label: '采购申请', icon: <FileAddOutlined />, path: '/purchase-requests' },
       { label: '审批中心', icon: <AuditOutlined />, path: '/approvals' },
-      { label: '询报价', icon: <FileSearchOutlined /> },
+      { label: '询报价', icon: <FileSearchOutlined />, path: '/rfqs' },
       { label: '采购订单', icon: <ShoppingCartOutlined /> },
       { label: '收货发票', icon: <InboxOutlined /> },
       { label: '三单匹配', icon: <SwapOutlined /> },
@@ -743,6 +898,49 @@ const localizedContent = {
       withdrawnAction: '撤回',
       unknown: '未知',
     },
+    rfq: {
+      dataState: '后端 RFQ 数据',
+      unavailable: '询报价暂不可用',
+      loading: '加载中',
+      empty: '暂无 RFQ',
+      list: 'RFQ 列表',
+      detail: 'RFQ 详情',
+      create: '新建 RFQ',
+      createSuccess: 'RFQ 已创建',
+      createFailed: '创建失败',
+      quoteSuccess: '报价已保存',
+      quoteFailed: '报价保存失败',
+      approvedRequest: '已审批申请',
+      noApprovedRequest: '暂无已通过审批的申请',
+      procurementUser: '采购员',
+      suppliers: '候选供应商',
+      invitedSuppliers: '受邀供应商',
+      quoteProgress: '报价进度',
+      sourceRequest: '来源申请',
+      comparison: '报价对比',
+      quoteEntry: '报价录入',
+      quoteAmount: '报价金额',
+      taxRate: '税率',
+      taxAmount: '税额',
+      totalAmount: '含税总额',
+      deliveryDate: '交付日期',
+      supplierScore: '供应商评分',
+      riskNote: '风险备注',
+      attachmentFile: '附件文件名',
+      attachmentDescription: '附件说明',
+      saveQuote: '保存报价',
+      rank: '推荐',
+      score: '评分',
+      issued: '已发出',
+      quoting: '报价中',
+      comparisonReady: '可比价',
+      noQuote: '未报价',
+      noComparison: '至少两家报价后显示推荐排序',
+      noPo: '本切片只做比价，不生成 PO',
+      discardTitle: '放弃本次 RFQ 编辑？',
+      discardContent: '当前 RFQ 还没有保存，关闭后本次修改会丢失。',
+      discardConfirm: '放弃 RFQ',
+    },
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
   },
   en: {
@@ -760,9 +958,11 @@ const localizedContent = {
       foundationTitle: 'Organization & Master Data',
       purchaseRequestsTitle: 'Purchase Requests',
       approvalsTitle: 'Approval Center',
+      rfqTitle: 'RFQ',
     },
     actions: {
       newRequest: 'New Request',
+      newRfq: 'New RFQ',
     },
     status: {
       backend: 'Backend',
@@ -799,7 +999,7 @@ const localizedContent = {
       { label: 'Dashboard', icon: <DashboardOutlined />, path: '/' },
       { label: 'Requests', icon: <FileAddOutlined />, path: '/purchase-requests' },
       { label: 'Approvals', icon: <AuditOutlined />, path: '/approvals' },
-      { label: 'RFQ', icon: <FileSearchOutlined /> },
+      { label: 'RFQ', icon: <FileSearchOutlined />, path: '/rfqs' },
       { label: 'Purchase Orders', icon: <ShoppingCartOutlined /> },
       { label: 'Receiving & Invoices', icon: <InboxOutlined /> },
       { label: '3-Way Match', icon: <SwapOutlined /> },
@@ -1025,6 +1225,49 @@ const localizedContent = {
       withdrawnAction: 'Withdrawn',
       unknown: 'Unknown',
     },
+    rfq: {
+      dataState: 'Backend RFQs',
+      unavailable: 'RFQs unavailable',
+      loading: 'Loading',
+      empty: 'No RFQs',
+      list: 'RFQ List',
+      detail: 'RFQ Detail',
+      create: 'New RFQ',
+      createSuccess: 'RFQ created',
+      createFailed: 'Create failed',
+      quoteSuccess: 'Quote saved',
+      quoteFailed: 'Quote failed',
+      approvedRequest: 'Approved Request',
+      noApprovedRequest: 'No approved requests',
+      procurementUser: 'Buyer',
+      suppliers: 'Candidate Suppliers',
+      invitedSuppliers: 'Invited Suppliers',
+      quoteProgress: 'Quote Progress',
+      sourceRequest: 'Source Request',
+      comparison: 'Quote Comparison',
+      quoteEntry: 'Quote Entry',
+      quoteAmount: 'Quote Amount',
+      taxRate: 'Tax Rate',
+      taxAmount: 'Tax Amount',
+      totalAmount: 'Tax-Inclusive Total',
+      deliveryDate: 'Delivery Date',
+      supplierScore: 'Supplier Score',
+      riskNote: 'Risk Note',
+      attachmentFile: 'Attachment File',
+      attachmentDescription: 'Attachment Note',
+      saveQuote: 'Save Quote',
+      rank: 'Rank',
+      score: 'Score',
+      issued: 'Issued',
+      quoting: 'Quoting',
+      comparisonReady: 'Comparison Ready',
+      noQuote: 'No quote',
+      noComparison: 'At least two quotes are needed for ranking',
+      noPo: 'This slice compares quotes only; no PO is created',
+      discardTitle: 'Discard RFQ edits?',
+      discardContent: 'This RFQ has not been saved. Closing will discard it.',
+      discardConfirm: 'Discard RFQ',
+    },
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
 } as const
@@ -1098,7 +1341,9 @@ function Workspace({
   const isFoundationRoute = location.pathname === '/master-data'
   const isPurchaseRequestRoute = location.pathname === '/purchase-requests'
   const isApprovalRoute = location.pathname === '/approvals'
+  const isRfqRoute = location.pathname === '/rfqs'
   const [isCreateDrawerOpen, setCreateDrawerOpen] = useState(false)
+  const [isRfqCreateDrawerOpen, setRfqCreateDrawerOpen] = useState(false)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
@@ -1146,6 +1391,12 @@ function Workspace({
   const purchaseRequestsQuery = useQuery({
     queryKey: ['purchase-requests', selectedCompanyId],
     queryFn: () => fetchPurchaseRequests(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const rfqsQuery = useQuery({
+    queryKey: ['rfqs', selectedCompanyId],
+    queryFn: () => fetchRfqs(selectedCompanyId),
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
@@ -1229,6 +1480,11 @@ function Workspace({
   }
 
   const handleNewRequestClick = () => {
+    if (isRfqRoute) {
+      setRfqCreateDrawerOpen(true)
+      return
+    }
+
     if (isPurchaseRequestRoute) {
       setCreateDrawerOpen(true)
       return
@@ -1257,6 +1513,17 @@ function Workspace({
       navigate('/purchase-requests', { replace: true })
     }
   }, [isPurchaseRequestRoute, location.search, navigate])
+
+  useEffect(() => {
+    if (!isRfqRoute) {
+      return
+    }
+
+    if (new URLSearchParams(location.search).get('new') === '1') {
+      setRfqCreateDrawerOpen(true)
+      navigate('/rfqs', { replace: true })
+    }
+  }, [isRfqRoute, location.search, navigate])
 
   return (
     <Layout className="app-shell">
@@ -1318,6 +1585,8 @@ function Workspace({
                   ? messages.header.purchaseRequestsTitle
                   : isApprovalRoute
                     ? messages.header.approvalsTitle
+                    : isRfqRoute
+                      ? messages.header.rfqTitle
                     : messages.header.title}
             </h1>
           </div>
@@ -1334,8 +1603,8 @@ function Workspace({
             </Tooltip>
             {!isFoundationRoute && (
               <button className="primary-button" onClick={handleNewRequestClick} type="button">
-                <FileAddOutlined />
-                <span>{messages.actions.newRequest}</span>
+                {isRfqRoute ? <FileSearchOutlined /> : <FileAddOutlined />}
+                <span>{isRfqRoute ? messages.actions.newRfq : messages.actions.newRequest}</span>
               </button>
             )}
             <Dropdown
@@ -1405,6 +1674,25 @@ function Workspace({
               messages={messages}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
+              users={usersQuery.data?.data ?? []}
+            />
+          ) : isRfqRoute ? (
+            <RfqView
+              categories={categoriesQuery.data?.data ?? []}
+              isCreateOpen={isRfqCreateDrawerOpen}
+              isError={rfqsQuery.isError || purchaseRequestsQuery.isError}
+              isLoading={rfqsQuery.isLoading}
+              language={language}
+              messages={messages}
+              onCreateClose={() => setRfqCreateDrawerOpen(false)}
+              onRefresh={() => {
+                void queryClient.invalidateQueries({ queryKey: ['rfqs'] })
+              }}
+              purchaseRequests={purchaseRequests}
+              rfqs={rfqsQuery.data?.data ?? []}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
+              suppliers={suppliersQuery.data?.data ?? []}
               users={usersQuery.data?.data ?? []}
             />
           ) : (
@@ -2610,6 +2898,620 @@ function ApprovalCenterView({
   )
 }
 
+function RfqView({
+  categories,
+  isCreateOpen,
+  isError,
+  isLoading,
+  language,
+  messages,
+  onCreateClose,
+  onRefresh,
+  purchaseRequests,
+  rfqs,
+  selectedCompany,
+  selectedCompanyId,
+  suppliers,
+  users,
+}: {
+  categories: CategorySummary[]
+  isCreateOpen: boolean
+  isError: boolean
+  isLoading: boolean
+  language: Language
+  messages: LocalizedMessages
+  onCreateClose: () => void
+  onRefresh: () => void
+  purchaseRequests: PurchaseRequestListItem[]
+  rfqs: RfqListItem[]
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  suppliers: SupplierSummary[]
+  users: UserSummary[]
+}) {
+  const queryClient = useQueryClient()
+  const [modal, modalContextHolder] = Modal.useModal()
+  const wasCreateOpen = useRef(false)
+  const [selectedRfqId, setSelectedRfqId] = useState<string | undefined>()
+  const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [isCreateDirty, setCreateDirty] = useState(false)
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const approvedRequests = purchaseRequests.filter((request) => request.approval?.status === 'APPROVED')
+  const buyers = users.filter(
+    (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
+  )
+  const [createForm, setCreateForm] = useState<RfqCreateFormState>(() =>
+    buildRfqCreateFormDefaults(selectedCompanyId, approvedRequests, suppliers, buyers),
+  )
+  const [quoteForm, setQuoteForm] = useState<RfqQuoteFormState>(() => buildRfqQuoteFormDefaults())
+
+  useEffect(() => {
+    if (rfqs.length === 0) {
+      setSelectedRfqId(undefined)
+      setDetailDrawerOpen(false)
+      return
+    }
+
+    if (selectedRfqId && !rfqs.some((rfq) => rfq.rfqId === selectedRfqId)) {
+      setSelectedRfqId(undefined)
+      setDetailDrawerOpen(false)
+    }
+  }, [rfqs, selectedRfqId])
+
+  useEffect(() => {
+    const didOpenCreateDrawer = isCreateOpen && !wasCreateOpen.current
+    wasCreateOpen.current = isCreateOpen
+    if (!didOpenCreateDrawer) {
+      return
+    }
+
+    setCreateDirty(false)
+    setFeedback(null)
+    setDetailDrawerOpen(false)
+    setCreateForm(buildRfqCreateFormDefaults(selectedCompanyId, approvedRequests, suppliers, buyers))
+  }, [approvedRequests, buyers, isCreateOpen, selectedCompanyId, suppliers])
+
+  useEffect(() => {
+    setCreateForm((current) => {
+      const currentRequest = approvedRequests.find((request) => request.requestId === current.requestId)
+      const request = currentRequest ?? approvedRequests[0]
+      const procurementUser =
+        buyers.find((buyer) => buyer.userId === current.procurementUserId) ?? buyers[0]
+      const validSupplierIds = suppliersForCategory(request?.categoryId ?? '', suppliers).map((supplier) => supplier.supplierId)
+      const supplierIds = current.supplierIds.filter((supplierId) => validSupplierIds.includes(supplierId))
+      const next = {
+        ...current,
+        procurementUserId: procurementUser?.userId ?? '',
+        requestId: request?.requestId ?? '',
+        supplierIds: supplierIds.length > 0 ? supplierIds : validSupplierIds.slice(0, 3),
+        title: current.title || (request ? `${request.title} RFQ` : ''),
+      }
+      if (
+        next.procurementUserId === current.procurementUserId &&
+        next.requestId === current.requestId &&
+        next.title === current.title &&
+        next.supplierIds.join('|') === current.supplierIds.join('|')
+      ) {
+        return current
+      }
+      return next
+    })
+  }, [approvedRequests, buyers, suppliers])
+
+  const detailQuery = useQuery({
+    queryKey: ['rfq-detail', selectedRfqId, selectedCompanyId],
+    queryFn: () => fetchRfqDetail(selectedRfqId ?? '', selectedCompanyId),
+    enabled: Boolean(selectedRfqId),
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
+  const detail = detailQuery.data?.data
+  const comparisonQuery = useQuery({
+    queryKey: ['rfq-comparison', selectedRfqId, selectedCompanyId],
+    queryFn: () => fetchRfqComparison(selectedRfqId ?? '', selectedCompanyId),
+    enabled: Boolean(selectedRfqId),
+    placeholderData: keepPreviousData,
+    retry: 1,
+  })
+  const comparisonRows = comparisonQuery.data?.data ?? []
+
+  useEffect(() => {
+    if (!detail) {
+      setQuoteForm(buildRfqQuoteFormDefaults())
+      return
+    }
+
+    setQuoteForm((current) => buildRfqQuoteFormDefaults(detail, current.supplierId))
+  }, [detail])
+
+  const createMutation = useMutation({
+    mutationFn: createRfq,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.rfq.createFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setCreateDirty(false)
+      setFeedback({ message: messages.rfq.createSuccess, tone: 'success' })
+      setSelectedRfqId(response.data.rfqId)
+      setDetailDrawerOpen(true)
+      onCreateClose()
+      onRefresh()
+      void queryClient.invalidateQueries({ queryKey: ['rfq-detail', response.data.rfqId] })
+    },
+  })
+
+  const quoteMutation = useMutation({
+    mutationFn: ({
+      rfqId,
+      supplierId,
+      payload,
+    }: {
+      rfqId: string
+      supplierId: string
+      payload: UpsertRfqQuotePayload
+    }) => upsertRfqQuote(rfqId, supplierId, payload),
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.rfq.quoteFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (_response, variables) => {
+      setFeedback({ message: messages.rfq.quoteSuccess, tone: 'success' })
+      void queryClient.invalidateQueries({ queryKey: ['rfqs'] })
+      void queryClient.invalidateQueries({ queryKey: ['rfq-detail', variables.rfqId] })
+      void queryClient.invalidateQueries({ queryKey: ['rfq-comparison', variables.rfqId] })
+    },
+  })
+
+  const selectedCreateRequest = approvedRequests.find((request) => request.requestId === createForm.requestId)
+  const selectableSuppliers = suppliersForCategory(selectedCreateRequest?.categoryId ?? '', suppliers)
+  const quoteSupplier = detail?.suppliers.find((supplier) => supplier.supplierId === quoteForm.supplierId)
+  const quoteBySupplier = new Map(detail?.quotes.map((quote) => [quote.supplierId, quote]) ?? [])
+  const drawerMode = isCreateOpen ? 'create' : isDetailDrawerOpen ? 'detail' : null
+  const drawerTitle = drawerMode === 'create' ? messages.rfq.create : messages.rfq.detail
+
+  const updateCreateForm = <Key extends keyof RfqCreateFormState>(key: Key, value: RfqCreateFormState[Key]) => {
+    setCreateDirty(true)
+    setCreateForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const handleCreateRequestChange = (requestId: string) => {
+    const request = approvedRequests.find((item) => item.requestId === requestId)
+    const nextSuppliers = suppliersForCategory(request?.categoryId ?? '', suppliers).slice(0, 3)
+    setCreateDirty(true)
+    setCreateForm((current) => ({
+      ...current,
+      requestId,
+      supplierIds: nextSuppliers.map((supplier) => supplier.supplierId),
+      title: request ? `${request.title} RFQ` : current.title,
+    }))
+  }
+
+  const handleCreateRfq = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!createForm.requestId || !createForm.procurementUserId || createForm.supplierIds.length === 0) {
+      setFeedback({ message: messages.rfq.noApprovedRequest, tone: 'danger' })
+      return
+    }
+
+    createMutation.mutate({
+      companyId: selectedCompanyId,
+      procurementUserId: createForm.procurementUserId,
+      requestId: createForm.requestId,
+      supplierIds: createForm.supplierIds,
+      title: createForm.title,
+    })
+  }
+
+  const handleQuoteSupplierChange = (supplierId: string) => {
+    setQuoteForm(buildRfqQuoteFormDefaults(detail, supplierId))
+  }
+
+  const updateQuoteForm = <Key extends keyof RfqQuoteFormState>(key: Key, value: RfqQuoteFormState[Key]) => {
+    setQuoteForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const handleQuoteSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!detail || !quoteForm.supplierId) {
+      return
+    }
+
+    quoteMutation.mutate({
+      rfqId: detail.rfqId,
+      supplierId: quoteForm.supplierId,
+      payload: {
+        attachments: quoteForm.fileName
+          ? [
+              {
+                contentType: 'application/pdf',
+                description: quoteForm.fileDescription,
+                fileName: quoteForm.fileName,
+                sizeBytes: 0,
+              },
+            ]
+          : [],
+        companyId: selectedCompanyId,
+        deliveryDate: quoteForm.deliveryDate,
+        procurementUserId: detail.procurementUserId,
+        quoteAmount: quoteForm.quoteAmount,
+        riskNote: quoteForm.riskNote,
+        supplierScore: quoteForm.supplierScore,
+        taxRate: quoteForm.taxRate,
+      },
+    })
+  }
+
+  const closeCreateDrawer = () => {
+    setCreateDirty(false)
+    onCreateClose()
+  }
+
+  const handleDrawerClose = () => {
+    if (drawerMode === 'create' && isCreateDirty) {
+      modal.confirm({
+        mousePosition: getViewportCenter(),
+        centered: true,
+        cancelText: messages.purchaseRequest.continueEdit,
+        content: messages.rfq.discardContent,
+        focusable: { autoFocusButton: 'cancel' },
+        okType: 'danger',
+        okText: messages.rfq.discardConfirm,
+        onOk: closeCreateDrawer,
+        rootClassName: 'procure-confirm-modal',
+        title: messages.rfq.discardTitle,
+      })
+      return
+    }
+
+    if (drawerMode === 'create') {
+      closeCreateDrawer()
+      return
+    }
+
+    setDetailDrawerOpen(false)
+    setFeedback(null)
+  }
+
+  return (
+    <>
+      {modalContextHolder}
+      <section className="request-grid rfq-grid">
+        <section className="panel request-list-panel">
+          <PanelTitle icon={<FileSearchOutlined />} title={messages.rfq.list} aside={selectedCompany.companyName} />
+          {isError && <div className="data-alert">{messages.rfq.unavailable}</div>}
+          <div className="table-wrap">
+            <table className="request-table">
+              <thead>
+                <tr>
+                  <th>RFQ</th>
+                  <th>{messages.rfq.sourceRequest}</th>
+                  <th>{messages.purchaseRequest.category}</th>
+                  <th>{messages.rfq.quoteProgress}</th>
+                  <th>{messages.purchaseRequest.totalAmount}</th>
+                  <th>{messages.purchaseRequest.status}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rfqs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>{isLoading ? messages.rfq.loading : messages.rfq.empty}</td>
+                  </tr>
+                ) : (
+                  rfqs.map((rfq) => (
+                    <tr key={rfq.rfqId}>
+                      <td>
+                        <button
+                          className={rfq.rfqId === selectedRfqId ? 'row-link active' : 'row-link'}
+                          onClick={() => {
+                            setSelectedRfqId(rfq.rfqId)
+                            setDetailDrawerOpen(true)
+                            setFeedback(null)
+                          }}
+                          type="button"
+                        >
+                          <TruncatedText text={rfq.rfqId} />
+                        </button>
+                      </td>
+                      <td>
+                        <TruncatedText text={rfq.requestId} />
+                      </td>
+                      <td>
+                        <TruncatedText text={categoryNameOf(rfq.categoryId, categories)} />
+                      </td>
+                      <td>{`${rfq.quoteCount}/${rfq.supplierCount}`}</td>
+                      <td>{formatCurrency(rfq.requestTotalAmount, rfq.currency, language)}</td>
+                      <td>
+                        <span className={`tag ${rfqStatusToneOf(rfq.status)}`}>
+                          {formatRfqStatus(rfq.status, messages)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <Drawer
+        className="request-drawer rfq-drawer"
+        destroyOnClose={false}
+        keyboard
+        maskClosable
+        onClose={handleDrawerClose}
+        open={drawerMode !== null}
+        title={drawerTitle}
+        size={840}
+      >
+        {drawerMode === 'create' ? (
+          <form className="request-form rfq-form" onSubmit={handleCreateRfq}>
+            <label className="form-wide">
+              <span>{messages.rfq.approvedRequest}</span>
+              <select
+                disabled={approvedRequests.length === 0}
+                required
+                value={createForm.requestId}
+                onChange={(event) => handleCreateRequestChange(event.target.value)}
+              >
+                {approvedRequests.length === 0 ? (
+                  <option value="">{messages.rfq.noApprovedRequest}</option>
+                ) : (
+                  approvedRequests.map((request) => (
+                    <option key={request.requestId} value={request.requestId}>
+                      {request.requestId} · {request.title}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+            <label>
+              <span>{messages.rfq.procurementUser}</span>
+              <select
+                required
+                value={createForm.procurementUserId}
+                onChange={(event) => updateCreateForm('procurementUserId', event.target.value)}
+              >
+                {buyers.map((buyer) => (
+                  <option key={buyer.userId} value={buyer.userId}>
+                    {buyer.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>{messages.purchaseRequest.title}</span>
+              <input required value={createForm.title} onChange={(event) => updateCreateForm('title', event.target.value)} />
+            </label>
+            <label className="form-wide">
+              <span>{messages.rfq.suppliers}</span>
+              <Select
+                mode="multiple"
+                options={selectableSuppliers.map((supplier) => ({
+                  label: supplier.supplierName,
+                  value: supplier.supplierId,
+                }))}
+                onChange={(value) => updateCreateForm('supplierIds', value)}
+                value={createForm.supplierIds}
+              />
+            </label>
+            {selectedCreateRequest && (
+              <dl className="detail-grid form-wide">
+                <div>
+                  <dt>{messages.purchaseRequest.category}</dt>
+                  <dd>{categoryNameOf(selectedCreateRequest.categoryId, categories)}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseRequest.totalAmount}</dt>
+                  <dd>{formatCurrency(selectedCreateRequest.totalAmount, selectedCreateRequest.currency, language)}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseRequest.expectedDeliveryDate}</dt>
+                  <dd>{formatDate(selectedCreateRequest.expectedDeliveryDate, language)}</dd>
+                </div>
+                <div>
+                  <dt>{messages.purchaseRequest.approvalStatus}</dt>
+                  <dd>{formatApprovalStatus(selectedCreateRequest.approval?.status ?? 'APPROVED', messages)}</dd>
+                </div>
+              </dl>
+            )}
+            <button className="primary-button form-wide" disabled={createMutation.isPending} type="submit">
+              <FileSearchOutlined />
+              <span>{messages.rfq.create}</span>
+            </button>
+            {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+          </form>
+        ) : detail ? (
+          <div className="request-detail rfq-detail">
+            <div className="detail-heading">
+              <div>
+                <TruncatedText className="text-strong" text={detail.title} />
+                <TruncatedText className="text-small" text={`${detail.rfqId} · ${detail.requestId}`} />
+              </div>
+              <span className={`tag ${rfqStatusToneOf(detail.status)}`}>
+                {formatRfqStatus(detail.status, messages)}
+              </span>
+            </div>
+            <dl className="detail-grid">
+              <div>
+                <dt>{messages.rfq.procurementUser}</dt>
+                <dd>{userNameOf(detail.procurementUserId, users)}</dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseRequest.category}</dt>
+                <dd>{categoryNameOf(detail.categoryId, categories)}</dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseRequest.totalAmount}</dt>
+                <dd>{formatCurrency(detail.requestTotalAmount, detail.currency, language)}</dd>
+              </div>
+              <div>
+                <dt>{messages.rfq.quoteProgress}</dt>
+                <dd>{`${detail.quotes.length}/${detail.suppliers.length}`}</dd>
+              </div>
+            </dl>
+
+            <section className="approval-section">
+              <PanelTitle icon={<TeamOutlined />} title={messages.rfq.invitedSuppliers} aside={messages.rfq.noPo} />
+              <div className="supplier-invite-list">
+                {detail.suppliers.map((supplier) => {
+                  const quote = quoteBySupplier.get(supplier.supplierId)
+                  return (
+                    <button
+                      className={supplier.supplierId === quoteForm.supplierId ? 'supplier-chip active' : 'supplier-chip'}
+                      key={supplier.supplierId}
+                      onClick={() => handleQuoteSupplierChange(supplier.supplierId)}
+                      type="button"
+                    >
+                      <strong>{supplier.supplierName}</strong>
+                      <span>{quote ? formatCurrency(quote.totalAmount, detail.currency, language) : messages.rfq.noQuote}</span>
+                      <em className={`tag ${riskToneOf(supplier.riskLevel)}`}>
+                        {formatRiskLevel(supplier.riskLevel, language)}
+                      </em>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="approval-section">
+              <PanelTitle icon={<FileSearchOutlined />} title={messages.rfq.quoteEntry} aside={quoteSupplier?.supplierName} />
+              <form className="quote-form" onSubmit={handleQuoteSubmit}>
+                <label>
+                  <span>{messages.rfq.suppliers}</span>
+                  <select value={quoteForm.supplierId} onChange={(event) => handleQuoteSupplierChange(event.target.value)}>
+                    {detail.suppliers.map((supplier) => (
+                      <option key={supplier.supplierId} value={supplier.supplierId}>
+                        {supplier.supplierName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{messages.rfq.quoteAmount}</span>
+                  <input
+                    min="0.01"
+                    required
+                    step="0.01"
+                    type="number"
+                    value={quoteForm.quoteAmount}
+                    onChange={(event) => updateQuoteForm('quoteAmount', Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  <span>{messages.rfq.taxRate}</span>
+                  <input
+                    min="0"
+                    max="1"
+                    required
+                    step="0.0001"
+                    type="number"
+                    value={quoteForm.taxRate}
+                    onChange={(event) => updateQuoteForm('taxRate', Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  <span>{messages.rfq.deliveryDate}</span>
+                  <input
+                    required
+                    type="date"
+                    value={quoteForm.deliveryDate}
+                    onChange={(event) => updateQuoteForm('deliveryDate', event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>{messages.rfq.supplierScore}</span>
+                  <input
+                    min="0"
+                    max="100"
+                    required
+                    step="0.01"
+                    type="number"
+                    value={quoteForm.supplierScore}
+                    onChange={(event) => updateQuoteForm('supplierScore', Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  <span>{messages.rfq.attachmentFile}</span>
+                  <input value={quoteForm.fileName} onChange={(event) => updateQuoteForm('fileName', event.target.value)} />
+                </label>
+                <label className="form-wide">
+                  <span>{messages.rfq.riskNote}</span>
+                  <textarea value={quoteForm.riskNote} onChange={(event) => updateQuoteForm('riskNote', event.target.value)} />
+                </label>
+                <label className="form-wide">
+                  <span>{messages.rfq.attachmentDescription}</span>
+                  <input
+                    value={quoteForm.fileDescription}
+                    onChange={(event) => updateQuoteForm('fileDescription', event.target.value)}
+                  />
+                </label>
+                <button className="primary-button form-wide" disabled={quoteMutation.isPending} type="submit">
+                  <CheckCircleOutlined />
+                  <span>{messages.rfq.saveQuote}</span>
+                </button>
+              </form>
+            </section>
+
+            <section className="approval-section">
+              <PanelTitle icon={<NodeIndexOutlined />} title={messages.rfq.comparison} aside={messages.rfq.noPo} />
+              <div className="table-wrap">
+                <table className="request-table">
+                  <thead>
+                    <tr>
+                      <th>{messages.rfq.rank}</th>
+                      <th>{messages.foundation.supplierPool}</th>
+                      <th>{messages.rfq.totalAmount}</th>
+                      <th>{messages.rfq.deliveryDate}</th>
+                      <th>{messages.rfq.score}</th>
+                      <th>{messages.foundation.risk}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparisonRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>{messages.rfq.noComparison}</td>
+                      </tr>
+                    ) : (
+                      comparisonRows.map((row) => (
+                        <tr key={row.supplierId}>
+                          <td>
+                            <span className={row.rank === 1 ? 'tag success' : 'tag'}>{row.rank}</span>
+                          </td>
+                          <td>
+                            <TruncatedText className="text-strong" text={row.supplierName} />
+                            {row.attachments[0] && <TruncatedText className="text-small" text={row.attachments[0].fileName} />}
+                          </td>
+                          <td>{formatCurrency(row.totalAmount, detail.currency, language)}</td>
+                          <td>{formatDate(row.deliveryDate, language)}</td>
+                          <td>{row.recommendationScore}</td>
+                          <td>
+                            <span className={`tag ${riskToneOf(row.riskLevel)}`}>
+                              {formatRiskLevel(row.riskLevel, language)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+          </div>
+        ) : (
+          <div className="empty-state">{detailQuery.isLoading ? messages.rfq.loading : messages.rfq.empty}</div>
+        )}
+      </Drawer>
+    </>
+  )
+}
+
 function ApprovalPath({
   messages,
   nodes,
@@ -3277,6 +4179,75 @@ function preferredSupplierForCategory(categoryId: string, suppliers: SupplierSum
   return suppliers.find(supportsCategory)
 }
 
+function suppliersForCategory(categoryId: string, suppliers: SupplierSummary[]) {
+  return suppliers.filter((supplier) => supplier.categories.some((category) => category.categoryId === categoryId))
+}
+
+function buildRfqCreateFormDefaults(
+  selectedCompanyId: string,
+  approvedRequests: PurchaseRequestListItem[],
+  suppliers: SupplierSummary[],
+  buyers: UserSummary[],
+): RfqCreateFormState {
+  const request = approvedRequests.find((item) => item.companyId === selectedCompanyId) ?? approvedRequests[0]
+  const candidateSuppliers = suppliersForCategory(request?.categoryId ?? '', suppliers)
+  const buyer =
+    buyers.find((user) => user.companyId === selectedCompanyId) ??
+    buyers[0]
+
+  return {
+    procurementUserId: buyer?.userId ?? '',
+    requestId: request?.requestId ?? '',
+    supplierIds: candidateSuppliers.slice(0, 3).map((supplier) => supplier.supplierId),
+    title: request ? `${request.title} RFQ` : '',
+  }
+}
+
+function buildRfqQuoteFormDefaults(detail?: RfqDetail, preferredSupplierId?: string): RfqQuoteFormState {
+  const supplier =
+    detail?.suppliers.find((item) => item.supplierId === preferredSupplierId) ??
+    detail?.suppliers[0]
+  const quote = detail?.quotes.find((item) => item.supplierId === supplier?.supplierId)
+  const attachment = quote?.attachments[0]
+
+  return {
+    deliveryDate: quote?.deliveryDate ?? nextDate(14),
+    fileDescription: attachment?.description ?? '',
+    fileName: attachment?.fileName ?? '',
+    quoteAmount: quote?.quoteAmount ?? 0,
+    riskNote: quote?.riskNote ?? '',
+    supplierId: supplier?.supplierId ?? '',
+    supplierScore: quote?.supplierScore ?? 85,
+    taxRate: quote?.taxRate ?? 0.13,
+  }
+}
+
+function nextDate(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function formatRfqStatus(status: RfqStatus, messages: LocalizedMessages) {
+  const labels = {
+    COMPARISON_READY: messages.rfq.comparisonReady,
+    ISSUED: messages.rfq.issued,
+    QUOTING: messages.rfq.quoting,
+  }
+
+  return labels[status] ?? status
+}
+
+function rfqStatusToneOf(status: RfqStatus) {
+  if (status === 'COMPARISON_READY') {
+    return 'success'
+  }
+  if (status === 'QUOTING') {
+    return 'warn'
+  }
+  return 'neutral'
+}
+
 function formatDate(value: string, language: Language) {
   return new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
     day: '2-digit',
@@ -3386,6 +4357,10 @@ function App() {
             />
             <Route
               path="/approvals"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/rfqs"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />

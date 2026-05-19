@@ -252,7 +252,9 @@ class ApprovalWorkflowIntegrationTest {
 
     @Test
     void approvalDoesNotCreateDownstreamProcurementRecords() throws Exception {
-        String approvalId = submitAndReadApprovalId(createDraft(manufacturingSpareDraft()));
+        String requestId = createDraft(manufacturingSpareDraft());
+        String approvalId = submitAndReadApprovalId(requestId);
+        int initialRfqCount = rowCount("rfqs");
 
         mockMvc.perform(post("/api/approvals/{approvalId}/approve", approvalId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -260,7 +262,8 @@ class ApprovalWorkflowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("APPROVED"));
 
-        assertThat(tableExists("rfqs")).isFalse();
+        assertThat(rowCount("rfqs")).isEqualTo(initialRfqCount);
+        assertThat(rfqCountForRequest(requestId)).isZero();
         assertThat(tableExists("purchase_orders")).isFalse();
         assertThat(tableExists("receipts")).isFalse();
         assertThat(tableExists("invoices")).isFalse();
@@ -439,5 +442,19 @@ class ApprovalWorkflowIntegrationTest {
               AND table_name = ?
             """, Integer.class, tableName);
         return count != null && count > 0;
+    }
+
+    private int rowCount(String tableName) {
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    private int rfqCountForRequest(String requestId) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rfqs WHERE request_id = ?",
+            Integer.class,
+            requestId
+        );
+        return count == null ? 0 : count;
     }
 }
