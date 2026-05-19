@@ -347,6 +347,10 @@ type RfqQuoteAttachment = {
   contentType: string | null
   sizeBytes: number | null
   storageObjectKey: string | null
+  storageStatus?: string | null
+  downloadable?: boolean | null
+  downloadUrl?: string | null
+  downloadDisabledReason?: string | null
   createdAt: string
 }
 
@@ -431,6 +435,19 @@ type UpsertRfqQuotePayload = {
     contentType?: string
     sizeBytes?: number
   }>
+  attachmentIds?: string[]
+}
+
+type UploadedAttachment = {
+  attachmentId: string
+  originalFileName: string
+  description: string | null
+  contentType: string
+  sizeBytes: number
+  storageStatus: string
+  downloadable: boolean
+  downloadUrl: string | null
+  downloadDisabledReason: string | null
 }
 
 type RfqCreateFormState = {
@@ -449,6 +466,8 @@ type RfqQuoteFormState = {
   riskNote: string
   fileName: string
   fileDescription: string
+  file: File | null
+  uploadedAttachments: UploadedAttachment[]
 }
 
 type PurchaseOrderLine = {
@@ -654,6 +673,10 @@ type ReceiptInvoiceAttachment = {
   contentType: string
   sizeBytes: number
   storageObjectKey: string | null
+  storageStatus?: string | null
+  downloadable?: boolean | null
+  downloadUrl?: string | null
+  downloadDisabledReason?: string | null
   createdAt: string
 }
 
@@ -686,6 +709,7 @@ type FulfillmentPurchaseOrder = {
   receiptSummary: ReceiptProgressStatus
   invoiceSummary: InvoiceProgressStatus
   invoiceAmountStatus: InvoiceAmountStatus
+  attachmentCount: number
   lines: FulfillmentLine[]
   issuedAt: string | null
   updatedAt: string
@@ -746,6 +770,7 @@ type CreateReceiptPayload = {
     contentType: string
     sizeBytes: number
   }>
+  attachmentIds?: string[]
 }
 
 type CreateInvoicePayload = {
@@ -769,6 +794,7 @@ type CreateInvoicePayload = {
     contentType: string
     sizeBytes: number
   }>
+  attachmentIds?: string[]
 }
 
 type ReceiptCreateFormState = {
@@ -778,6 +804,8 @@ type ReceiptCreateFormState = {
   note: string
   fileName: string
   fileDescription: string
+  file: File | null
+  uploadedAttachments: UploadedAttachment[]
   lines: Array<{
     poLineId: string
     receivedQuantity: number
@@ -793,6 +821,8 @@ type InvoiceCreateFormState = {
   note: string
   fileName: string
   fileDescription: string
+  file: File | null
+  uploadedAttachments: UploadedAttachment[]
   lines: Array<{
     poLineId: string
     invoicedQuantity: number
@@ -1159,6 +1189,53 @@ async function upsertRfqQuote(rfqId: string, supplierId: string, payload: Upsert
   return putApi<RfqQuote>(`/api/rfqs/${encodeURIComponent(rfqId)}/quotes/${encodeURIComponent(supplierId)}`, payload)
 }
 
+async function uploadAttachment({
+  companyId,
+  description,
+  file,
+  supplierId,
+  targetId,
+  targetType,
+  uploadedBy,
+}: {
+  companyId: string
+  description?: string
+  file: File
+  supplierId?: string
+  targetId: string
+  targetType: 'RFQ_QUOTE' | 'RECEIPT' | 'INVOICE'
+  uploadedBy?: string
+}) {
+  const formData = new FormData()
+  formData.append('companyId', companyId)
+  formData.append('targetType', targetType)
+  formData.append('targetId', targetId)
+  if (supplierId) {
+    formData.append('supplierId', supplierId)
+  }
+  if (uploadedBy) {
+    formData.append('uploadedBy', uploadedBy)
+  }
+  if (description) {
+    formData.append('description', description)
+  }
+  formData.append('file', file)
+
+  const response = await fetch(`${apiBaseUrl}/api/attachments`, {
+    body: formData,
+    method: 'POST',
+  })
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null)
+    const message =
+      errorBody && typeof errorBody.message === 'string'
+        ? errorBody.message
+        : `Request failed with ${response.status}`
+    throw new Error(message)
+  }
+  return response.json() as Promise<ApiEnvelope<UploadedAttachment>>
+}
+
 async function fetchRfqComparison(rfqId: string, companyId?: string) {
   const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
   return fetchApi<RfqComparisonRow[]>(`/api/rfqs/${encodeURIComponent(rfqId)}/comparison${query}`)
@@ -1255,7 +1332,7 @@ async function fetchProcurementDashboard(scope: ProcurementDashboardScope, compa
   return fetchApi<ProcurementDashboard>(`/api/procurement-dashboard?${query.toString()}`)
 }
 
-const localizedContent = {
+export const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
     boundaryNote: '集团共享供应商池，公司级采购数据隔离',
@@ -1685,6 +1762,10 @@ const localizedContent = {
       riskNote: '风险备注',
       attachmentFile: '附件文件名',
       attachmentDescription: '附件说明',
+      downloadAttachment: '下载',
+      metadataOnlyReason: '仅有元数据，未上传真实文件',
+      pendingUploadReason: '保存时上传后可下载',
+      uploadingAttachment: '附件上传中',
       saveQuote: '保存报价',
       rank: '推荐',
       score: '评分',
@@ -2296,6 +2377,10 @@ const localizedContent = {
       riskNote: 'Risk Note',
       attachmentFile: 'Attachment File',
       attachmentDescription: 'Attachment Note',
+      downloadAttachment: 'Download',
+      metadataOnlyReason: 'Metadata only; no uploaded file',
+      pendingUploadReason: 'Upload on save before download',
+      uploadingAttachment: 'Uploading attachment',
       saveQuote: 'Save Quote',
       rank: 'Rank',
       score: 'Score',
@@ -4557,6 +4642,7 @@ function RfqView({
     buildRfqCreateFormDefaults(selectedCompanyId, approvedRequests, suppliers, buyers),
   )
   const [quoteForm, setQuoteForm] = useState<RfqQuoteFormState>(() => buildRfqQuoteFormDefaults())
+  const [isQuoteUploading, setQuoteUploading] = useState(false)
 
   useEffect(() => {
     if (rfqs.length === 0) {
@@ -4702,7 +4788,11 @@ function RfqView({
   const quoteBySupplier = new Map(detail?.quotes.map((quote) => [quote.supplierId, quote]) ?? [])
   const drawerMode = isCreateOpen ? 'create' : isDetailDrawerOpen ? 'detail' : null
   const drawerTitle = drawerMode === 'create' ? messages.rfq.create : messages.rfq.detail
-  const saveQuoteDisabledReason = quoteMutation.isPending ? messages.rfq.saveQuotePendingReason : undefined
+  const saveQuoteDisabledReason = quoteMutation.isPending
+    ? messages.rfq.saveQuotePendingReason
+    : isQuoteUploading
+      ? messages.rfq.uploadingAttachment
+      : undefined
   const aiRfqDisabledReason = aiRfqMutation.isPending
     ? messages.ai.generating
     : comparisonRows.length < 2
@@ -4760,29 +4850,62 @@ function RfqView({
       return
     }
 
-    quoteMutation.mutate({
-      rfqId: detail.rfqId,
-      supplierId: quoteForm.supplierId,
-      payload: {
-        attachments: quoteForm.fileName
-          ? [
-              {
-                contentType: 'application/pdf',
-                description: quoteForm.fileDescription,
-                fileName: quoteForm.fileName,
-                sizeBytes: 0,
-              },
-            ]
-          : [],
-        companyId: selectedCompanyId,
-        deliveryDate: quoteForm.deliveryDate,
-        procurementUserId: detail.procurementUserId,
-        quoteAmount: quoteForm.quoteAmount,
-        riskNote: quoteForm.riskNote,
-        supplierScore: quoteForm.supplierScore,
-        taxRate: quoteForm.taxRate,
-      },
-    })
+    void (async () => {
+      setQuoteUploading(true)
+      try {
+        let uploadedAttachments = quoteForm.uploadedAttachments
+        if (quoteForm.file) {
+          const uploadResponse = await uploadAttachment({
+            companyId: selectedCompanyId,
+            description: quoteForm.fileDescription,
+            file: quoteForm.file,
+            supplierId: quoteForm.supplierId,
+            targetId: detail.rfqId,
+            targetType: 'RFQ_QUOTE',
+            uploadedBy: detail.procurementUserId,
+          })
+          uploadedAttachments = [uploadResponse.data]
+          setQuoteForm((current) => ({
+            ...current,
+            file: null,
+            fileName: uploadResponse.data.originalFileName,
+            uploadedAttachments,
+          }))
+        }
+
+        quoteMutation.mutate({
+          rfqId: detail.rfqId,
+          supplierId: quoteForm.supplierId,
+          payload: {
+            attachmentIds: uploadedAttachments.map((attachment) => attachment.attachmentId),
+            attachments: uploadedAttachments.length === 0 && quoteForm.fileName
+              ? [
+                  {
+                    contentType: 'application/pdf',
+                    description: quoteForm.fileDescription,
+                    fileName: quoteForm.fileName,
+                    sizeBytes: 0,
+                  },
+                ]
+              : [],
+            companyId: selectedCompanyId,
+            deliveryDate: quoteForm.deliveryDate,
+            procurementUserId: detail.procurementUserId,
+            quoteAmount: quoteForm.quoteAmount,
+            riskNote: quoteForm.riskNote,
+            supplierScore: quoteForm.supplierScore,
+            taxRate: quoteForm.taxRate,
+          },
+        })
+      } catch (error) {
+        setFeedback({
+          message: `${messages.rfq.quoteFailed}: ${error instanceof Error ? error.message : ''}`,
+          tone: 'danger',
+        })
+      } finally {
+        setQuoteUploading(false)
+      }
+    })()
   }
 
   const requestAiRfqExplanation = () => {
@@ -5129,7 +5252,20 @@ function RfqView({
                 </label>
                 <label>
                   <span>{messages.rfq.attachmentFile}</span>
-                  <input value={quoteForm.fileName} onChange={(event) => updateQuoteForm('fileName', event.target.value)} />
+                  <input
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt"
+                    type="file"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null
+                      setQuoteDirty(true)
+                      setQuoteForm((current) => ({
+                        ...current,
+                        file,
+                        fileName: file?.name ?? current.fileName,
+                        uploadedAttachments: file ? [] : current.uploadedAttachments,
+                      }))
+                    }}
+                  />
                 </label>
                 <label className="form-wide">
                   <span>{messages.rfq.riskNote}</span>
@@ -5142,6 +5278,28 @@ function RfqView({
                     onChange={(event) => updateQuoteForm('fileDescription', event.target.value)}
                   />
                 </label>
+                <AttachmentList
+                  attachments={[
+                    ...quoteForm.uploadedAttachments,
+                    ...(quoteForm.uploadedAttachments.length === 0 && quoteForm.fileName
+                      ? [{
+                          attachmentId: '',
+                          contentType: 'application/pdf',
+                          description: quoteForm.fileDescription || null,
+                          downloadable: false,
+                          downloadDisabledReason: quoteForm.file
+                            ? messages.rfq.pendingUploadReason
+                            : messages.rfq.metadataOnlyReason,
+                          downloadUrl: null,
+                          originalFileName: quoteForm.fileName,
+                          sizeBytes: quoteForm.file?.size ?? 0,
+                          storageStatus: quoteForm.file ? 'PENDING' : 'METADATA_ONLY',
+                        }]
+                      : []),
+                  ]}
+                  className="form-wide"
+                  messages={messages}
+                />
                 <DisabledActionTooltip className="form-wide" title={saveQuoteDisabledReason}>
                   <button className="primary-button form-wide" disabled={Boolean(saveQuoteDisabledReason)} type="submit">
                     <CheckCircleOutlined />
@@ -5178,7 +5336,9 @@ function RfqView({
                           </td>
                           <td>
                             <TruncatedText className="text-strong" text={row.supplierName} />
-                            {row.attachments[0] && <TruncatedText className="text-small" text={row.attachments[0].fileName} />}
+                            {row.attachments[0] && (
+                              <AttachmentInlineAction attachment={row.attachments[0]} messages={messages} />
+                            )}
                           </td>
                           <td>{formatCurrency(row.totalAmount, detail.currency, language)}</td>
                           <td>{formatDate(row.deliveryDate, language)}</td>
@@ -6520,6 +6680,13 @@ function ThreeWayMatchingView({
   )
 }
 
+export function shouldConfirmReceiptInvoiceDrawerClose(
+  drawerMode: ReceiptInvoiceCreateMode | 'detail' | null,
+  isCreateDirty: boolean,
+) {
+  return (drawerMode === 'receipt' || drawerMode === 'invoice') && isCreateDirty
+}
+
 function ReceiptsInvoicesView({
   createMode,
   language,
@@ -6662,7 +6829,7 @@ function ReceiptsInvoicesView({
   }
 
   const handleDrawerClose = () => {
-    if ((drawerMode === 'receipt' || drawerMode === 'invoice') && isCreateDirty) {
+    if (shouldConfirmReceiptInvoiceDrawerClose(drawerMode, isCreateDirty)) {
       modal.confirm({
         mousePosition: getViewportCenter(),
         centered: true,
@@ -6738,58 +6905,116 @@ function ReceiptsInvoicesView({
 
   const handleCreateReceipt = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    receiptMutation.mutate({
-      attachments: receiptForm.fileName.trim()
-        ? [{
-            contentType: 'image/jpeg',
+    void (async () => {
+      try {
+        let uploadedAttachments = receiptForm.uploadedAttachments
+        if (receiptForm.file) {
+          const uploadResponse = await uploadAttachment({
+            companyId: selectedCompanyId,
             description: receiptForm.fileDescription,
-            fileName: receiptForm.fileName,
-            sizeBytes: 0,
-          }]
-        : [],
-      companyId: selectedCompanyId,
-      lines: receiptForm.lines
-        .filter((line) => line.receivedQuantity > 0)
-        .map((line) => ({
-          note: line.note,
-          poLineId: line.poLineId,
-          receivedQuantity: line.receivedQuantity,
-        })),
-      note: receiptForm.note,
-      poId: receiptForm.poId,
-      receivedBy: receiptForm.receivedBy,
-      receivedDate: receiptForm.receivedDate,
-    })
+            file: receiptForm.file,
+            supplierId: fulfillmentRows.find((row) => row.poId === receiptForm.poId)?.supplierId,
+            targetId: receiptForm.poId,
+            targetType: 'RECEIPT',
+            uploadedBy: receiptForm.receivedBy,
+          })
+          uploadedAttachments = [uploadResponse.data]
+          setReceiptForm((current) => ({
+            ...current,
+            file: null,
+            fileName: uploadResponse.data.originalFileName,
+            uploadedAttachments,
+          }))
+        }
+        receiptMutation.mutate({
+          attachmentIds: uploadedAttachments.map((attachment) => attachment.attachmentId),
+          attachments: uploadedAttachments.length === 0 && receiptForm.fileName.trim()
+            ? [{
+                contentType: 'image/jpeg',
+                description: receiptForm.fileDescription,
+                fileName: receiptForm.fileName,
+                sizeBytes: 0,
+              }]
+            : [],
+          companyId: selectedCompanyId,
+          lines: receiptForm.lines
+            .filter((line) => line.receivedQuantity > 0)
+            .map((line) => ({
+              note: line.note,
+              poLineId: line.poLineId,
+              receivedQuantity: line.receivedQuantity,
+            })),
+          note: receiptForm.note,
+          poId: receiptForm.poId,
+          receivedBy: receiptForm.receivedBy,
+          receivedDate: receiptForm.receivedDate,
+        })
+      } catch (error) {
+        setFeedback({
+          message: `${messages.receiptInvoice.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+          tone: 'danger',
+        })
+      }
+    })()
   }
 
   const handleCreateInvoice = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    invoiceMutation.mutate({
-      attachments: invoiceForm.fileName.trim()
-        ? [{
-            contentType: 'application/pdf',
+    void (async () => {
+      try {
+        let uploadedAttachments = invoiceForm.uploadedAttachments
+        if (invoiceForm.file) {
+          const uploadResponse = await uploadAttachment({
+            companyId: selectedCompanyId,
             description: invoiceForm.fileDescription,
-            fileName: invoiceForm.fileName,
-            sizeBytes: 0,
-          }]
-        : [],
-      companyId: selectedCompanyId,
-      invoiceDate: invoiceForm.invoiceDate,
-      invoiceNumber: invoiceForm.invoiceNumber,
-      lines: invoiceForm.lines
-        .filter((line) => line.invoicedQuantity > 0)
-        .map((line) => ({
-          invoicedQuantity: line.invoicedQuantity,
-          poLineId: line.poLineId,
-          taxAmount: roundAmount(line.taxAmount),
-          taxRate: line.taxRate,
-          totalAmount: roundAmount(line.totalAmount),
-          untaxedAmount: roundAmount(line.untaxedAmount),
-        })),
-      note: invoiceForm.note,
-      poId: invoiceForm.poId,
-      registeredBy: invoiceForm.registeredBy,
-    })
+            file: invoiceForm.file,
+            supplierId: fulfillmentRows.find((row) => row.poId === invoiceForm.poId)?.supplierId,
+            targetId: invoiceForm.poId,
+            targetType: 'INVOICE',
+            uploadedBy: invoiceForm.registeredBy,
+          })
+          uploadedAttachments = [uploadResponse.data]
+          setInvoiceForm((current) => ({
+            ...current,
+            file: null,
+            fileName: uploadResponse.data.originalFileName,
+            uploadedAttachments,
+          }))
+        }
+        invoiceMutation.mutate({
+          attachmentIds: uploadedAttachments.map((attachment) => attachment.attachmentId),
+          attachments: uploadedAttachments.length === 0 && invoiceForm.fileName.trim()
+            ? [{
+                contentType: 'application/pdf',
+                description: invoiceForm.fileDescription,
+                fileName: invoiceForm.fileName,
+                sizeBytes: 0,
+              }]
+            : [],
+          companyId: selectedCompanyId,
+          invoiceDate: invoiceForm.invoiceDate,
+          invoiceNumber: invoiceForm.invoiceNumber,
+          lines: invoiceForm.lines
+            .filter((line) => line.invoicedQuantity > 0)
+            .map((line) => ({
+              invoicedQuantity: line.invoicedQuantity,
+              poLineId: line.poLineId,
+              taxAmount: roundAmount(line.taxAmount),
+              taxRate: line.taxRate,
+              totalAmount: roundAmount(line.totalAmount),
+              untaxedAmount: roundAmount(line.untaxedAmount),
+            })),
+          note: invoiceForm.note,
+          poId: invoiceForm.poId,
+          registeredBy: invoiceForm.registeredBy,
+        })
+      } catch (error) {
+        setFeedback({
+          message: `${messages.receiptInvoice.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+          tone: 'danger',
+        })
+      }
+    })()
   }
 
   return (
@@ -6937,16 +7162,37 @@ function ReceiptsInvoicesView({
             />
             <ReceiptInvoiceAttachmentFields
               description={receiptForm.fileDescription}
+              file={receiptForm.file}
               fileName={receiptForm.fileName}
               messages={messages}
               onDescriptionChange={(value) => {
                 setCreateDirty(true)
                 setReceiptForm((current) => ({ ...current, fileDescription: value }))
               }}
-              onFileNameChange={(value) => {
+              onFileChange={(file) => {
                 setCreateDirty(true)
-                setReceiptForm((current) => ({ ...current, fileName: value }))
+                setReceiptForm((current) => ({
+                  ...current,
+                  file,
+                  fileName: file?.name ?? current.fileName,
+                  uploadedAttachments: file ? [] : current.uploadedAttachments,
+                }))
               }}
+              pendingAttachment={receiptForm.uploadedAttachments[0] ?? (receiptForm.fileName
+                ? {
+                    attachmentId: '',
+                    contentType: receiptForm.file?.type || 'image/jpeg',
+                    description: receiptForm.fileDescription || null,
+                    downloadable: false,
+                    downloadDisabledReason: receiptForm.file
+                      ? messages.rfq.pendingUploadReason
+                      : messages.rfq.metadataOnlyReason,
+                    downloadUrl: null,
+                    originalFileName: receiptForm.fileName,
+                    sizeBytes: receiptForm.file?.size ?? 0,
+                    storageStatus: receiptForm.file ? 'PENDING' : 'METADATA_ONLY',
+                  }
+                : undefined)}
             />
             <label className="form-wide">
               <span>{messages.receiptInvoice.note}</span>
@@ -7021,16 +7267,37 @@ function ReceiptsInvoicesView({
             />
             <ReceiptInvoiceAttachmentFields
               description={invoiceForm.fileDescription}
+              file={invoiceForm.file}
               fileName={invoiceForm.fileName}
               messages={messages}
               onDescriptionChange={(value) => {
                 setCreateDirty(true)
                 setInvoiceForm((current) => ({ ...current, fileDescription: value }))
               }}
-              onFileNameChange={(value) => {
+              onFileChange={(file) => {
                 setCreateDirty(true)
-                setInvoiceForm((current) => ({ ...current, fileName: value }))
+                setInvoiceForm((current) => ({
+                  ...current,
+                  file,
+                  fileName: file?.name ?? current.fileName,
+                  uploadedAttachments: file ? [] : current.uploadedAttachments,
+                }))
               }}
+              pendingAttachment={invoiceForm.uploadedAttachments[0] ?? (invoiceForm.fileName
+                ? {
+                    attachmentId: '',
+                    contentType: invoiceForm.file?.type || 'application/pdf',
+                    description: invoiceForm.fileDescription || null,
+                    downloadable: false,
+                    downloadDisabledReason: invoiceForm.file
+                      ? messages.rfq.pendingUploadReason
+                      : messages.rfq.metadataOnlyReason,
+                    downloadUrl: null,
+                    originalFileName: invoiceForm.fileName,
+                    sizeBytes: invoiceForm.file?.size ?? 0,
+                    storageStatus: invoiceForm.file ? 'PENDING' : 'METADATA_ONLY',
+                  }
+                : undefined)}
             />
             <label className="form-wide">
               <span>{messages.receiptInvoice.note}</span>
@@ -7254,29 +7521,41 @@ function InvoiceFormLines({
   )
 }
 
-function ReceiptInvoiceAttachmentFields({
+export function ReceiptInvoiceAttachmentFields({
   description,
+  file,
   fileName,
   messages,
   onDescriptionChange,
-  onFileNameChange,
+  onFileChange,
+  pendingAttachment,
 }: {
   description: string
+  file: File | null
   fileName: string
   messages: LocalizedMessages
   onDescriptionChange: (value: string) => void
-  onFileNameChange: (value: string) => void
+  onFileChange: (file: File | null) => void
+  pendingAttachment?: UploadedAttachment
 }) {
   return (
     <>
       <label>
         <span>{messages.receiptInvoice.attachmentFile}</span>
-        <input value={fileName} onChange={(event) => onFileNameChange(event.target.value)} />
+        <input
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt"
+          type="file"
+          onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+        />
+        {fileName && <small>{file?.name ?? fileName}</small>}
       </label>
       <label>
         <span>{messages.receiptInvoice.attachmentDescription}</span>
         <input value={description} onChange={(event) => onDescriptionChange(event.target.value)} />
       </label>
+      {pendingAttachment && (
+        <AttachmentList attachments={[pendingAttachment]} className="form-wide" messages={messages} />
+      )}
     </>
   )
 }
@@ -7338,6 +7617,10 @@ function FulfillmentDetail({
         <div>
           <dt>{messages.receiptInvoice.variance}</dt>
           <dd>{formatCurrency(po.invoiceAmountVariance, po.currency, language)}</dd>
+        </div>
+        <div>
+          <dt>{messages.receiptInvoice.attachments}</dt>
+          <dd>{po.attachmentCount}</dd>
         </div>
       </dl>
       <div className="action-row">
@@ -7427,7 +7710,9 @@ function ReceiptInvoiceRelatedTables({
                     <td>{formatDate(receipt.receivedDate, language)}</td>
                     <td>{userNameOf(receipt.receivedBy, users)}</td>
                     <td>{receipt.receivedQuantity}</td>
-                    <td>{receipt.attachments.map((attachment) => attachment.fileName).join(' / ') || '-'}</td>
+                    <td>
+                      <AttachmentInlineList attachments={receipt.attachments} messages={messages} />
+                    </td>
                   </tr>
                 ))
               )}
@@ -7460,7 +7745,9 @@ function ReceiptInvoiceRelatedTables({
                     <td>{formatDate(invoice.invoiceDate, language)}</td>
                     <td>{userNameOf(invoice.registeredBy, users)}</td>
                     <td>{formatCurrency(invoice.totalAmount, invoice.currency, language)}</td>
-                    <td>{invoice.attachments.map((attachment) => attachment.fileName).join(' / ') || '-'}</td>
+                    <td>
+                      <AttachmentInlineList attachments={invoice.attachments} messages={messages} />
+                    </td>
                   </tr>
                 ))
               )}
@@ -7469,6 +7756,88 @@ function ReceiptInvoiceRelatedTables({
         </div>
       </section>
     </>
+  )
+}
+
+export function AttachmentList({
+  attachments,
+  className,
+  messages,
+}: {
+  attachments: UploadedAttachment[]
+  className?: string
+  messages: LocalizedMessages
+}) {
+  if (attachments.length === 0) {
+    return null
+  }
+
+  return (
+    <div className={`attachment-list ${className ?? ''}`.trim()}>
+      {attachments.map((attachment, index) => {
+        const disabledReason = attachment.downloadable ? undefined : attachment.downloadDisabledReason ?? messages.rfq.metadataOnlyReason
+        return (
+          <div className="attachment-row" key={attachment.attachmentId || `${attachment.originalFileName}-${index}`}>
+            <FileAddOutlined />
+            <span>{attachment.originalFileName}</span>
+            <small>{attachment.storageStatus}</small>
+            <DisabledActionTooltip title={disabledReason}>
+              <button
+                className="icon-action"
+                disabled={Boolean(disabledReason)}
+                onClick={() => openAttachmentDownload(attachment)}
+                type="button"
+              >
+                <FileSearchOutlined />
+                <span>{messages.rfq.downloadAttachment}</span>
+              </button>
+            </DisabledActionTooltip>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AttachmentInlineList({
+  attachments,
+  messages,
+}: {
+  attachments: ReceiptInvoiceAttachment[]
+  messages: LocalizedMessages
+}) {
+  if (attachments.length === 0) {
+    return <>-</>
+  }
+  return (
+    <div className="attachment-inline-list">
+      {attachments.map((attachment) => (
+        <AttachmentInlineAction attachment={attachment} key={attachment.attachmentId} messages={messages} />
+      ))}
+    </div>
+  )
+}
+
+export function AttachmentInlineAction({
+  attachment,
+  messages,
+}: {
+  attachment: RfqQuoteAttachment | ReceiptInvoiceAttachment
+  messages: LocalizedMessages
+}) {
+  const disabledReason = attachment.downloadable ? undefined : attachment.downloadDisabledReason ?? messages.rfq.metadataOnlyReason
+  return (
+    <DisabledActionTooltip title={disabledReason}>
+      <button
+        className="attachment-link"
+        disabled={Boolean(disabledReason)}
+        onClick={() => openAttachmentDownload(attachment)}
+        type="button"
+      >
+        <FileAddOutlined />
+        <span>{attachment.fileName}</span>
+      </button>
+    </DisabledActionTooltip>
   )
 }
 
@@ -8139,7 +8508,7 @@ function DisabledActionTooltip({
 
   return (
     <Tooltip title={title} trigger={['hover', 'focus']}>
-      <span className={className ? `disabled-tooltip-wrap ${className}` : 'disabled-tooltip-wrap'}>{children}</span>
+      <span className={className ? `disabled-tooltip-wrap ${className}` : 'disabled-tooltip-wrap'} title={title}>{children}</span>
     </Tooltip>
   )
 }
@@ -8790,6 +9159,42 @@ function suppliersForCategory(categoryId: string, suppliers: SupplierSummary[]) 
   return suppliers.filter((supplier) => supplier.categories.some((category) => category.categoryId === categoryId))
 }
 
+function uploadedFromRfqAttachment(attachment: RfqQuoteAttachment): UploadedAttachment {
+  return {
+    attachmentId: attachment.attachmentId,
+    contentType: attachment.contentType ?? 'application/octet-stream',
+    description: attachment.description,
+    downloadable: Boolean(attachment.downloadable),
+    downloadDisabledReason: attachment.downloadDisabledReason ?? null,
+    downloadUrl: attachment.downloadUrl ?? null,
+    originalFileName: attachment.fileName,
+    sizeBytes: attachment.sizeBytes ?? 0,
+    storageStatus: attachment.storageStatus ?? (attachment.downloadable ? 'READY' : 'METADATA_ONLY'),
+  }
+}
+
+function attachmentDownloadUrl(attachment: {
+  attachmentId: string
+  downloadable?: boolean | null
+  downloadUrl?: string | null
+}) {
+  if (attachment.downloadUrl) {
+    return attachment.downloadUrl.startsWith('http') ? attachment.downloadUrl : `${apiBaseUrl}${attachment.downloadUrl}`
+  }
+  return attachment.downloadable ? `${apiBaseUrl}/api/attachments/${encodeURIComponent(attachment.attachmentId)}/download` : null
+}
+
+function openAttachmentDownload(attachment: {
+  attachmentId: string
+  downloadable?: boolean | null
+  downloadUrl?: string | null
+}) {
+  const url = attachmentDownloadUrl(attachment)
+  if (url) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
 function buildRfqCreateFormDefaults(
   selectedCompanyId: string,
   approvedRequests: PurchaseRequestListItem[],
@@ -8826,11 +9231,13 @@ function buildRfqQuoteFormDefaults(detail?: RfqDetail, preferredSupplierId?: str
     deliveryDate: quote?.deliveryDate ?? nextDate(14),
     fileDescription: attachment?.description ?? '',
     fileName: attachment?.fileName ?? '',
+    file: null,
     quoteAmount: quote?.quoteAmount ?? 0,
     riskNote: quote?.riskNote ?? '',
     supplierId: supplier?.supplierId ?? '',
     supplierScore: quote?.supplierScore ?? 85,
     taxRate: quote?.taxRate ?? 0.13,
+    uploadedAttachments: quote?.attachments.filter((item) => Boolean(item.downloadable)).map(uploadedFromRfqAttachment) ?? [],
   }
 }
 
@@ -8872,6 +9279,7 @@ function buildReceiptCreateFormDefaults(
 
   return {
     fileDescription: '',
+    file: null,
     fileName: '',
     lines: po?.lines.map((line) => ({
       note: '',
@@ -8882,6 +9290,7 @@ function buildReceiptCreateFormDefaults(
     poId: po?.poId ?? '',
     receivedBy: receiver?.userId ?? '',
     receivedDate: nextDate(0),
+    uploadedAttachments: [],
   }
 }
 
@@ -8901,6 +9310,7 @@ function buildInvoiceCreateFormDefaults(
 
   return {
     fileDescription: '',
+    file: null,
     fileName: '',
     invoiceDate: nextDate(0),
     invoiceNumber: po ? `FP-${po.poId.replace('PO-', '')}` : '',
@@ -8922,6 +9332,7 @@ function buildInvoiceCreateFormDefaults(
     note: '',
     poId: po?.poId ?? '',
     registeredBy: registeredUser?.userId ?? '',
+    uploadedAttachments: [],
   }
 }
 

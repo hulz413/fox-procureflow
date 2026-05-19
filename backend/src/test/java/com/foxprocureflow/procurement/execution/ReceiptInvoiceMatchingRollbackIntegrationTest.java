@@ -63,6 +63,18 @@ class ReceiptInvoiceMatchingRollbackIntegrationTest {
     void rollsBackReceiptAndInvoiceCreationWhenMatchingRefreshFails() throws Exception {
         when(matchingService.recalculateForPo("company-digital", "PO-20260518-0301"))
             .thenThrow(new IllegalStateException("matching refresh failed"));
+        insertReadyAttachment(
+            "ATT-ROLLBACK-RECEIPT",
+            "RECEIPT",
+            "rollback-receipt-test.jpg",
+            "image/jpeg",
+            "user-demo-operator");
+        insertReadyAttachment(
+            "ATT-ROLLBACK-INVOICE",
+            "INVOICE",
+            "rollback-invoice-test.pdf",
+            "application/pdf",
+            "user-digital-finance");
 
         int receiptCount = tableCount("purchase_receipts");
         int receiptLineCount = tableCount("purchase_receipt_lines");
@@ -77,6 +89,7 @@ class ReceiptInvoiceMatchingRollbackIntegrationTest {
         assertThat(tableCount("purchase_receipts")).isEqualTo(receiptCount);
         assertThat(tableCount("purchase_receipt_lines")).isEqualTo(receiptLineCount);
         assertThat(tableCount("purchase_receipt_attachments")).isEqualTo(receiptAttachmentCount);
+        assertThat(linkedBusinessId("ATT-ROLLBACK-RECEIPT")).isNull();
 
         int invoiceCount = tableCount("supplier_invoices");
         int invoiceLineCount = tableCount("supplier_invoice_lines");
@@ -91,6 +104,7 @@ class ReceiptInvoiceMatchingRollbackIntegrationTest {
         assertThat(tableCount("supplier_invoices")).isEqualTo(invoiceCount);
         assertThat(tableCount("supplier_invoice_lines")).isEqualTo(invoiceLineCount);
         assertThat(tableCount("supplier_invoice_attachments")).isEqualTo(invoiceAttachmentCount);
+        assertThat(linkedBusinessId("ATT-ROLLBACK-INVOICE")).isNull();
     }
 
     private Map<String, Object> receiptPayload() {
@@ -104,12 +118,7 @@ class ReceiptInvoiceMatchingRollbackIntegrationTest {
                 "poLineId", "PO-20260518-0301-L01",
                 "receivedQuantity", 1.00
             )),
-            "attachments", List.of(Map.of(
-                "fileName", "rollback-receipt-test.jpg",
-                "description", "回滚测试收货凭证元数据",
-                "contentType", "image/jpeg",
-                "sizeBytes", 0
-            ))
+            "attachmentIds", List.of("ATT-ROLLBACK-RECEIPT")
         );
     }
 
@@ -129,13 +138,56 @@ class ReceiptInvoiceMatchingRollbackIntegrationTest {
                 "taxAmount", 13.00,
                 "totalAmount", 113.00
             )),
-            "attachments", List.of(Map.of(
-                "fileName", "rollback-invoice-test.pdf",
-                "description", "回滚测试发票元数据",
-                "contentType", "application/pdf",
-                "sizeBytes", 0
-            ))
+            "attachmentIds", List.of("ATT-ROLLBACK-INVOICE")
         );
+    }
+
+    private void insertReadyAttachment(
+        String attachmentId,
+        String targetType,
+        String fileName,
+        String contentType,
+        String uploadedBy
+    ) {
+        jdbcTemplate.update("""
+            INSERT INTO file_attachments (
+                attachment_id,
+                company_id,
+                target_type,
+                target_id,
+                target_secondary_id,
+                supplier_id,
+                bucket_name,
+                object_key,
+                original_file_name,
+                description,
+                content_type,
+                size_bytes,
+                etag,
+                storage_status,
+                uploaded_by,
+                linked_business_id,
+                linked_at,
+                created_at,
+                updated_at
+            )
+            VALUES (?, 'company-digital', ?, 'PO-20260518-0301', NULL, 'supplier-bluechip',
+                    'invoice-files', ?, ?, '回滚测试真实附件', ?, 128, 'rollback-test',
+                    'READY', ?, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            attachmentId,
+            targetType,
+            "companies/company-digital/rollback/" + attachmentId + "-" + fileName,
+            fileName,
+            contentType,
+            uploadedBy);
+    }
+
+    private String linkedBusinessId(String attachmentId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT linked_business_id FROM file_attachments WHERE attachment_id = ?",
+            String.class,
+            attachmentId);
     }
 
     private int tableCount(String tableName) {

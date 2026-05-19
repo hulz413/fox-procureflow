@@ -36,7 +36,8 @@ public final class RfqDtos {
         @NotNull LocalDate deliveryDate,
         @NotNull @DecimalMin(value = "0.00") @DecimalMax(value = "100.00") BigDecimal supplierScore,
         @Size(max = 1000) String riskNote,
-        @Valid List<QuoteAttachmentRequest> attachments
+        @Valid List<QuoteAttachmentRequest> attachments,
+        List<@NotBlank String> attachmentIds
     ) {
     }
 
@@ -127,6 +128,10 @@ public final class RfqDtos {
         String contentType,
         Long sizeBytes,
         String storageObjectKey,
+        String storageStatus,
+        Boolean downloadable,
+        String downloadUrl,
+        String downloadDisabledReason,
         LocalDateTime createdAt
     ) {
     }

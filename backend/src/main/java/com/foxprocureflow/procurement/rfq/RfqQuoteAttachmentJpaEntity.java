@@ -19,6 +19,9 @@ public class RfqQuoteAttachmentJpaEntity {
     @Column(nullable = false, length = 96, unique = true)
     private String attachmentId;
 
+    @Column(length = 96)
+    private String fileAttachmentId;
+
     @Column(nullable = false, length = 80)
     private String quoteId;
 
@@ -42,6 +45,9 @@ public class RfqQuoteAttachmentJpaEntity {
     @Column(length = 512)
     private String storageObjectKey;
 
+    @Column(nullable = false, length = 32)
+    private String storageStatus;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -59,7 +65,35 @@ public class RfqQuoteAttachmentJpaEntity {
         Long sizeBytes,
         String storageObjectKey
     ) {
+        this(
+            attachmentId,
+            null,
+            quoteId,
+            rfqId,
+            supplierId,
+            fileName,
+            description,
+            contentType,
+            sizeBytes,
+            storageObjectKey,
+            storageObjectKey == null ? "METADATA_ONLY" : "READY");
+    }
+
+    RfqQuoteAttachmentJpaEntity(
+        String attachmentId,
+        String fileAttachmentId,
+        String quoteId,
+        String rfqId,
+        String supplierId,
+        String fileName,
+        String description,
+        String contentType,
+        Long sizeBytes,
+        String storageObjectKey,
+        String storageStatus
+    ) {
         this.attachmentId = attachmentId;
+        this.fileAttachmentId = fileAttachmentId;
         this.quoteId = quoteId;
         this.rfqId = rfqId;
         this.supplierId = supplierId;
@@ -68,11 +102,16 @@ public class RfqQuoteAttachmentJpaEntity {
         this.contentType = contentType;
         this.sizeBytes = sizeBytes;
         this.storageObjectKey = storageObjectKey;
+        this.storageStatus = storageStatus;
         this.createdAt = LocalDateTime.now();
     }
 
     public String getAttachmentId() {
         return attachmentId;
+    }
+
+    public String getFileAttachmentId() {
+        return fileAttachmentId;
     }
 
     public String getQuoteId() {
@@ -105,6 +144,10 @@ public class RfqQuoteAttachmentJpaEntity {
 
     public String getStorageObjectKey() {
         return storageObjectKey;
+    }
+
+    public String getStorageStatus() {
+        return storageStatus;
     }
 
     public LocalDateTime getCreatedAt() {

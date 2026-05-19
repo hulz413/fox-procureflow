@@ -9,4 +9,6 @@ public interface RfqQuoteAttachmentRepository extends JpaRepository<RfqQuoteAtta
     List<RfqQuoteAttachmentJpaEntity> findByQuoteId(String quoteId);
 
     List<RfqQuoteAttachmentJpaEntity> findByQuoteIdIn(Collection<String> quoteIds);
+
+    List<RfqQuoteAttachmentJpaEntity> findByFileAttachmentIdIn(Collection<String> fileAttachmentIds);
 }

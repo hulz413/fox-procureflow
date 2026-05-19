@@ -15,6 +15,7 @@
 ## 本地开发
 
 - Docker 运行数据库、中间件和对象存储；React 前端和 Java 后端在宿主机运行。
+- 前端 Vite/Vitest 工具链需要 Node.js `>=20.19` 或 `>=22.12`；如果本机默认 `node -v` 是 `20.11.x`，`npm run dev` 会因 `node:util.styleText` 缺失而导致页面无法打开。先切到满足版本的 Node，再启动前端。
 - 本机 Java 21 通过 Homebrew `openjdk@21` 提供；运行 Gradle 或后端前若 shell 找不到 Java，使用 `JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"`，并把 `$(brew --prefix openjdk@21)/bin` 放到 `PATH` 前面。
 - 在默认本地端口启动服务前，先检查并停止旧的 `8080` 后端进程和 `5173` 前端进程，再启动当前代码。
 

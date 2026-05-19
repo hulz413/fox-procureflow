@@ -10,6 +10,8 @@
 - Docker
 - Docker Compose 插件或 `docker-compose`
 
+当前前端依赖 Vite 8 / Vitest 4，本机默认 Node.js 若仍是 `20.11.x`，启动时会报 `node:util` 缺少 `styleText`，前端服务不会监听 `5173`，页面也就打不开。用 `nvm use 22`、Volta、Homebrew 或其他方式切到 Node.js `>=20.19` / `>=22.12` 后再执行前端命令。
+
 如果 Java 21 通过 Homebrew 安装，推荐使用 `openjdk@21`：
 
 ```bash

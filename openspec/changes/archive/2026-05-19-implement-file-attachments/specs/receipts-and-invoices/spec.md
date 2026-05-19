@@ -1,8 +1,31 @@
-## Purpose
+## ADDED Requirements
 
-Define PO-based receipt and supplier invoice registration for Fox Procureflow, including company-scoped APIs, uploaded attachment references, frontend workspace behavior, and the synchronous refresh boundary with three-way matching.
+### Requirement: Receipts and invoices preserve matching, payment, and AI boundaries while using real attachments
+The system SHALL keep receipt and invoice registration focused on factual receipt/invoice data and uploaded file attachments while allowing the three-way matching capability to synchronously refresh matching results after successful receipt or invoice creation; the workflow SHALL NOT create payment, asynchronous messaging, or AI-generated decisions.
 
-## Requirements
+#### Scenario: Receipt creation refreshes matching records after matching is available
+- **WHEN** a receipt is created for an issued purchase order after the three-way matching capability is available
+- **THEN** the system MUST synchronously recalculate the current three-way matching result for the same `companyId` and `poId`
+- **AND** the receipt and its uploaded attachments MUST remain available as source input for the matching detail
+- **AND** the system MUST NOT create payment records, RabbitMQ events, or AI recommendations
+
+#### Scenario: Invoice creation refreshes matching records after matching is available
+- **WHEN** a supplier invoice is created for an issued purchase order after the three-way matching capability is available
+- **THEN** the system MUST synchronously recalculate the current three-way matching result for the same `companyId` and `poId`
+- **AND** the invoice and its uploaded attachments MUST remain available as source input for the matching detail
+- **AND** the system MUST NOT create payment records, RabbitMQ events, or AI recommendations
+
+#### Scenario: Receipt and invoice creation rolls back if matching refresh fails
+- **WHEN** receipt or invoice creation succeeds in validation but the synchronous matching refresh fails for the same purchase order
+- **THEN** the system MUST roll back the receipt or invoice creation transaction
+- **AND** the system MUST NOT leave source receipt/invoice data or business attachment associations without a refreshed matching result
+
+#### Scenario: Receipt and invoice workflow uses only required storage infrastructure
+- **WHEN** a developer runs the receipt, invoice, and matching refresh workflow with real attachments in the MVP local environment
+- **THEN** the workflow MUST use MySQL, synchronous service calls, and MinIO object storage
+- **AND** it MUST NOT require Redis, RabbitMQ, MongoDB, Prometheus, Grafana, Jaeger, Zipkin, Keycloak, or DeepSeek
+
+## MODIFIED Requirements
 
 ### Requirement: Receipts are registered from issued purchase orders
 The system SHALL allow warehouse or procurement users to create company-scoped receipt records from purchase orders whose status is `ISSUED`, including references to uploaded receiving proof attachments.
@@ -141,27 +164,12 @@ The frontend SHALL provide a real receipts and invoices page in the procurement 
 - **THEN** the frontend MUST disable invalid create or download actions with a client-visible reason
 - **AND** it MUST still rely on backend validation for final enforcement
 
-### Requirement: Receipts and invoices preserve matching, payment, and AI boundaries while using real attachments
-The system SHALL keep receipt and invoice registration focused on factual receipt/invoice data and uploaded file attachments while allowing the three-way matching capability to synchronously refresh matching results after successful receipt or invoice creation; the workflow SHALL NOT create payment, asynchronous messaging, or AI-generated decisions.
+## REMOVED Requirements
 
-#### Scenario: Receipt creation refreshes matching records after matching is available
-- **WHEN** a receipt is created for an issued purchase order after the three-way matching capability is available
-- **THEN** the system MUST synchronously recalculate the current three-way matching result for the same `companyId` and `poId`
-- **AND** the receipt and its uploaded attachments MUST remain available as source input for the matching detail
-- **AND** the system MUST NOT create payment records, RabbitMQ events, or AI recommendations
+### Requirement: Receipt and invoice attachment metadata is stored without object upload
+**Reason**: The roadmap's real attachment upload slice replaces placeholder-only receipt and invoice attachment behavior with MinIO-backed files and MySQL metadata.
+**Migration**: Existing metadata-only receipt and invoice attachments remain visible as non-downloadable historical metadata; new receipt and invoice attachments must be uploaded through the file attachment API before business submission.
 
-#### Scenario: Invoice creation refreshes matching records after matching is available
-- **WHEN** a supplier invoice is created for an issued purchase order after the three-way matching capability is available
-- **THEN** the system MUST synchronously recalculate the current three-way matching result for the same `companyId` and `poId`
-- **AND** the invoice and its uploaded attachments MUST remain available as source input for the matching detail
-- **AND** the system MUST NOT create payment records, RabbitMQ events, or AI recommendations
-
-#### Scenario: Receipt and invoice creation rolls back if matching refresh fails
-- **WHEN** receipt or invoice creation succeeds in validation but the synchronous matching refresh fails for the same purchase order
-- **THEN** the system MUST roll back the receipt or invoice creation transaction
-- **AND** the system MUST NOT leave source receipt/invoice data or business attachment associations without a refreshed matching result
-
-#### Scenario: Receipt and invoice workflow uses only required storage infrastructure
-- **WHEN** a developer runs the receipt, invoice, and matching refresh workflow with real attachments in the MVP local environment
-- **THEN** the workflow MUST use MySQL, synchronous service calls, and MinIO object storage
-- **AND** it MUST NOT require Redis, RabbitMQ, MongoDB, Prometheus, Grafana, Jaeger, Zipkin, Keycloak, or DeepSeek
+### Requirement: Receipts and invoices do not implement matching, payment, upload, or AI workflows
+**Reason**: This change intentionally adds upload for receipt and invoice attachments while preserving the payment, asynchronous messaging, and AI non-goals.
+**Migration**: Matching refresh behavior moves to the new requirement "Receipts and invoices preserve matching, payment, and AI boundaries while using real attachments".

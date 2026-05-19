@@ -3,6 +3,8 @@ package com.foxprocureflow.procurement.rfq;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.foxprocureflow.attachments.AttachmentDtos.BusinessAttachmentSnapshot;
+import com.foxprocureflow.attachments.FileAttachmentService;
 import com.foxprocureflow.identity.persistence.DemoCompanyMasterRepository;
 import com.foxprocureflow.identity.persistence.DemoSupplierCategoryJpaEntity;
 import com.foxprocureflow.identity.persistence.DemoSupplierCategoryRepository;
@@ -61,6 +63,7 @@ public class RfqService {
     private final DemoUserRepository userRepository;
     private final DemoSupplierRepository demoSupplierRepository;
     private final DemoSupplierCategoryRepository supplierCategoryRepository;
+    private final FileAttachmentService fileAttachmentService;
     private final ObjectMapper objectMapper;
 
     public RfqService(
@@ -75,6 +78,7 @@ public class RfqService {
         DemoUserRepository userRepository,
         DemoSupplierRepository demoSupplierRepository,
         DemoSupplierCategoryRepository supplierCategoryRepository,
+        FileAttachmentService fileAttachmentService,
         ObjectMapper objectMapper
     ) {
         this.rfqRepository = rfqRepository;
@@ -88,6 +92,7 @@ public class RfqService {
         this.userRepository = userRepository;
         this.demoSupplierRepository = demoSupplierRepository;
         this.supplierCategoryRepository = supplierCategoryRepository;
+        this.fileAttachmentService = fileAttachmentService;
         this.objectMapper = objectMapper;
     }
 
@@ -231,7 +236,7 @@ public class RfqService {
                 supplierScore,
                 blankToNull(request.riskNote())));
         RfqQuoteJpaEntity savedQuote = quoteRepository.saveAndFlush(quote);
-        replaceAttachments(savedQuote, request.attachments());
+        replaceAttachments(savedQuote, rfq.getCompanyId(), request.attachments(), request.attachmentIds());
         refreshStatus(rfq);
 
         return toQuoteResponse(savedQuote, attachmentRepository.findByQuoteId(savedQuote.getQuoteId()));
@@ -334,17 +339,49 @@ public class RfqService {
         }
     }
 
-    private void replaceAttachments(RfqQuoteJpaEntity quote, List<QuoteAttachmentRequest> attachments) {
+    private void replaceAttachments(
+        RfqQuoteJpaEntity quote,
+        String companyId,
+        List<QuoteAttachmentRequest> metadataAttachments,
+        List<String> attachmentIds
+    ) {
         List<RfqQuoteAttachmentJpaEntity> existing = attachmentRepository.findByQuoteId(quote.getQuoteId());
         if (!existing.isEmpty()) {
+            fileAttachmentService.releaseBusinessLinks(existing.stream()
+                .map(RfqQuoteAttachmentJpaEntity::getFileAttachmentId)
+                .filter(value -> value != null && !value.isBlank())
+                .toList(), quote.getQuoteId());
             attachmentRepository.deleteAll(existing);
             attachmentRepository.flush();
         }
-        if (attachments == null || attachments.isEmpty()) {
+        if (attachmentIds != null && !attachmentIds.isEmpty()) {
+            List<BusinessAttachmentSnapshot> snapshots = fileAttachmentService.claimForRfqQuote(
+                companyId,
+                quote.getRfqId(),
+                quote.getSupplierId(),
+                quote.getQuoteId(),
+                attachmentIds);
+            attachmentRepository.saveAll(snapshots.stream()
+                .map(snapshot -> new RfqQuoteAttachmentJpaEntity(
+                    snapshot.attachmentId(),
+                    snapshot.attachmentId(),
+                    quote.getQuoteId(),
+                    quote.getRfqId(),
+                    quote.getSupplierId(),
+                    snapshot.fileName(),
+                    snapshot.description(),
+                    snapshot.contentType(),
+                    snapshot.sizeBytes(),
+                    snapshot.storageObjectKey(),
+                    snapshot.storageStatus().name()))
+                .toList());
+            return;
+        }
+        if (metadataAttachments == null || metadataAttachments.isEmpty()) {
             return;
         }
         int[] index = {1};
-        attachmentRepository.saveAll(attachments.stream()
+        attachmentRepository.saveAll(metadataAttachments.stream()
             .map(attachment -> new RfqQuoteAttachmentJpaEntity(
                 quote.getQuoteId() + "-A" + "%02d".formatted(index[0]++),
                 quote.getQuoteId(),
@@ -436,7 +473,28 @@ public class RfqService {
             attachment.getContentType(),
             attachment.getSizeBytes(),
             attachment.getStorageObjectKey(),
+            attachment.getStorageStatus(),
+            FileAttachmentService.isDownloadable(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus()),
+            FileAttachmentService.isDownloadable(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus())
+                ? "/api/attachments/" + attachment.getFileAttachmentId() + "/download?companyId=" + companyIdByRfqId(attachment.getRfqId())
+                : null,
+            FileAttachmentService.downloadDisabledReason(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus()),
             attachment.getCreatedAt());
+    }
+
+    private String companyIdByRfqId(String rfqId) {
+        return rfqRepository.findByRfqId(rfqId)
+            .map(RfqJpaEntity::getCompanyId)
+            .orElse(null);
     }
 
     private Map<String, Object> requestSnapshot(

@@ -40,7 +40,8 @@ public final class ReceiptInvoiceDtos {
         @NotNull LocalDate receivedDate,
         @Size(max = 1000) String note,
         @NotEmpty @Valid List<CreateReceiptLineRequest> lines,
-        @Valid List<AttachmentMetadataRequest> attachments
+        @Valid List<AttachmentMetadataRequest> attachments,
+        List<@NotBlank String> attachmentIds
     ) {
     }
 
@@ -62,7 +63,8 @@ public final class ReceiptInvoiceDtos {
         @NotBlank String registeredBy,
         @Size(max = 1000) String note,
         @NotEmpty @Valid List<CreateInvoiceLineRequest> lines,
-        @Valid List<AttachmentMetadataRequest> attachments
+        @Valid List<AttachmentMetadataRequest> attachments,
+        List<@NotBlank String> attachmentIds
     ) {
     }
 
@@ -86,6 +88,10 @@ public final class ReceiptInvoiceDtos {
         String contentType,
         Long sizeBytes,
         String storageObjectKey,
+        String storageStatus,
+        Boolean downloadable,
+        String downloadUrl,
+        String downloadDisabledReason,
         LocalDateTime createdAt
     ) {
     }
@@ -229,6 +235,7 @@ public final class ReceiptInvoiceDtos {
         ReceiptProgressStatus receiptSummary,
         InvoiceProgressStatus invoiceSummary,
         InvoiceAmountStatus invoiceAmountStatus,
+        int attachmentCount,
         List<FulfillmentLineResponse> lines,
         LocalDateTime issuedAt,
         LocalDateTime updatedAt

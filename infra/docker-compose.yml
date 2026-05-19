@@ -93,6 +93,10 @@ services:
       mc mb --ignore-existing local/procurement-attachments;
       mc mb --ignore-existing local/rfq-attachments;
       mc mb --ignore-existing local/invoice-files;
+      printf '%s\n' 'Fox Procureflow demo RFQ quotation attachment' > /tmp/yunzhou-workstation-rfq.pdf;
+      printf '%s\n' 'Fox Procureflow demo receipt proof attachment' > /tmp/chengcai-receipt-proof.jpg;
+      mc cp /tmp/yunzhou-workstation-rfq.pdf local/rfq-attachments/companies/company-digital/rfqs/RFQ-20260518-0301/quotes/RFQ-20260518-0301-Q02/RFQ-20260518-0301-Q02-A01-yunzhou-workstation-rfq.pdf;
+      mc cp /tmp/chengcai-receipt-proof.jpg local/invoice-files/companies/company-digital/receipts/RCPT-20260519-0301/RCPT-20260519-0301-A01-chengcai-receipt-proof.jpg;
       "
 
 volumes:

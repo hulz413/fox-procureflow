@@ -3,6 +3,8 @@ package com.foxprocureflow.procurement.execution;
 import com.foxprocureflow.identity.persistence.DemoCompanyMasterRepository;
 import com.foxprocureflow.identity.persistence.DemoUserJpaEntity;
 import com.foxprocureflow.identity.persistence.DemoUserRepository;
+import com.foxprocureflow.attachments.AttachmentDtos.BusinessAttachmentSnapshot;
+import com.foxprocureflow.attachments.FileAttachmentService;
 import com.foxprocureflow.matching.ThreeWayMatchingService;
 import com.foxprocureflow.procurement.execution.ReceiptInvoiceDtos.AttachmentMetadataRequest;
 import com.foxprocureflow.procurement.execution.ReceiptInvoiceDtos.AttachmentMetadataResponse;
@@ -59,6 +61,7 @@ public class ReceiptInvoiceService {
     private final DemoCompanyMasterRepository companyRepository;
     private final DemoUserRepository userRepository;
     private final ThreeWayMatchingService matchingService;
+    private final FileAttachmentService fileAttachmentService;
 
     public ReceiptInvoiceService(
         PurchaseReceiptRepository receiptRepository,
@@ -71,7 +74,8 @@ public class ReceiptInvoiceService {
         PurchaseOrderLineRepository purchaseOrderLineRepository,
         DemoCompanyMasterRepository companyRepository,
         DemoUserRepository userRepository,
-        ThreeWayMatchingService matchingService
+        ThreeWayMatchingService matchingService,
+        FileAttachmentService fileAttachmentService
     ) {
         this.receiptRepository = receiptRepository;
         this.receiptLineRepository = receiptLineRepository;
@@ -84,6 +88,7 @@ public class ReceiptInvoiceService {
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
         this.matchingService = matchingService;
+        this.fileAttachmentService = fileAttachmentService;
     }
 
     @Transactional(readOnly = true)
@@ -140,7 +145,12 @@ public class ReceiptInvoiceService {
         List<PurchaseReceiptLineJpaEntity> receiptLines = receiptLineRepository.saveAll(request.lines().stream()
             .map(line -> toReceiptLine(receiptId, purchaseOrder.getPoId(), line, lineById.get(line.poLineId())))
             .toList());
-        List<PurchaseReceiptAttachmentJpaEntity> attachments = receiptAttachmentRepository.saveAll(toReceiptAttachments(receiptId, request.attachments()));
+        List<PurchaseReceiptAttachmentJpaEntity> attachments = receiptAttachmentRepository.saveAll(toReceiptAttachments(
+            receiptId,
+            request.attachments(),
+            request.attachmentIds(),
+            request.companyId(),
+            purchaseOrder));
         matchingService.recalculateForPo(request.companyId(), purchaseOrder.getPoId());
         return toDetailResponse(receipt, purchaseOrder, receiptLines, attachments);
     }
@@ -216,7 +226,12 @@ public class ReceiptInvoiceService {
         List<SupplierInvoiceLineJpaEntity> invoiceLines = invoiceLineRepository.saveAll(normalizedLines.stream()
             .map(line -> toInvoiceLine(invoiceId, purchaseOrder, line, lineById.get(line.poLineId())))
             .toList());
-        List<SupplierInvoiceAttachmentJpaEntity> attachments = invoiceAttachmentRepository.saveAll(toInvoiceAttachments(invoiceId, request.attachments()));
+        List<SupplierInvoiceAttachmentJpaEntity> attachments = invoiceAttachmentRepository.saveAll(toInvoiceAttachments(
+            invoiceId,
+            request.attachments(),
+            request.attachmentIds(),
+            request.companyId(),
+            purchaseOrder));
         matchingService.recalculateForPo(request.companyId(), purchaseOrder.getPoId());
         return toDetailResponse(invoice, purchaseOrder, invoiceLines, attachments);
     }
@@ -239,6 +254,20 @@ public class ReceiptInvoiceService {
             .collect(Collectors.groupingBy(
                 SupplierInvoiceJpaEntity::getPoId,
                 Collectors.reducing(ZERO_MONEY, SupplierInvoiceJpaEntity::getTotalAmount, BigDecimal::add)));
+        List<PurchaseReceiptJpaEntity> receipts = receiptRepository.findByPoIdIn(poIds);
+        List<SupplierInvoiceJpaEntity> invoices = invoiceRepository.findByPoIdIn(poIds);
+        Map<String, String> receiptPoById = receipts.stream()
+            .collect(Collectors.toMap(PurchaseReceiptJpaEntity::getReceiptId, PurchaseReceiptJpaEntity::getPoId));
+        Map<String, String> invoicePoById = invoices.stream()
+            .collect(Collectors.toMap(SupplierInvoiceJpaEntity::getInvoiceId, SupplierInvoiceJpaEntity::getPoId));
+        Map<String, Long> receiptAttachmentCountByPo = receiptAttachmentRepository.findByReceiptIdIn(receiptPoById.keySet()).stream()
+            .collect(Collectors.groupingBy(
+                attachment -> receiptPoById.get(attachment.getReceiptId()),
+                Collectors.counting()));
+        Map<String, Long> invoiceAttachmentCountByPo = invoiceAttachmentRepository.findByInvoiceIdIn(invoicePoById.keySet()).stream()
+            .collect(Collectors.groupingBy(
+                attachment -> invoicePoById.get(attachment.getInvoiceId()),
+                Collectors.counting()));
 
         return purchaseOrders.stream()
             .map(purchaseOrder -> toFulfillmentResponse(
@@ -246,7 +275,9 @@ public class ReceiptInvoiceService {
                 poLinesByPo.getOrDefault(purchaseOrder.getPoId(), List.of()),
                 receiptQuantityByLine,
                 invoiceQuantityByLine,
-                invoiceTotalByPo.getOrDefault(purchaseOrder.getPoId(), ZERO_MONEY)))
+                invoiceTotalByPo.getOrDefault(purchaseOrder.getPoId(), ZERO_MONEY),
+                receiptAttachmentCountByPo.getOrDefault(purchaseOrder.getPoId(), 0L)
+                    + invoiceAttachmentCountByPo.getOrDefault(purchaseOrder.getPoId(), 0L)))
             .toList();
     }
 
@@ -316,7 +347,33 @@ public class ReceiptInvoiceService {
             blankToNull(line.note()));
     }
 
-    private List<PurchaseReceiptAttachmentJpaEntity> toReceiptAttachments(String receiptId, List<AttachmentMetadataRequest> requestAttachments) {
+    private List<PurchaseReceiptAttachmentJpaEntity> toReceiptAttachments(
+        String receiptId,
+        List<AttachmentMetadataRequest> requestAttachments,
+        List<String> attachmentIds,
+        String companyId,
+        PurchaseOrderJpaEntity purchaseOrder
+    ) {
+        if (attachmentIds != null && !attachmentIds.isEmpty()) {
+            List<BusinessAttachmentSnapshot> snapshots = fileAttachmentService.claimForReceipt(
+                companyId,
+                purchaseOrder.getPoId(),
+                purchaseOrder.getSupplierId(),
+                receiptId,
+                attachmentIds);
+            return snapshots.stream()
+                .map(snapshot -> new PurchaseReceiptAttachmentJpaEntity(
+                    snapshot.attachmentId(),
+                    snapshot.attachmentId(),
+                    receiptId,
+                    snapshot.fileName(),
+                    snapshot.description(),
+                    snapshot.contentType(),
+                    snapshot.sizeBytes(),
+                    snapshot.storageObjectKey(),
+                    snapshot.storageStatus().name()))
+                .toList();
+        }
         List<AttachmentMetadataRequest> attachments = attachments(requestAttachments);
         List<PurchaseReceiptAttachmentJpaEntity> entities = new java.util.ArrayList<>();
         for (int index = 0; index < attachments.size(); index++) {
@@ -371,7 +428,33 @@ public class ReceiptInvoiceService {
             purchaseOrder.getCurrency());
     }
 
-    private List<SupplierInvoiceAttachmentJpaEntity> toInvoiceAttachments(String invoiceId, List<AttachmentMetadataRequest> requestAttachments) {
+    private List<SupplierInvoiceAttachmentJpaEntity> toInvoiceAttachments(
+        String invoiceId,
+        List<AttachmentMetadataRequest> requestAttachments,
+        List<String> attachmentIds,
+        String companyId,
+        PurchaseOrderJpaEntity purchaseOrder
+    ) {
+        if (attachmentIds != null && !attachmentIds.isEmpty()) {
+            List<BusinessAttachmentSnapshot> snapshots = fileAttachmentService.claimForInvoice(
+                companyId,
+                purchaseOrder.getPoId(),
+                purchaseOrder.getSupplierId(),
+                invoiceId,
+                attachmentIds);
+            return snapshots.stream()
+                .map(snapshot -> new SupplierInvoiceAttachmentJpaEntity(
+                    snapshot.attachmentId(),
+                    snapshot.attachmentId(),
+                    invoiceId,
+                    snapshot.fileName(),
+                    snapshot.description(),
+                    snapshot.contentType(),
+                    snapshot.sizeBytes(),
+                    snapshot.storageObjectKey(),
+                    snapshot.storageStatus().name()))
+                .toList();
+        }
         List<AttachmentMetadataRequest> attachments = attachments(requestAttachments);
         List<SupplierInvoiceAttachmentJpaEntity> entities = new java.util.ArrayList<>();
         for (int index = 0; index < attachments.size(); index++) {
@@ -520,6 +603,8 @@ public class ReceiptInvoiceService {
         Map<String, BigDecimal> receiptQuantityByLine,
         Map<String, BigDecimal> invoiceQuantityByLine,
         BigDecimal invoiceTotalAmount
+        ,
+        long attachmentCount
     ) {
         List<PurchaseOrderLineJpaEntity> sortedLines = lines.stream()
             .sorted(Comparator.comparing(PurchaseOrderLineJpaEntity::getLineNo))
@@ -551,6 +636,7 @@ public class ReceiptInvoiceService {
             receiptProgress(orderedQuantity, receivedQuantity),
             invoiceProgress(orderedQuantity, invoicedQuantity),
             invoiceAmountStatus(normalizedInvoiceTotal, variance),
+            Math.toIntExact(attachmentCount),
             sortedLines.stream()
                 .map(line -> toFulfillmentLine(line, receiptQuantityByLine, invoiceQuantityByLine))
                 .toList(),
@@ -583,6 +669,21 @@ public class ReceiptInvoiceService {
             attachment.getContentType(),
             attachment.getSizeBytes(),
             attachment.getStorageObjectKey(),
+            attachment.getStorageStatus(),
+            FileAttachmentService.isDownloadable(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus()),
+            FileAttachmentService.isDownloadable(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus())
+                ? "/api/attachments/" + attachment.getFileAttachmentId() + "/download?companyId=" + companyIdByReceiptId(attachment.getReceiptId())
+                : null,
+            FileAttachmentService.downloadDisabledReason(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus()),
             attachment.getCreatedAt());
     }
 
@@ -594,7 +695,34 @@ public class ReceiptInvoiceService {
             attachment.getContentType(),
             attachment.getSizeBytes(),
             attachment.getStorageObjectKey(),
+            attachment.getStorageStatus(),
+            FileAttachmentService.isDownloadable(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus()),
+            FileAttachmentService.isDownloadable(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus())
+                ? "/api/attachments/" + attachment.getFileAttachmentId() + "/download?companyId=" + companyIdByInvoiceId(attachment.getInvoiceId())
+                : null,
+            FileAttachmentService.downloadDisabledReason(
+                attachment.getFileAttachmentId(),
+                attachment.getStorageObjectKey(),
+                attachment.getStorageStatus()),
             attachment.getCreatedAt());
+    }
+
+    private String companyIdByReceiptId(String receiptId) {
+        return receiptRepository.findByReceiptId(receiptId)
+            .map(PurchaseReceiptJpaEntity::getCompanyId)
+            .orElse(null);
+    }
+
+    private String companyIdByInvoiceId(String invoiceId) {
+        return invoiceRepository.findByInvoiceId(invoiceId)
+            .map(SupplierInvoiceJpaEntity::getCompanyId)
+            .orElse(null);
     }
 
     private SourcePurchaseOrderResponse toSourcePo(PurchaseOrderJpaEntity purchaseOrder) {

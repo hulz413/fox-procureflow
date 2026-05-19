@@ -19,6 +19,9 @@ public class SupplierInvoiceAttachmentJpaEntity {
     @Column(nullable = false, length = 96, unique = true)
     private String attachmentId;
 
+    @Column(length = 96)
+    private String fileAttachmentId;
+
     @Column(nullable = false, length = 80)
     private String invoiceId;
 
@@ -37,6 +40,9 @@ public class SupplierInvoiceAttachmentJpaEntity {
     @Column(length = 500)
     private String storageObjectKey;
 
+    @Column(nullable = false, length = 32)
+    private String storageStatus;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -51,18 +57,38 @@ public class SupplierInvoiceAttachmentJpaEntity {
         String contentType,
         Long sizeBytes
     ) {
+        this(attachmentId, null, invoiceId, fileName, description, contentType, sizeBytes, null, "METADATA_ONLY");
+    }
+
+    SupplierInvoiceAttachmentJpaEntity(
+        String attachmentId,
+        String fileAttachmentId,
+        String invoiceId,
+        String fileName,
+        String description,
+        String contentType,
+        Long sizeBytes,
+        String storageObjectKey,
+        String storageStatus
+    ) {
         this.attachmentId = attachmentId;
+        this.fileAttachmentId = fileAttachmentId;
         this.invoiceId = invoiceId;
         this.fileName = fileName;
         this.description = description;
         this.contentType = contentType;
         this.sizeBytes = sizeBytes;
-        this.storageObjectKey = null;
+        this.storageObjectKey = storageObjectKey;
+        this.storageStatus = storageStatus;
         this.createdAt = LocalDateTime.now();
     }
 
     public String getAttachmentId() {
         return attachmentId;
+    }
+
+    public String getFileAttachmentId() {
+        return fileAttachmentId;
     }
 
     public String getInvoiceId() {
@@ -87,6 +113,10 @@ public class SupplierInvoiceAttachmentJpaEntity {
 
     public String getStorageObjectKey() {
         return storageObjectKey;
+    }
+
+    public String getStorageStatus() {
+        return storageStatus;
     }
 
     public LocalDateTime getCreatedAt() {

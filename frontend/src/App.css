@@ -1817,6 +1817,68 @@ tbody tr:last-child td {
   resize: vertical;
 }
 
+.attachment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.attachment-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--pf-border);
+  border-radius: 7px;
+  background: #f9faf8;
+}
+
+.attachment-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-row small {
+  color: var(--pf-muted);
+  font-size: 11px;
+}
+
+.attachment-inline-list {
+  display: grid;
+  gap: 4px;
+}
+
+.attachment-link,
+.icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pf-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.attachment-link span,
+.icon-action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-link:disabled,
+.icon-action:disabled {
+  color: var(--pf-muted);
+  cursor: not-allowed;
+}
+
 @media (max-width: 980px) {
   .sidebar {
     width: 86px !important;
