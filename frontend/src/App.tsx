@@ -655,6 +655,9 @@ type ExceptionHighlight = {
   supplierId: string
   supplierName: string
   severity: ThreeWayMatchSeverity | null
+  differenceCount: number
+  primaryDifferenceType: ThreeWayMatchDifferenceType | null
+  primaryDifferenceDescription: string | null
   invoiceVarianceAmount: number
   currency: string
   lastCalculatedAt: string
@@ -1610,6 +1613,7 @@ export const localizedContent = {
       supplier: '供应商',
       severity: '严重度',
       invoiceVariance: '金额差异',
+      exceptionReason: '异常原因',
       lastCalculated: '最近计算',
     },
     foundation: {
@@ -2267,6 +2271,7 @@ export const localizedContent = {
       supplier: 'Supplier',
       severity: 'Severity',
       invoiceVariance: 'Invoice Variance',
+      exceptionReason: 'Exception Reason',
       lastCalculated: 'Last Calculated',
     },
     foundation: {
@@ -3537,11 +3542,14 @@ function ProcurementDashboardView({
                             text={`${exception.companyName} · ${exception.supplierName}`}
                           />
                           <span className="exception-meta">
-                            {messages.dashboard.invoiceVariance}: {formatCurrency(exception.invoiceVarianceAmount, exception.currency, language)}
+                            {messages.dashboard.exceptionReason}: {formatDashboardExceptionReason(exception, messages)}
                           </span>
-                          <span className="exception-meta">
-                            {messages.dashboard.lastCalculated}: {formatDateTime(exception.lastCalculatedAt, language)}
-                          </span>
+                          {hasAmountVariance(exception.invoiceVarianceAmount) && (
+                            <span className="exception-meta">
+                              {messages.dashboard.invoiceVariance}: {formatCurrency(exception.invoiceVarianceAmount, exception.currency, language)}
+                            </span>
+                          )}
+                          <span className="exception-meta">{messages.dashboard.lastCalculated}: {formatDateTime(exception.lastCalculatedAt, language)}</span>
                         </div>
                         <span className={`tag ${exception.severity ? severityToneOf(exception.severity) : 'neutral'}`}>
                           {exception.severity ? formatMatchSeverity(exception.severity, messages) : messages.dashboard.empty}
@@ -9875,6 +9883,21 @@ function formatDifferenceType(type: ThreeWayMatchDifferenceType, messages: Local
   }
 
   return labels[type] ?? type
+}
+
+function formatDashboardExceptionReason(exception: ExceptionHighlight, messages: LocalizedMessages) {
+  if (!exception.primaryDifferenceType) {
+    return messages.dashboard.empty
+  }
+
+  const typeLabel = formatDifferenceType(exception.primaryDifferenceType, messages)
+  return exception.primaryDifferenceDescription
+    ? `${typeLabel} · ${exception.primaryDifferenceDescription}`
+    : typeLabel
+}
+
+function hasAmountVariance(amount: number) {
+  return Math.abs(amount) > 0.005
 }
 
 function formatMatchAction(action: ThreeWayMatchActionType, messages: LocalizedMessages) {

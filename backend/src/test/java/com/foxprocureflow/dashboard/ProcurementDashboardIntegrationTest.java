@@ -124,7 +124,11 @@ class ProcurementDashboardIntegrationTest {
             .andExpect(jsonPath("$.data.statusDistributions[?(@.documentType=='threeWayMatching')].status", hasItem("EXCEPTION")))
             .andExpect(jsonPath("$.data.supplierDistribution[*].supplierId", hasItem("supplier-hengrun")))
             .andExpect(jsonPath("$.data.supplierDistribution[*].supplierId", hasItem("supplier-anjie")))
-            .andExpect(jsonPath("$.data.exceptionHighlights[0].severity").value("HIGH"));
+            .andExpect(jsonPath("$.data.exceptionHighlights[0].severity").value("HIGH"))
+            .andExpect(jsonPath("$.data.exceptionHighlights[0].differenceCount").value(1))
+            .andExpect(jsonPath("$.data.exceptionHighlights[0].primaryDifferenceType").value("MISSING_RECEIPT"))
+            .andExpect(jsonPath("$.data.exceptionHighlights[0].primaryDifferenceDescription").value("已开票但未登记对应收货"))
+            .andExpect(jsonPath("$.data.exceptionHighlights[0].invoiceVarianceAmount").value(0.00));
     }
 
     @Test

@@ -274,11 +274,37 @@ public class ProcurementDashboardService {
                    matching.supplier_id,
                    matching.supplier_name,
                    matching.highest_severity,
+                   matching.difference_count,
+                   primary_difference.difference_type AS primary_difference_type,
+                   primary_difference.description AS primary_difference_description,
                    matching.invoice_variance_amount,
                    matching.currency,
                    matching.last_calculated_at
             FROM three_way_match_results matching
             JOIN demo_companies company ON company.company_id = matching.company_id
+            LEFT JOIN (
+                SELECT ranked.match_id,
+                       ranked.difference_type,
+                       ranked.description
+                FROM (
+                    SELECT difference_item.match_id,
+                           difference_item.difference_type,
+                           difference_item.description,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY difference_item.match_id
+                               ORDER BY CASE difference_item.severity
+                                       WHEN 'HIGH' THEN 3
+                                       WHEN 'MEDIUM' THEN 2
+                                       WHEN 'LOW' THEN 1
+                                       ELSE 0
+                                   END DESC,
+                                   difference_item.created_at ASC,
+                                   difference_item.id ASC
+                           ) AS difference_rank
+                    FROM three_way_match_differences difference_item
+                ) ranked
+                WHERE ranked.difference_rank = 1
+            ) primary_difference ON primary_difference.match_id = matching.match_id
             WHERE matching.company_id IN (:companyIds)
               AND matching.status = 'EXCEPTION'
             ORDER BY CASE matching.highest_severity
@@ -300,6 +326,9 @@ public class ProcurementDashboardService {
                 rs.getString("supplier_id"),
                 rs.getString("supplier_name"),
                 rs.getString("highest_severity"),
+                rs.getInt("difference_count"),
+                rs.getString("primary_difference_type"),
+                rs.getString("primary_difference_description"),
                 rs.getBigDecimal("invoice_variance_amount"),
                 rs.getString("currency"),
                 toLocalDateTime(rs.getTimestamp("last_calculated_at"))));

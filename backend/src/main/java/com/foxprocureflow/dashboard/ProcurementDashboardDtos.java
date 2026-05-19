@@ -78,6 +78,9 @@ public final class ProcurementDashboardDtos {
         String supplierId,
         String supplierName,
         String severity,
+        int differenceCount,
+        String primaryDifferenceType,
+        String primaryDifferenceDescription,
         BigDecimal invoiceVarianceAmount,
         String currency,
         LocalDateTime lastCalculatedAt
