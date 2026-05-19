@@ -9,8 +9,7 @@ public record AiAssistantProperties(
     String apiKey,
     String baseUrl,
     String model,
-    Duration timeout,
-    String unavailableReason
+    Duration timeout
 ) {
 
     public AiAssistantProperties {
@@ -23,9 +22,6 @@ public record AiAssistantProperties(
         if (timeout == null || timeout.isNegative() || timeout.isZero()) {
             timeout = Duration.ofSeconds(30);
         }
-        if (unavailableReason == null || unavailableReason.isBlank()) {
-            unavailableReason = "OpenAI-compatible API key is not configured";
-        }
     }
 
     boolean isConfigured() {
@@ -36,5 +32,21 @@ public record AiAssistantProperties(
             && !baseUrl.isBlank()
             && model != null
             && !model.isBlank();
+    }
+
+    String unavailableReason() {
+        if (!enabled) {
+            return "AI assistant is disabled";
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            return "OpenAI-compatible API key is not configured";
+        }
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "OpenAI-compatible base URL is not configured";
+        }
+        if (model == null || model.isBlank()) {
+            return "OpenAI-compatible model is not configured";
+        }
+        return "OpenAI-compatible provider is not configured";
     }
 }

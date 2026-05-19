@@ -44,4 +44,3 @@ fox:
         base-url: ${OPENAI_COMPATIBLE_BASE_URL:https://api.deepseek.com}
         model: ${OPENAI_COMPATIBLE_MODEL:deepseek-v4-flash}
         timeout: ${OPENAI_COMPATIBLE_TIMEOUT:30s}
-        unavailable-reason: ${OPENAI_COMPATIBLE_UNAVAILABLE_REASON:OpenAI-compatible API key is not configured}

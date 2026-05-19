@@ -84,6 +84,27 @@ class AiProviderAndValidationTest {
     }
 
     @Test
+    void openAiCompatiblePropertiesDeriveUnavailableReasonFromConfiguration() {
+        assertThat(new AiAssistantProperties(
+                false,
+                "",
+                "https://api.deepseek.com",
+                "deepseek-test",
+                Duration.ofSeconds(2))
+            .unavailableReason())
+            .isEqualTo("AI assistant is disabled");
+
+        assertThat(new AiAssistantProperties(
+                true,
+                "",
+                "https://api.deepseek.com",
+                "deepseek-test",
+                Duration.ofSeconds(2))
+            .unavailableReason())
+            .isEqualTo("OpenAI-compatible API key is not configured");
+    }
+
+    @Test
     void openAiCompatibleProviderMapsRateLimitErrors() throws Exception {
         HttpServer server = startServer(429, "{\"error\":{\"message\":\"rate limited\"}}");
         try {
@@ -93,8 +114,7 @@ class AiProviderAndValidationTest {
                     "test-key",
                     "http://127.0.0.1:" + server.getAddress().getPort(),
                     "deepseek-test",
-                    Duration.ofSeconds(2),
-                    "unavailable"),
+                    Duration.ofSeconds(2)),
                 objectMapper);
 
             assertThatThrownBy(() -> provider.generate(new AiProviderRequest(AiScenario.PURCHASE_REQUEST_RISK, "system", "user")))
@@ -119,8 +139,7 @@ class AiProviderAndValidationTest {
                     "test-key",
                     "http://127.0.0.1:" + server.getAddress().getPort(),
                     "deepseek-test",
-                    Duration.ofSeconds(2),
-                    "unavailable"),
+                    Duration.ofSeconds(2)),
                 objectMapper);
 
             AiProviderResult result = provider.generate(new AiProviderRequest(AiScenario.PURCHASE_REQUEST_RISK, "system", "user"));
