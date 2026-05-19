@@ -524,6 +524,11 @@ tbody tr:last-child td {
   background: #f6eeee;
 }
 
+.amount-danger {
+  color: var(--pf-danger);
+  font-weight: 700;
+}
+
 .tag.neutral {
   color: #66726b;
   background: #f0f2f0;

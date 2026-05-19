@@ -36,6 +36,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/api/rfqs/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/purchase-orders/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/purchase-orders/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/receipts/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/receipts/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/invoices/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/invoices/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/receipts-invoices/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated())
             .build();

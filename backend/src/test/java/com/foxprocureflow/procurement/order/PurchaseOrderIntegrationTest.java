@@ -206,8 +206,6 @@ class PurchaseOrderIntegrationTest {
             .andExpect(jsonPath("$['paths']['/api/purchase-orders/{poId}/publish']").exists())
             .andExpect(jsonPath("$['paths']['/api/purchase-orders/{poId}/cancel']").exists())
             .andExpect(content().string(containsString("Create a purchase order from an RFQ quote")))
-            .andExpect(content().string(not(containsString("/api/receipts"))))
-            .andExpect(content().string(not(containsString("/api/invoices"))))
             .andExpect(content().string(not(containsString("/api/matching"))));
     }
 

@@ -16,6 +16,27 @@ node_version_ok() {
   '
 }
 
+ensure_java() {
+  if command -v java >/dev/null 2>&1 && java -version >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local mac_java_home
+  local candidate
+  mac_java_home="$(/usr/libexec/java_home -v 21 2>/dev/null || true)"
+
+  for candidate in "${JAVA_HOME:-}" "$mac_java_home" /opt/homebrew/opt/openjdk@21 /usr/local/opt/openjdk@21; do
+    [[ -n "$candidate" ]] || continue
+    if [[ -x "$candidate/bin/java" ]]; then
+      export JAVA_HOME="$candidate"
+      export PATH="$candidate/bin:$PATH"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 compose_cmd() {
   if docker compose version >/dev/null 2>&1; then
     echo "docker compose"
@@ -38,6 +59,31 @@ print_urls() {
   echo "Swagger UI:   http://localhost:${BACKEND_PORT}/swagger-ui.html"
   echo "RabbitMQ UI:  http://localhost:15672 (reserved)"
   echo "MinIO UI:     http://localhost:9001 (reserved)"
+}
+
+stop_existing_listener() {
+  local port="$1"
+  local label="$2"
+  local pids
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return
+  fi
+
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN || true)"
+  if [[ -z "$pids" ]]; then
+    return
+  fi
+
+  echo "Stopping existing ${label} listener(s) on port ${port}: ${pids//$'\n'/ }"
+  kill $pids >/dev/null 2>&1 || true
+  sleep 1
+
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN || true)"
+  if [[ -n "$pids" ]]; then
+    echo "Force stopping existing ${label} listener(s) on port ${port}: ${pids//$'\n'/ }"
+    kill -9 $pids >/dev/null 2>&1 || true
+  fi
 }
 
 start_infra() {
@@ -66,12 +112,13 @@ start_backend() {
     return
   fi
 
-  if ! command -v java >/dev/null 2>&1 || ! java -version >/dev/null 2>&1; then
+  if ! ensure_java; then
     echo "Java 21 runtime is not available. Install Java 21, then run:"
     echo "  cd backend && ./gradlew bootRun"
     return
   fi
 
+  stop_existing_listener "$BACKEND_PORT" "backend"
   echo "Starting backend on port ${BACKEND_PORT}..."
   (cd "$BACKEND_DIR" && FOX_BACKEND_PORT="$BACKEND_PORT" ./gradlew bootRun) &
   BACKEND_PID=$!
@@ -102,6 +149,7 @@ start_frontend() {
     (cd "$FRONTEND_DIR" && npm install)
   fi
 
+  stop_existing_listener "$FRONTEND_PORT" "frontend"
   echo "Starting frontend on port ${FRONTEND_PORT}..."
   (cd "$FRONTEND_DIR" && npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT") &
   FRONTEND_PID=$!

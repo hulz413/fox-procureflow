@@ -560,6 +560,171 @@ type PurchaseOrderCreateFormState = {
   deliveryNote: string
 }
 
+type ReceiptProgressStatus = 'NOT_RECEIVED' | 'PARTIALLY_RECEIVED' | 'FULLY_RECEIVED'
+type InvoiceProgressStatus = 'NOT_INVOICED' | 'PARTIALLY_INVOICED' | 'FULLY_INVOICED'
+type InvoiceAmountStatus = 'NOT_INVOICED' | 'MATCHED' | 'VARIANCE'
+type PurchaseReceiptStatus = 'RECORDED'
+type SupplierInvoiceStatus = 'RECORDED'
+type ReceiptInvoiceCreateMode = 'receipt' | 'invoice'
+
+type ReceiptInvoiceAttachment = {
+  attachmentId: string
+  fileName: string
+  description: string | null
+  contentType: string
+  sizeBytes: number
+  storageObjectKey: string | null
+  createdAt: string
+}
+
+type FulfillmentLine = {
+  poLineId: string
+  lineNo: number
+  itemName: string
+  specification: string | null
+  orderedQuantity: number
+  receivedQuantity: number
+  invoicedQuantity: number
+  unit: string
+  confirmedAmount: number
+}
+
+type FulfillmentPurchaseOrder = {
+  poId: string
+  companyId: string
+  title: string
+  supplierId: string
+  supplierName: string
+  poTotalAmount: number
+  currency: string
+  expectedDeliveryDate: string
+  orderedQuantity: number
+  receivedQuantity: number
+  invoicedQuantity: number
+  invoiceTotalAmount: number
+  invoiceAmountVariance: number
+  receiptSummary: ReceiptProgressStatus
+  invoiceSummary: InvoiceProgressStatus
+  invoiceAmountStatus: InvoiceAmountStatus
+  lines: FulfillmentLine[]
+  issuedAt: string | null
+  updatedAt: string
+}
+
+type ReceiptListItem = {
+  receiptId: string
+  companyId: string
+  poId: string
+  supplierId: string
+  supplierName: string
+  receivedBy: string
+  receivedDate: string
+  status: PurchaseReceiptStatus
+  receivedQuantity: number
+  lineCount: number
+  attachmentCount: number
+  attachments: ReceiptInvoiceAttachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+type InvoiceListItem = {
+  invoiceId: string
+  companyId: string
+  poId: string
+  supplierId: string
+  supplierName: string
+  invoiceNumber: string
+  invoiceDate: string
+  registeredBy: string
+  status: SupplierInvoiceStatus
+  untaxedAmount: number
+  taxAmount: number
+  totalAmount: number
+  currency: string
+  lineCount: number
+  attachmentCount: number
+  attachments: ReceiptInvoiceAttachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+type CreateReceiptPayload = {
+  companyId: string
+  poId: string
+  receivedBy: string
+  receivedDate: string
+  note?: string
+  lines: Array<{
+    poLineId: string
+    receivedQuantity: number
+    note?: string
+  }>
+  attachments?: Array<{
+    fileName: string
+    description?: string
+    contentType: string
+    sizeBytes: number
+  }>
+}
+
+type CreateInvoicePayload = {
+  companyId: string
+  poId: string
+  invoiceNumber: string
+  invoiceDate: string
+  registeredBy: string
+  note?: string
+  lines: Array<{
+    poLineId: string
+    invoicedQuantity: number
+    untaxedAmount: number
+    taxRate: number
+    taxAmount: number
+    totalAmount: number
+  }>
+  attachments?: Array<{
+    fileName: string
+    description?: string
+    contentType: string
+    sizeBytes: number
+  }>
+}
+
+type ReceiptCreateFormState = {
+  poId: string
+  receivedBy: string
+  receivedDate: string
+  note: string
+  fileName: string
+  fileDescription: string
+  lines: Array<{
+    poLineId: string
+    receivedQuantity: number
+    note: string
+  }>
+}
+
+type InvoiceCreateFormState = {
+  poId: string
+  invoiceNumber: string
+  invoiceDate: string
+  registeredBy: string
+  note: string
+  fileName: string
+  fileDescription: string
+  lines: Array<{
+    poLineId: string
+    invoicedQuantity: number
+    untaxedAmount: number
+    taxRate: number
+    taxAmount: number
+    totalAmount: number
+  }>
+}
+
+type InvoiceEditableLineKey = 'invoicedQuantity' | 'untaxedAmount' | 'taxRate' | 'taxAmount' | 'totalAmount'
+
 const demoContext: DemoContext = {
   groupId: 'group-xinghe',
   groupName: '星河控股集团',
@@ -747,6 +912,28 @@ async function cancelPurchaseOrder(poId: string, payload: CancelPurchaseOrderPay
   return postApi<PurchaseOrderDetail>(`/api/purchase-orders/${encodeURIComponent(poId)}/cancel`, payload)
 }
 
+async function fetchFulfillmentPurchaseOrders(companyId: string) {
+  return fetchApi<FulfillmentPurchaseOrder[]>(`/api/receipts-invoices/purchase-orders?companyId=${encodeURIComponent(companyId)}`)
+}
+
+async function fetchReceipts(companyId: string, poId?: string) {
+  const poQuery = poId ? `&poId=${encodeURIComponent(poId)}` : ''
+  return fetchApi<ReceiptListItem[]>(`/api/receipts?companyId=${encodeURIComponent(companyId)}${poQuery}`)
+}
+
+async function fetchInvoices(companyId: string, poId?: string) {
+  const poQuery = poId ? `&poId=${encodeURIComponent(poId)}` : ''
+  return fetchApi<InvoiceListItem[]>(`/api/invoices?companyId=${encodeURIComponent(companyId)}${poQuery}`)
+}
+
+async function createReceipt(payload: CreateReceiptPayload) {
+  return postApi<unknown>('/api/receipts', payload)
+}
+
+async function createInvoice(payload: CreateInvoicePayload) {
+  return postApi<unknown>('/api/invoices', payload)
+}
+
 const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -765,11 +952,14 @@ const localizedContent = {
       approvalsTitle: '审批中心',
       rfqTitle: '询报价',
       purchaseOrdersTitle: '采购订单',
+      receiptInvoiceTitle: '收货发票',
     },
     actions: {
       newRequest: '新建申请',
       newRfq: '新建 RFQ',
       newPo: '新建 PO',
+      newReceipt: '登记收货',
+      newInvoice: '登记发票',
     },
     status: {
       backend: '后端',
@@ -808,7 +998,7 @@ const localizedContent = {
       { label: '审批中心', icon: <AuditOutlined />, path: '/approvals' },
       { label: '询报价', icon: <FileSearchOutlined />, path: '/rfqs' },
       { label: '采购订单', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
-      { label: '收货发票', icon: <InboxOutlined /> },
+      { label: '收货发票', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '三单匹配', icon: <SwapOutlined /> },
       { label: '供应商池', icon: <TeamOutlined />, count: '5' },
       { label: '主数据', icon: <DatabaseOutlined />, path: '/master-data' },
@@ -1137,6 +1327,58 @@ const localizedContent = {
       cancelDisabledCancelledReason: '已取消的 PO 不能重复取消',
       cancelPendingReason: 'PO 取消中',
     },
+    receiptInvoice: {
+      dataState: '后端履约数据',
+      unavailable: '收货发票暂不可用',
+      loading: '加载中',
+      empty: '暂无已发布 PO',
+      list: 'PO 履约列表',
+      detail: '履约详情',
+      receiptList: '收货单',
+      invoiceList: '供应商发票',
+      createReceipt: '登记收货',
+      createInvoice: '登记发票',
+      receiptSuccess: '收货已登记',
+      invoiceSuccess: '发票已登记',
+      actionFailed: '操作失败',
+      orderedQuantity: '订购数量',
+      receivedQuantity: '已收货',
+      invoicedQuantity: '已开票',
+      invoiceTotal: '发票总额',
+      variance: '金额差异',
+      receiptSummary: '收货状态',
+      invoiceSummary: '开票状态',
+      invoiceAmountStatus: '金额状态',
+      sourcePo: '来源 PO',
+      receiver: '收货人',
+      receivedDate: '收货日期',
+      registeredBy: '登记人',
+      invoiceNumber: '发票号',
+      invoiceDate: '发票日期',
+      untaxedAmount: '未税金额',
+      note: '备注',
+      attachmentFile: '附件文件名',
+      attachmentDescription: '附件说明',
+      attachments: '附件元数据',
+      lineFulfillment: '明细履约',
+      notReceived: '未收货',
+      partiallyReceived: '部分收货',
+      fullyReceived: '已收齐',
+      notInvoiced: '未开票',
+      partiallyInvoiced: '部分开票',
+      fullyInvoiced: '已开齐',
+      matched: '金额一致',
+      amountVariance: '金额偏差',
+      recorded: '已记录',
+      noIssuedPo: '暂无可登记的已发布 PO',
+      fullyReceivedReason: '该 PO 已收齐，不能继续登记收货',
+      fullyInvoicedReason: '该 PO 已开齐，不能继续登记发票',
+      createPendingReason: '提交中',
+      discardTitle: '放弃本次收货/发票编辑？',
+      discardContent: '当前单据还没有保存，关闭后本次输入会丢失。',
+      discardConfirm: '放弃输入',
+      boundary: '只记录收货和发票，不创建三单匹配结果',
+    },
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
   },
   en: {
@@ -1156,11 +1398,14 @@ const localizedContent = {
       approvalsTitle: 'Approval Center',
       rfqTitle: 'RFQ',
       purchaseOrdersTitle: 'Purchase Orders',
+      receiptInvoiceTitle: 'Receiving & Invoices',
     },
     actions: {
       newRequest: 'New Request',
       newRfq: 'New RFQ',
       newPo: 'New PO',
+      newReceipt: 'Record Receipt',
+      newInvoice: 'Record Invoice',
     },
     status: {
       backend: 'Backend',
@@ -1199,7 +1444,7 @@ const localizedContent = {
       { label: 'Approvals', icon: <AuditOutlined />, path: '/approvals' },
       { label: 'RFQ', icon: <FileSearchOutlined />, path: '/rfqs' },
       { label: 'Purchase Orders', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
-      { label: 'Receiving & Invoices', icon: <InboxOutlined /> },
+      { label: 'Receiving & Invoices', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '3-Way Match', icon: <SwapOutlined /> },
       { label: 'Supplier Pool', icon: <TeamOutlined />, count: '5' },
       { label: 'Master Data', icon: <DatabaseOutlined />, path: '/master-data' },
@@ -1528,6 +1773,58 @@ const localizedContent = {
       cancelDisabledCancelledReason: 'Cancelled POs cannot be cancelled again',
       cancelPendingReason: 'Cancelling PO',
     },
+    receiptInvoice: {
+      dataState: 'Backend fulfillment data',
+      unavailable: 'Receiving and invoices unavailable',
+      loading: 'Loading',
+      empty: 'No issued POs',
+      list: 'PO Fulfillment List',
+      detail: 'Fulfillment Detail',
+      receiptList: 'Receipts',
+      invoiceList: 'Supplier Invoices',
+      createReceipt: 'Record Receipt',
+      createInvoice: 'Record Invoice',
+      receiptSuccess: 'Receipt recorded',
+      invoiceSuccess: 'Invoice recorded',
+      actionFailed: 'Action failed',
+      orderedQuantity: 'Ordered',
+      receivedQuantity: 'Received',
+      invoicedQuantity: 'Invoiced',
+      invoiceTotal: 'Invoice Total',
+      variance: 'Variance',
+      receiptSummary: 'Receipt Status',
+      invoiceSummary: 'Invoice Status',
+      invoiceAmountStatus: 'Amount Status',
+      sourcePo: 'Source PO',
+      receiver: 'Receiver',
+      receivedDate: 'Received Date',
+      registeredBy: 'Registered By',
+      invoiceNumber: 'Invoice No.',
+      invoiceDate: 'Invoice Date',
+      untaxedAmount: 'Untaxed Amount',
+      note: 'Note',
+      attachmentFile: 'Attachment File',
+      attachmentDescription: 'Attachment Description',
+      attachments: 'Attachment Metadata',
+      lineFulfillment: 'Line Fulfillment',
+      notReceived: 'Not received',
+      partiallyReceived: 'Partially received',
+      fullyReceived: 'Fully received',
+      notInvoiced: 'Not invoiced',
+      partiallyInvoiced: 'Partially invoiced',
+      fullyInvoiced: 'Fully invoiced',
+      matched: 'Matched',
+      amountVariance: 'Variance',
+      recorded: 'Recorded',
+      noIssuedPo: 'No issued PO available',
+      fullyReceivedReason: 'This PO is fully received',
+      fullyInvoicedReason: 'This PO is fully invoiced',
+      createPendingReason: 'Submitting',
+      discardTitle: 'Discard receiving/invoice edits?',
+      discardContent: 'This document has not been saved. Closing will discard your input.',
+      discardConfirm: 'Discard input',
+      boundary: 'Records receipts and invoices only; no three-way matching result is created',
+    },
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
 } as const
@@ -1603,9 +1900,11 @@ function Workspace({
   const isApprovalRoute = location.pathname === '/approvals'
   const isRfqRoute = location.pathname === '/rfqs'
   const isPurchaseOrderRoute = location.pathname === '/purchase-orders'
+  const isReceiptInvoiceRoute = location.pathname === '/receipts-invoices'
   const [isCreateDrawerOpen, setCreateDrawerOpen] = useState(false)
   const [isRfqCreateDrawerOpen, setRfqCreateDrawerOpen] = useState(false)
   const [isPoCreateDrawerOpen, setPoCreateDrawerOpen] = useState(false)
+  const [receiptInvoiceCreateMode, setReceiptInvoiceCreateMode] = useState<ReceiptInvoiceCreateMode | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
@@ -1748,6 +2047,11 @@ function Workspace({
   }
 
   const handleNewRequestClick = () => {
+    if (isReceiptInvoiceRoute) {
+      setReceiptInvoiceCreateMode('receipt')
+      return
+    }
+
     if (isPurchaseOrderRoute) {
       setPoCreateDrawerOpen(true)
       return
@@ -1809,8 +2113,28 @@ function Workspace({
     }
   }, [isPurchaseOrderRoute, location.search, navigate])
 
-  const primaryActionIcon = isPurchaseOrderRoute ? <ShoppingCartOutlined /> : isRfqRoute ? <FileSearchOutlined /> : <FileAddOutlined />
-  const primaryActionLabel = isPurchaseOrderRoute
+  useEffect(() => {
+    if (!isReceiptInvoiceRoute) {
+      return
+    }
+
+    const requestedMode = new URLSearchParams(location.search).get('new')
+    if (requestedMode === 'receipt' || requestedMode === 'invoice') {
+      setReceiptInvoiceCreateMode(requestedMode)
+      navigate('/receipts-invoices', { replace: true })
+    }
+  }, [isReceiptInvoiceRoute, location.search, navigate])
+
+  const primaryActionIcon = isReceiptInvoiceRoute
+    ? <InboxOutlined />
+    : isPurchaseOrderRoute
+      ? <ShoppingCartOutlined />
+      : isRfqRoute
+        ? <FileSearchOutlined />
+        : <FileAddOutlined />
+  const primaryActionLabel = isReceiptInvoiceRoute
+    ? messages.actions.newReceipt
+    : isPurchaseOrderRoute
     ? messages.actions.newPo
     : isRfqRoute
       ? messages.actions.newRfq
@@ -1876,11 +2200,13 @@ function Workspace({
                   ? messages.header.purchaseRequestsTitle
                   : isApprovalRoute
                     ? messages.header.approvalsTitle
-                    : isRfqRoute
+                  : isRfqRoute
                       ? messages.header.rfqTitle
                       : isPurchaseOrderRoute
                         ? messages.header.purchaseOrdersTitle
-                    : messages.header.title}
+                        : isReceiptInvoiceRoute
+                          ? messages.header.receiptInvoiceTitle
+                          : messages.header.title}
             </h1>
           </div>
           <div className={isFoundationRoute ? 'top-actions compact' : 'top-actions'}>
@@ -2002,6 +2328,16 @@ function Workspace({
               }}
               purchaseOrders={purchaseOrdersQuery.data?.data ?? []}
               rfqs={rfqsQuery.data?.data ?? []}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
+              users={usersQuery.data?.data ?? []}
+            />
+          ) : isReceiptInvoiceRoute ? (
+            <ReceiptsInvoicesView
+              createMode={receiptInvoiceCreateMode}
+              language={language}
+              messages={messages}
+              onCreateModeChange={setReceiptInvoiceCreateMode}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               users={usersQuery.data?.data ?? []}
@@ -4657,6 +4993,958 @@ function PurchaseOrderView({
   )
 }
 
+function ReceiptsInvoicesView({
+  createMode,
+  language,
+  messages,
+  onCreateModeChange,
+  selectedCompany,
+  selectedCompanyId,
+  users,
+}: {
+  createMode: ReceiptInvoiceCreateMode | null
+  language: Language
+  messages: LocalizedMessages
+  onCreateModeChange: (mode: ReceiptInvoiceCreateMode | null) => void
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  users: UserSummary[]
+}) {
+  const queryClient = useQueryClient()
+  const [modal, modalContextHolder] = Modal.useModal()
+  const wasCreateOpen = useRef(false)
+  const [selectedPoId, setSelectedPoId] = useState<string | undefined>()
+  const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [isCreateDirty, setCreateDirty] = useState(false)
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
+  const fulfillmentQuery = useQuery({
+    queryKey: ['receipts-invoices', 'purchase-orders', selectedCompanyId],
+    queryFn: () => fetchFulfillmentPurchaseOrders(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const receiptsQuery = useQuery({
+    queryKey: ['receipts', selectedCompanyId],
+    queryFn: () => fetchReceipts(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const invoicesQuery = useQuery({
+    queryKey: ['invoices', selectedCompanyId],
+    queryFn: () => fetchInvoices(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const fulfillmentRows = fulfillmentQuery.data?.data ?? []
+  const receipts = receiptsQuery.data?.data ?? []
+  const invoices = invoicesQuery.data?.data ?? []
+  const selectedPo = fulfillmentRows.find((row) => row.poId === selectedPoId)
+  const relatedReceipts = selectedPo ? receipts.filter((receipt) => receipt.poId === selectedPo.poId) : []
+  const relatedInvoices = selectedPo ? invoices.filter((invoice) => invoice.poId === selectedPo.poId) : []
+  const activeUsers = users.filter((user) => user.active)
+  const financeUsers = activeUsers.filter((user) => user.roles.some((role) => role.roleId === 'role-finance'))
+  const receiptUsers = activeUsers.filter((user) =>
+    user.roles.some((role) => role.roleId === 'role-warehouse' || role.roleId === 'role-procurement' || role.roleId === 'role-demo-operator'),
+  )
+  const [receiptForm, setReceiptForm] = useState<ReceiptCreateFormState>(() =>
+    buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId),
+  )
+  const [invoiceForm, setInvoiceForm] = useState<InvoiceCreateFormState>(() =>
+    buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId),
+  )
+
+  useEffect(() => {
+    if (fulfillmentRows.length === 0) {
+      setSelectedPoId(undefined)
+      setDetailDrawerOpen(false)
+      return
+    }
+
+    if (selectedPoId && !fulfillmentRows.some((row) => row.poId === selectedPoId)) {
+      setSelectedPoId(undefined)
+      setDetailDrawerOpen(false)
+    }
+  }, [fulfillmentRows, selectedPoId])
+
+  useEffect(() => {
+    const didOpenCreateDrawer = Boolean(createMode) && !wasCreateOpen.current
+    wasCreateOpen.current = Boolean(createMode)
+    if (!didOpenCreateDrawer) {
+      return
+    }
+
+    setCreateDirty(false)
+    setFeedback(null)
+    setDetailDrawerOpen(false)
+    setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId))
+    setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId))
+  }, [createMode, financeUsers, fulfillmentRows, receiptUsers, selectedCompanyId])
+
+  const receiptMutation = useMutation({
+    mutationFn: createReceipt,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.receiptInvoice.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: () => {
+      setCreateDirty(false)
+      setFeedback({ message: messages.receiptInvoice.receiptSuccess, tone: 'success' })
+      onCreateModeChange(null)
+      void queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      void queryClient.invalidateQueries({ queryKey: ['receipts-invoices'] })
+    },
+  })
+
+  const invoiceMutation = useMutation({
+    mutationFn: createInvoice,
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.receiptInvoice.actionFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: () => {
+      setCreateDirty(false)
+      setFeedback({ message: messages.receiptInvoice.invoiceSuccess, tone: 'success' })
+      onCreateModeChange(null)
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      void queryClient.invalidateQueries({ queryKey: ['receipts-invoices'] })
+    },
+  })
+
+  const isError = fulfillmentQuery.isError || receiptsQuery.isError || invoicesQuery.isError
+  const isLoading = fulfillmentQuery.isLoading || receiptsQuery.isLoading || invoicesQuery.isLoading
+  const drawerMode = createMode ?? (isDetailDrawerOpen ? 'detail' : null)
+  const drawerTitle =
+    drawerMode === 'receipt'
+      ? messages.receiptInvoice.createReceipt
+      : drawerMode === 'invoice'
+        ? messages.receiptInvoice.createInvoice
+        : messages.receiptInvoice.detail
+
+  const closeCreateDrawer = () => {
+    setCreateDirty(false)
+    onCreateModeChange(null)
+  }
+
+  const closeDetailDrawer = () => {
+    setDetailDrawerOpen(false)
+    setFeedback(null)
+  }
+
+  const handleDrawerClose = () => {
+    if ((drawerMode === 'receipt' || drawerMode === 'invoice') && isCreateDirty) {
+      modal.confirm({
+        mousePosition: getViewportCenter(),
+        centered: true,
+        cancelText: messages.purchaseRequest.continueEdit,
+        content: messages.receiptInvoice.discardContent,
+        focusable: { autoFocusButton: 'cancel' },
+        okType: 'danger',
+        okText: messages.receiptInvoice.discardConfirm,
+        onOk: closeCreateDrawer,
+        rootClassName: 'procure-confirm-modal',
+        title: messages.receiptInvoice.discardTitle,
+      })
+      return
+    }
+
+    if (drawerMode === 'receipt' || drawerMode === 'invoice') {
+      closeCreateDrawer()
+      return
+    }
+
+    closeDetailDrawer()
+  }
+
+  const openPoDetail = (poId: string) => {
+    setSelectedPoId(poId)
+    setDetailDrawerOpen(true)
+    setFeedback(null)
+  }
+
+  const openCreateMode = (mode: ReceiptInvoiceCreateMode, po?: FulfillmentPurchaseOrder) => {
+    const row = po ?? fulfillmentRows[0]
+    if (mode === 'receipt') {
+      setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, row?.poId))
+    } else {
+      setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, row?.poId))
+    }
+    setCreateDirty(false)
+    setFeedback(null)
+    onCreateModeChange(mode)
+  }
+
+  const updateReceiptPo = (poId: string) => {
+    setCreateDirty(true)
+    setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, poId))
+  }
+
+  const updateInvoicePo = (poId: string) => {
+    setCreateDirty(true)
+    setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, poId))
+  }
+
+  const updateReceiptLine = (poLineId: string, receivedQuantity: number) => {
+    setCreateDirty(true)
+    setReceiptForm((current) => ({
+      ...current,
+      lines: current.lines.map((line) =>
+        line.poLineId === poLineId ? { ...line, receivedQuantity } : line,
+      ),
+    }))
+  }
+
+  const updateInvoiceLine = (
+    poLineId: string,
+    key: InvoiceEditableLineKey,
+    value: number,
+  ) => {
+    setCreateDirty(true)
+    setInvoiceForm((current) => ({
+      ...current,
+      lines: current.lines.map((line) => (line.poLineId === poLineId ? { ...line, [key]: value } : line)),
+    }))
+  }
+
+  const handleCreateReceipt = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    receiptMutation.mutate({
+      attachments: receiptForm.fileName.trim()
+        ? [{
+            contentType: 'image/jpeg',
+            description: receiptForm.fileDescription,
+            fileName: receiptForm.fileName,
+            sizeBytes: 0,
+          }]
+        : [],
+      companyId: selectedCompanyId,
+      lines: receiptForm.lines
+        .filter((line) => line.receivedQuantity > 0)
+        .map((line) => ({
+          note: line.note,
+          poLineId: line.poLineId,
+          receivedQuantity: line.receivedQuantity,
+        })),
+      note: receiptForm.note,
+      poId: receiptForm.poId,
+      receivedBy: receiptForm.receivedBy,
+      receivedDate: receiptForm.receivedDate,
+    })
+  }
+
+  const handleCreateInvoice = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    invoiceMutation.mutate({
+      attachments: invoiceForm.fileName.trim()
+        ? [{
+            contentType: 'application/pdf',
+            description: invoiceForm.fileDescription,
+            fileName: invoiceForm.fileName,
+            sizeBytes: 0,
+          }]
+        : [],
+      companyId: selectedCompanyId,
+      invoiceDate: invoiceForm.invoiceDate,
+      invoiceNumber: invoiceForm.invoiceNumber,
+      lines: invoiceForm.lines
+        .filter((line) => line.invoicedQuantity > 0)
+        .map((line) => ({
+          invoicedQuantity: line.invoicedQuantity,
+          poLineId: line.poLineId,
+          taxAmount: roundAmount(line.taxAmount),
+          taxRate: line.taxRate,
+          totalAmount: roundAmount(line.totalAmount),
+          untaxedAmount: roundAmount(line.untaxedAmount),
+        })),
+      note: invoiceForm.note,
+      poId: invoiceForm.poId,
+      registeredBy: invoiceForm.registeredBy,
+    })
+  }
+
+  return (
+    <>
+      {modalContextHolder}
+      <section className="request-grid rfq-grid">
+        <section className="panel request-list-panel">
+          <PanelTitle icon={<InboxOutlined />} title={messages.receiptInvoice.list} aside={selectedCompany.companyName} />
+          {isError && <div className="data-alert">{messages.receiptInvoice.unavailable}</div>}
+          {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
+          <div className="action-row">
+            <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
+              <button
+                className="primary-button"
+                disabled={fulfillmentRows.length === 0}
+                onClick={() => openCreateMode('receipt')}
+                type="button"
+              >
+                <InboxOutlined />
+                <span>{messages.receiptInvoice.createReceipt}</span>
+              </button>
+            </DisabledActionTooltip>
+            <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
+              <button
+                className="secondary-button"
+                disabled={fulfillmentRows.length === 0}
+                onClick={() => openCreateMode('invoice')}
+                type="button"
+              >
+                <ProfileOutlined />
+                <span>{messages.receiptInvoice.createInvoice}</span>
+              </button>
+            </DisabledActionTooltip>
+          </div>
+          <div className="table-wrap">
+            <table className="request-table">
+              <thead>
+                <tr>
+                  <th>PO</th>
+                  <th>{messages.purchaseOrder.supplier}</th>
+                  <th>{messages.rfq.totalAmount}</th>
+                  <th>{messages.receiptInvoice.receivedQuantity}</th>
+                  <th>{messages.receiptInvoice.invoicedQuantity}</th>
+                  <th>{messages.receiptInvoice.variance}</th>
+                  <th>{messages.purchaseRequest.status}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fulfillmentRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7}>{isLoading ? messages.receiptInvoice.loading : messages.receiptInvoice.empty}</td>
+                  </tr>
+                ) : (
+                  fulfillmentRows.map((row) => (
+                    <tr key={row.poId}>
+                      <td>
+                        <button
+                          className={row.poId === selectedPoId ? 'row-link active' : 'row-link'}
+                          onClick={() => openPoDetail(row.poId)}
+                          type="button"
+                        >
+                          <TruncatedText text={row.poId} />
+                        </button>
+                      </td>
+                      <td>
+                        <TruncatedText text={row.supplierName} />
+                      </td>
+                      <td>{formatCurrency(row.poTotalAmount, row.currency, language)}</td>
+                      <td>{`${row.receivedQuantity} / ${row.orderedQuantity}`}</td>
+                      <td>{`${row.invoicedQuantity} / ${row.orderedQuantity}`}</td>
+                      <td className={row.invoiceAmountStatus === 'VARIANCE' ? 'amount-danger' : undefined}>
+                        {formatCurrency(row.invoiceAmountVariance, row.currency, language)}
+                      </td>
+                      <td>
+                        <span className={`tag ${receiptProgressToneOf(row.receiptSummary)}`}>
+                          {formatReceiptProgress(row.receiptSummary, messages)}
+                        </span>
+                        <span className={`tag ${invoiceProgressToneOf(row.invoiceSummary)}`}>
+                          {formatInvoiceProgress(row.invoiceSummary, messages)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <Drawer
+        className="request-drawer rfq-drawer"
+        destroyOnClose={false}
+        keyboard
+        maskClosable
+        onClose={handleDrawerClose}
+        open={drawerMode !== null}
+        title={drawerTitle}
+        size={980}
+      >
+        {drawerMode === 'receipt' ? (
+          <form className="request-form rfq-form" onSubmit={handleCreateReceipt}>
+            <ReceiptInvoicePoSelect
+              fulfillmentRows={fulfillmentRows}
+              label={messages.receiptInvoice.sourcePo}
+              messages={messages}
+              onChange={updateReceiptPo}
+              value={receiptForm.poId}
+            />
+            <label>
+              <span>{messages.receiptInvoice.receiver}</span>
+              <select
+                required
+                value={receiptForm.receivedBy}
+                onChange={(event) => {
+                  setCreateDirty(true)
+                  setReceiptForm((current) => ({ ...current, receivedBy: event.target.value }))
+                }}
+              >
+                {receiptUsers.map((user) => (
+                  <option key={user.userId} value={user.userId}>
+                    {user.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>{messages.receiptInvoice.receivedDate}</span>
+              <input
+                required
+                type="date"
+                value={receiptForm.receivedDate}
+                onChange={(event) => {
+                  setCreateDirty(true)
+                  setReceiptForm((current) => ({ ...current, receivedDate: event.target.value }))
+                }}
+              />
+            </label>
+            <ReceiptFormLines
+              form={receiptForm}
+              language={language}
+              messages={messages}
+              onQuantityChange={updateReceiptLine}
+              po={fulfillmentRows.find((row) => row.poId === receiptForm.poId)}
+            />
+            <ReceiptInvoiceAttachmentFields
+              description={receiptForm.fileDescription}
+              fileName={receiptForm.fileName}
+              messages={messages}
+              onDescriptionChange={(value) => {
+                setCreateDirty(true)
+                setReceiptForm((current) => ({ ...current, fileDescription: value }))
+              }}
+              onFileNameChange={(value) => {
+                setCreateDirty(true)
+                setReceiptForm((current) => ({ ...current, fileName: value }))
+              }}
+            />
+            <label className="form-wide">
+              <span>{messages.receiptInvoice.note}</span>
+              <textarea
+                value={receiptForm.note}
+                onChange={(event) => {
+                  setCreateDirty(true)
+                  setReceiptForm((current) => ({ ...current, note: event.target.value }))
+                }}
+              />
+            </label>
+            <button className="primary-button form-wide" disabled={receiptMutation.isPending} type="submit">
+              <InboxOutlined />
+              <span>{messages.receiptInvoice.createReceipt}</span>
+            </button>
+          </form>
+        ) : drawerMode === 'invoice' ? (
+          <form className="request-form rfq-form" onSubmit={handleCreateInvoice}>
+            <ReceiptInvoicePoSelect
+              fulfillmentRows={fulfillmentRows}
+              label={messages.receiptInvoice.sourcePo}
+              messages={messages}
+              onChange={updateInvoicePo}
+              value={invoiceForm.poId}
+            />
+            <label>
+              <span>{messages.receiptInvoice.invoiceNumber}</span>
+              <input
+                required
+                value={invoiceForm.invoiceNumber}
+                onChange={(event) => {
+                  setCreateDirty(true)
+                  setInvoiceForm((current) => ({ ...current, invoiceNumber: event.target.value }))
+                }}
+              />
+            </label>
+            <label>
+              <span>{messages.receiptInvoice.invoiceDate}</span>
+              <input
+                required
+                type="date"
+                value={invoiceForm.invoiceDate}
+                onChange={(event) => {
+                  setCreateDirty(true)
+                  setInvoiceForm((current) => ({ ...current, invoiceDate: event.target.value }))
+                }}
+              />
+            </label>
+            <label>
+              <span>{messages.receiptInvoice.registeredBy}</span>
+              <select
+                required
+                value={invoiceForm.registeredBy}
+                onChange={(event) => {
+                  setCreateDirty(true)
+                  setInvoiceForm((current) => ({ ...current, registeredBy: event.target.value }))
+                }}
+              >
+                {financeUsers.map((user) => (
+                  <option key={user.userId} value={user.userId}>
+                    {user.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <InvoiceFormLines
+              form={invoiceForm}
+              language={language}
+              messages={messages}
+              onLineChange={updateInvoiceLine}
+              po={fulfillmentRows.find((row) => row.poId === invoiceForm.poId)}
+            />
+            <ReceiptInvoiceAttachmentFields
+              description={invoiceForm.fileDescription}
+              fileName={invoiceForm.fileName}
+              messages={messages}
+              onDescriptionChange={(value) => {
+                setCreateDirty(true)
+                setInvoiceForm((current) => ({ ...current, fileDescription: value }))
+              }}
+              onFileNameChange={(value) => {
+                setCreateDirty(true)
+                setInvoiceForm((current) => ({ ...current, fileName: value }))
+              }}
+            />
+            <label className="form-wide">
+              <span>{messages.receiptInvoice.note}</span>
+              <textarea
+                value={invoiceForm.note}
+                onChange={(event) => {
+                  setCreateDirty(true)
+                  setInvoiceForm((current) => ({ ...current, note: event.target.value }))
+                }}
+              />
+            </label>
+            <button className="primary-button form-wide" disabled={invoiceMutation.isPending} type="submit">
+              <ProfileOutlined />
+              <span>{messages.receiptInvoice.createInvoice}</span>
+            </button>
+          </form>
+        ) : selectedPo ? (
+          <FulfillmentDetail
+            invoices={relatedInvoices}
+            language={language}
+            messages={messages}
+            onCreateInvoice={() => openCreateMode('invoice', selectedPo)}
+            onCreateReceipt={() => openCreateMode('receipt', selectedPo)}
+            po={selectedPo}
+            receipts={relatedReceipts}
+            users={users}
+          />
+        ) : (
+          <div className="empty-state">{isLoading ? messages.receiptInvoice.loading : messages.receiptInvoice.empty}</div>
+        )}
+      </Drawer>
+    </>
+  )
+}
+
+function ReceiptInvoicePoSelect({
+  fulfillmentRows,
+  label,
+  messages,
+  onChange,
+  value,
+}: {
+  fulfillmentRows: FulfillmentPurchaseOrder[]
+  label: string
+  messages: LocalizedMessages
+  onChange: (poId: string) => void
+  value: string
+}) {
+  return (
+    <label className="form-wide">
+      <span>{label}</span>
+      <select disabled={fulfillmentRows.length === 0} required value={value} onChange={(event) => onChange(event.target.value)}>
+        {fulfillmentRows.length === 0 ? (
+          <option value="">{messages.receiptInvoice.noIssuedPo}</option>
+        ) : (
+          fulfillmentRows.map((row) => (
+            <option key={row.poId} value={row.poId}>
+              {row.poId} · {row.supplierName}
+            </option>
+          ))
+        )}
+      </select>
+    </label>
+  )
+}
+
+function ReceiptFormLines({
+  form,
+  language,
+  messages,
+  onQuantityChange,
+  po,
+}: {
+  form: ReceiptCreateFormState
+  language: Language
+  messages: LocalizedMessages
+  onQuantityChange: (poLineId: string, value: number) => void
+  po?: FulfillmentPurchaseOrder
+}) {
+  if (!po) {
+    return null
+  }
+
+  return (
+    <section className="approval-section form-wide">
+      <PanelTitle icon={<InboxOutlined />} title={messages.receiptInvoice.lineFulfillment} aside={messages.receiptInvoice.boundary} />
+      <div className="table-wrap">
+        <table className="request-table">
+          <thead>
+            <tr>
+              <th>{messages.purchaseRequest.itemName}</th>
+              <th>{messages.receiptInvoice.orderedQuantity}</th>
+              <th>{messages.receiptInvoice.receivedQuantity}</th>
+              <th>{messages.purchaseRequest.quantity}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {po.lines.map((line) => {
+              const formLine = form.lines.find((item) => item.poLineId === line.poLineId)
+              const remaining = Math.max(0, roundAmount(line.orderedQuantity - line.receivedQuantity))
+              return (
+                <tr key={line.poLineId}>
+                  <td>
+                    <TruncatedText className="text-strong" text={line.itemName} />
+                    {line.specification && <TruncatedText className="text-small" text={line.specification} />}
+                  </td>
+                  <td>{`${line.orderedQuantity} ${line.unit}`}</td>
+                  <td>{`${line.receivedQuantity} ${line.unit}`}</td>
+                  <td>
+                    <input
+                      className="inline-input"
+                      min={0}
+                      max={remaining}
+                      step="0.01"
+                      type="number"
+                      value={formLine?.receivedQuantity ?? 0}
+                      onChange={(event) => onQuantityChange(line.poLineId, Number(event.target.value))}
+                    />
+                    <small>{formatCurrency(line.confirmedAmount, po.currency, language)}</small>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function InvoiceFormLines({
+  form,
+  language,
+  messages,
+  onLineChange,
+  po,
+}: {
+  form: InvoiceCreateFormState
+  language: Language
+  messages: LocalizedMessages
+  onLineChange: (poLineId: string, key: InvoiceEditableLineKey, value: number) => void
+  po?: FulfillmentPurchaseOrder
+}) {
+  if (!po) {
+    return null
+  }
+
+  return (
+    <section className="approval-section form-wide">
+      <PanelTitle icon={<ProfileOutlined />} title={messages.receiptInvoice.lineFulfillment} aside={messages.receiptInvoice.boundary} />
+      <div className="table-wrap">
+        <table className="request-table">
+          <thead>
+            <tr>
+              <th>{messages.purchaseRequest.itemName}</th>
+              <th>{messages.receiptInvoice.invoicedQuantity}</th>
+              <th>{messages.receiptInvoice.untaxedAmount}</th>
+              <th>{messages.rfq.taxAmount}</th>
+              <th>{messages.rfq.totalAmount}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {po.lines.map((line) => {
+              const formLine = form.lines.find((item) => item.poLineId === line.poLineId)
+              const remaining = Math.max(0, roundAmount(line.orderedQuantity - line.invoicedQuantity))
+              return (
+                <tr key={line.poLineId}>
+                  <td>
+                    <TruncatedText className="text-strong" text={line.itemName} />
+                    {line.specification && <TruncatedText className="text-small" text={line.specification} />}
+                  </td>
+                  <td>
+                    <input
+                      className="inline-input"
+                      min={0}
+                      max={remaining}
+                      step="0.01"
+                      type="number"
+                      value={formLine?.invoicedQuantity ?? 0}
+                      onChange={(event) => onLineChange(line.poLineId, 'invoicedQuantity', Number(event.target.value))}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="inline-input"
+                      min={0}
+                      step="0.01"
+                      type="number"
+                      value={formLine?.untaxedAmount ?? 0}
+                      onChange={(event) => onLineChange(line.poLineId, 'untaxedAmount', Number(event.target.value))}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="inline-input"
+                      min={0}
+                      step="0.01"
+                      type="number"
+                      value={formLine?.taxAmount ?? 0}
+                      onChange={(event) => onLineChange(line.poLineId, 'taxAmount', Number(event.target.value))}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="inline-input"
+                      min={0}
+                      step="0.01"
+                      type="number"
+                      value={formLine?.totalAmount ?? 0}
+                      onChange={(event) => onLineChange(line.poLineId, 'totalAmount', Number(event.target.value))}
+                    />
+                    <small>{formatCurrency(line.confirmedAmount, po.currency, language)}</small>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function ReceiptInvoiceAttachmentFields({
+  description,
+  fileName,
+  messages,
+  onDescriptionChange,
+  onFileNameChange,
+}: {
+  description: string
+  fileName: string
+  messages: LocalizedMessages
+  onDescriptionChange: (value: string) => void
+  onFileNameChange: (value: string) => void
+}) {
+  return (
+    <>
+      <label>
+        <span>{messages.receiptInvoice.attachmentFile}</span>
+        <input value={fileName} onChange={(event) => onFileNameChange(event.target.value)} />
+      </label>
+      <label>
+        <span>{messages.receiptInvoice.attachmentDescription}</span>
+        <input value={description} onChange={(event) => onDescriptionChange(event.target.value)} />
+      </label>
+    </>
+  )
+}
+
+function FulfillmentDetail({
+  invoices,
+  language,
+  messages,
+  onCreateInvoice,
+  onCreateReceipt,
+  po,
+  receipts,
+  users,
+}: {
+  invoices: InvoiceListItem[]
+  language: Language
+  messages: LocalizedMessages
+  onCreateInvoice: () => void
+  onCreateReceipt: () => void
+  po: FulfillmentPurchaseOrder
+  receipts: ReceiptListItem[]
+  users: UserSummary[]
+}) {
+  const receiptDisabledReason = po.receiptSummary === 'FULLY_RECEIVED' ? messages.receiptInvoice.fullyReceivedReason : undefined
+  const invoiceDisabledReason = po.invoiceSummary === 'FULLY_INVOICED' ? messages.receiptInvoice.fullyInvoicedReason : undefined
+
+  return (
+    <div className="request-detail rfq-detail">
+      <div className="detail-heading">
+        <div>
+          <TruncatedText className="text-strong" text={po.title} />
+          <TruncatedText className="text-small" text={`${po.poId} · ${po.supplierName}`} />
+        </div>
+        <span className={`tag ${invoiceAmountToneOf(po.invoiceAmountStatus)}`}>
+          {formatInvoiceAmountStatus(po.invoiceAmountStatus, messages)}
+        </span>
+      </div>
+      <dl className="detail-grid">
+        <div>
+          <dt>{messages.purchaseOrder.supplier}</dt>
+          <dd>{po.supplierName}</dd>
+        </div>
+        <div>
+          <dt>{messages.rfq.totalAmount}</dt>
+          <dd>{formatCurrency(po.poTotalAmount, po.currency, language)}</dd>
+        </div>
+        <div>
+          <dt>{messages.receiptInvoice.receiptSummary}</dt>
+          <dd>{formatReceiptProgress(po.receiptSummary, messages)}</dd>
+        </div>
+        <div>
+          <dt>{messages.receiptInvoice.invoiceSummary}</dt>
+          <dd>{formatInvoiceProgress(po.invoiceSummary, messages)}</dd>
+        </div>
+        <div>
+          <dt>{messages.receiptInvoice.invoiceTotal}</dt>
+          <dd>{formatCurrency(po.invoiceTotalAmount, po.currency, language)}</dd>
+        </div>
+        <div>
+          <dt>{messages.receiptInvoice.variance}</dt>
+          <dd>{formatCurrency(po.invoiceAmountVariance, po.currency, language)}</dd>
+        </div>
+      </dl>
+      <div className="action-row">
+        <DisabledActionTooltip title={receiptDisabledReason}>
+          <button className="primary-button" disabled={Boolean(receiptDisabledReason)} onClick={onCreateReceipt} type="button">
+            <InboxOutlined />
+            <span>{messages.receiptInvoice.createReceipt}</span>
+          </button>
+        </DisabledActionTooltip>
+        <DisabledActionTooltip title={invoiceDisabledReason}>
+          <button className="secondary-button" disabled={Boolean(invoiceDisabledReason)} onClick={onCreateInvoice} type="button">
+            <ProfileOutlined />
+            <span>{messages.receiptInvoice.createInvoice}</span>
+          </button>
+        </DisabledActionTooltip>
+      </div>
+      <section className="approval-section">
+        <PanelTitle icon={<ShoppingCartOutlined />} title={messages.receiptInvoice.lineFulfillment} />
+        <div className="table-wrap">
+          <table className="request-table">
+            <thead>
+              <tr>
+                <th>{messages.purchaseRequest.itemName}</th>
+                <th>{messages.receiptInvoice.orderedQuantity}</th>
+                <th>{messages.receiptInvoice.receivedQuantity}</th>
+                <th>{messages.receiptInvoice.invoicedQuantity}</th>
+                <th>{messages.purchaseRequest.totalAmount}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {po.lines.map((line) => (
+                <tr key={line.poLineId}>
+                  <td>
+                    <TruncatedText className="text-strong" text={line.itemName} />
+                    {line.specification && <TruncatedText className="text-small" text={line.specification} />}
+                  </td>
+                  <td>{`${line.orderedQuantity} ${line.unit}`}</td>
+                  <td>{`${line.receivedQuantity} ${line.unit}`}</td>
+                  <td>{`${line.invoicedQuantity} ${line.unit}`}</td>
+                  <td>{formatCurrency(line.confirmedAmount, po.currency, language)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <ReceiptInvoiceRelatedTables invoices={invoices} language={language} messages={messages} receipts={receipts} users={users} />
+    </div>
+  )
+}
+
+function ReceiptInvoiceRelatedTables({
+  invoices,
+  language,
+  messages,
+  receipts,
+  users,
+}: {
+  invoices: InvoiceListItem[]
+  language: Language
+  messages: LocalizedMessages
+  receipts: ReceiptListItem[]
+  users: UserSummary[]
+}) {
+  return (
+    <>
+      <section className="approval-section">
+        <PanelTitle icon={<InboxOutlined />} title={messages.receiptInvoice.receiptList} />
+        <div className="table-wrap">
+          <table className="request-table">
+            <thead>
+              <tr>
+                <th>{messages.receiptInvoice.receivedDate}</th>
+                <th>{messages.receiptInvoice.receiver}</th>
+                <th>{messages.receiptInvoice.receivedQuantity}</th>
+                <th>{messages.receiptInvoice.attachments}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {receipts.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>{messages.receiptInvoice.notReceived}</td>
+                </tr>
+              ) : (
+                receipts.map((receipt) => (
+                  <tr key={receipt.receiptId}>
+                    <td>{formatDate(receipt.receivedDate, language)}</td>
+                    <td>{userNameOf(receipt.receivedBy, users)}</td>
+                    <td>{receipt.receivedQuantity}</td>
+                    <td>{receipt.attachments.map((attachment) => attachment.fileName).join(' / ') || '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="approval-section">
+        <PanelTitle icon={<ProfileOutlined />} title={messages.receiptInvoice.invoiceList} />
+        <div className="table-wrap">
+          <table className="request-table">
+            <thead>
+              <tr>
+                <th>{messages.receiptInvoice.invoiceNumber}</th>
+                <th>{messages.receiptInvoice.invoiceDate}</th>
+                <th>{messages.receiptInvoice.registeredBy}</th>
+                <th>{messages.rfq.totalAmount}</th>
+                <th>{messages.receiptInvoice.attachments}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>{messages.receiptInvoice.notInvoiced}</td>
+                </tr>
+              ) : (
+                invoices.map((invoice) => (
+                  <tr key={invoice.invoiceId}>
+                    <td>{invoice.invoiceNumber}</td>
+                    <td>{formatDate(invoice.invoiceDate, language)}</td>
+                    <td>{userNameOf(invoice.registeredBy, users)}</td>
+                    <td>{formatCurrency(invoice.totalAmount, invoice.currency, language)}</td>
+                    <td>{invoice.attachments.map((attachment) => attachment.fileName).join(' / ') || '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  )
+}
+
 function ApprovalPath({
   messages,
   nodes,
@@ -5409,6 +6697,75 @@ function buildPurchaseOrderCreateFormDefaults(
   }
 }
 
+function buildReceiptCreateFormDefaults(
+  fulfillmentRows: FulfillmentPurchaseOrder[],
+  users: UserSummary[],
+  selectedCompanyId: string,
+  preferredPoId?: string,
+): ReceiptCreateFormState {
+  const po =
+    fulfillmentRows.find((row) => row.poId === preferredPoId) ??
+    fulfillmentRows.find((row) => row.receiptSummary !== 'FULLY_RECEIVED') ??
+    fulfillmentRows[0]
+  const receiver =
+    users.find((user) => user.companyId === selectedCompanyId) ??
+    users[0]
+
+  return {
+    fileDescription: '',
+    fileName: '',
+    lines: po?.lines.map((line) => ({
+      note: '',
+      poLineId: line.poLineId,
+      receivedQuantity: Math.max(0, roundAmount(line.orderedQuantity - line.receivedQuantity)),
+    })) ?? [],
+    note: '',
+    poId: po?.poId ?? '',
+    receivedBy: receiver?.userId ?? '',
+    receivedDate: nextDate(0),
+  }
+}
+
+function buildInvoiceCreateFormDefaults(
+  fulfillmentRows: FulfillmentPurchaseOrder[],
+  users: UserSummary[],
+  selectedCompanyId: string,
+  preferredPoId?: string,
+): InvoiceCreateFormState {
+  const po =
+    fulfillmentRows.find((row) => row.poId === preferredPoId) ??
+    fulfillmentRows.find((row) => row.invoiceSummary !== 'FULLY_INVOICED') ??
+    fulfillmentRows[0]
+  const registeredUser =
+    users.find((user) => user.companyId === selectedCompanyId) ??
+    users[0]
+
+  return {
+    fileDescription: '',
+    fileName: '',
+    invoiceDate: nextDate(0),
+    invoiceNumber: po ? `FP-${po.poId.replace('PO-', '')}` : '',
+    lines: po?.lines.map((line) => {
+      const remainingQuantity = Math.max(0, roundAmount(line.orderedQuantity - line.invoicedQuantity))
+      const ratio = line.orderedQuantity > 0 ? remainingQuantity / line.orderedQuantity : 0
+      const totalAmount = roundAmount(line.confirmedAmount * ratio)
+      const untaxedAmount = roundAmount(totalAmount / 1.13)
+      const taxAmount = roundAmount(totalAmount - untaxedAmount)
+      return {
+        invoicedQuantity: remainingQuantity,
+        poLineId: line.poLineId,
+        taxAmount,
+        taxRate: 0.13,
+        totalAmount,
+        untaxedAmount,
+      }
+    }) ?? [],
+    note: '',
+    poId: po?.poId ?? '',
+    registeredBy: registeredUser?.userId ?? '',
+  }
+}
+
 function nextDate(days: number) {
   const date = new Date()
   date.setDate(date.getDate() + days)
@@ -5463,6 +6820,66 @@ function formatPurchaseOrderAction(action: PurchaseOrderAction, messages: Locali
   }
 
   return labels[action] ?? action
+}
+
+function formatReceiptProgress(status: ReceiptProgressStatus, messages: LocalizedMessages) {
+  const labels = {
+    FULLY_RECEIVED: messages.receiptInvoice.fullyReceived,
+    NOT_RECEIVED: messages.receiptInvoice.notReceived,
+    PARTIALLY_RECEIVED: messages.receiptInvoice.partiallyReceived,
+  }
+
+  return labels[status] ?? status
+}
+
+function receiptProgressToneOf(status: ReceiptProgressStatus) {
+  if (status === 'FULLY_RECEIVED') {
+    return 'success'
+  }
+  if (status === 'PARTIALLY_RECEIVED') {
+    return 'warn'
+  }
+  return 'neutral'
+}
+
+function formatInvoiceProgress(status: InvoiceProgressStatus, messages: LocalizedMessages) {
+  const labels = {
+    FULLY_INVOICED: messages.receiptInvoice.fullyInvoiced,
+    NOT_INVOICED: messages.receiptInvoice.notInvoiced,
+    PARTIALLY_INVOICED: messages.receiptInvoice.partiallyInvoiced,
+  }
+
+  return labels[status] ?? status
+}
+
+function invoiceProgressToneOf(status: InvoiceProgressStatus) {
+  if (status === 'FULLY_INVOICED') {
+    return 'success'
+  }
+  if (status === 'PARTIALLY_INVOICED') {
+    return 'warn'
+  }
+  return 'neutral'
+}
+
+function formatInvoiceAmountStatus(status: InvoiceAmountStatus, messages: LocalizedMessages) {
+  const labels = {
+    MATCHED: messages.receiptInvoice.matched,
+    NOT_INVOICED: messages.receiptInvoice.notInvoiced,
+    VARIANCE: messages.receiptInvoice.amountVariance,
+  }
+
+  return labels[status] ?? status
+}
+
+function invoiceAmountToneOf(status: InvoiceAmountStatus) {
+  if (status === 'VARIANCE') {
+    return 'danger'
+  }
+  if (status === 'MATCHED') {
+    return 'success'
+  }
+  return 'neutral'
 }
 
 function formatDate(value: string, language: Language) {
@@ -5582,6 +6999,10 @@ function App() {
             />
             <Route
               path="/purchase-orders"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/receipts-invoices"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
