@@ -576,6 +576,76 @@ type ThreeWayMatchDifferenceType =
   | 'INVOICE_AMOUNT_MISMATCH'
 type ThreeWayMatchActionType = 'ACKNOWLEDGE' | 'MARK_IN_PROGRESS' | 'RESOLVE' | 'REOPEN'
 type ThreeWayMatchTab = 'all' | 'exceptions' | 'resolved'
+type ProcurementDashboardScope = 'GROUP' | 'COMPANY'
+type ProcurementDashboardScopeValue = 'GROUP' | string
+
+type DashboardMetric = {
+  key: string
+  label: string
+  value: number
+  currency: string | null
+  generatedAt: string
+}
+
+type SpendTrendPoint = {
+  period: string
+  amount: number
+  currency: string
+  documentCount: number
+}
+
+type DocumentFunnelStage = {
+  key: string
+  label: string
+  count: number
+}
+
+type StatusDistributionBucket = {
+  documentType: string
+  documentLabel: string
+  status: string
+  label: string
+  count: number
+}
+
+type SupplierDistributionItem = {
+  supplierId: string
+  supplierName: string
+  issuedPoAmount: number
+  currency: string
+  issuedPoCount: number
+  quoteCount: number
+}
+
+type ExceptionHighlight = {
+  matchId: string
+  companyId: string
+  companyName: string
+  poId: string
+  poTitle: string
+  supplierId: string
+  supplierName: string
+  severity: ThreeWayMatchSeverity | null
+  invoiceVarianceAmount: number
+  currency: string
+  lastCalculatedAt: string
+}
+
+type ProcurementDashboard = {
+  scope: ProcurementDashboardScope
+  groupId: string
+  groupName: string
+  companyId: string | null
+  companyName: string | null
+  companyIds: string[]
+  generatedAt: string
+  summary: DashboardMetric[]
+  spendTrend: SpendTrendPoint[]
+  documentFunnel: DocumentFunnelStage[]
+  statusDistributions: StatusDistributionBucket[]
+  supplierDistribution: SupplierDistributionItem[]
+  exceptionHighlights: ExceptionHighlight[]
+}
 
 type ReceiptInvoiceAttachment = {
   attachmentId: string
@@ -862,14 +932,14 @@ const demoContext: DemoContext = {
   activeCompany: {
     companyId: 'company-digital',
     companyName: '星河数字科技有限公司',
-    businessScope: 'IT 设备、软件订阅、办公采购',
+    businessScope: '信息技术设备、软件订阅、办公采购',
     active: true,
   },
   companies: [
     {
       companyId: 'company-digital',
       companyName: '星河数字科技有限公司',
-      businessScope: 'IT 设备、软件订阅、办公采购',
+      businessScope: '信息技术设备、软件订阅、办公采购',
       active: true,
     },
     {
@@ -882,7 +952,7 @@ const demoContext: DemoContext = {
   supplierPoolScope: '集团共享供应商池',
   dataBoundary: {
     groupShared: '供应商池、采购品类模板、集团级看板汇总',
-    companyIsolated: '采购申请、审批实例、RFQ、PO、收货、发票、三单匹配结果',
+    companyIsolated: '采购申请、审批实例、询价单、采购订单、收货、发票、三单匹配结果',
   },
 }
 
@@ -1088,6 +1158,15 @@ async function handleThreeWayMatchAction(matchId: string, payload: HandleMatchAc
   return postApi<ThreeWayMatchDetail>(`/api/three-way-matching/${encodeURIComponent(matchId)}/actions`, payload)
 }
 
+async function fetchProcurementDashboard(scope: ProcurementDashboardScope, companyId?: string) {
+  const query = new URLSearchParams({ scope })
+  if (scope === 'COMPANY' && companyId) {
+    query.set('companyId', companyId)
+  }
+
+  return fetchApi<ProcurementDashboard>(`/api/procurement-dashboard?${query.toString()}`)
+}
+
 const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -1100,7 +1179,7 @@ const localizedContent = {
       procurementMetrics: '采购指标',
     },
     header: {
-      title: '采购工作台',
+      title: '采购看板',
       foundationTitle: '组织与主数据',
       purchaseRequestsTitle: '采购申请',
       approvalsTitle: '审批中心',
@@ -1148,7 +1227,7 @@ const localizedContent = {
       status: '状态',
     },
     navItems: [
-      { label: '采购工作台', icon: <DashboardOutlined />, path: '/' },
+      { label: '采购看板', icon: <DashboardOutlined />, path: '/' },
       { label: '采购申请', icon: <FileAddOutlined />, path: '/purchase-requests' },
       { label: '审批中心', icon: <AuditOutlined />, path: '/approvals' },
       { label: '询报价', icon: <FileSearchOutlined />, path: '/rfqs' },
@@ -1242,6 +1321,40 @@ const localizedContent = {
     boundary: {
       groupShared: '集团共享',
       companyIsolated: '公司隔离',
+    },
+    dashboard: {
+      dataState: '后端看板数据',
+      scope: '看板范围',
+      groupScope: '集团汇总',
+      loading: '加载采购看板',
+      unavailable: '采购看板暂不可用',
+      empty: '暂无数据',
+      spendTrend: '采购金额趋势',
+      documentFunnel: '采购单据漏斗',
+      statusDistribution: '状态分布',
+      supplierDistribution: '供应商分布',
+      exceptionHighlights: '匹配异常摘要',
+      noExceptions: '暂无三单匹配异常',
+      noTrend: '暂无采购金额趋势',
+      noFunnel: '暂无单据漏斗数据',
+      noStatus: '暂无状态分布',
+      noSuppliers: '暂无供应商分布',
+      viewMatching: '查看三单匹配',
+      generatedAt: '生成时间',
+      documentCount: '单据数',
+      issuedPoAmount: '已发布 PO 金额',
+      pendingApprovals: '待审批',
+      activeRfqs: '进行中 RFQ',
+      issuedPurchaseOrders: '已发布 PO',
+      receiptInvoiceFollowUp: '收货/发票待补齐',
+      matchingExceptions: '三单匹配异常',
+      quotes: '报价',
+      issuedPoCount: 'PO',
+      company: '公司',
+      supplier: '供应商',
+      severity: '严重度',
+      invoiceVariance: '金额差异',
+      lastCalculated: '最近计算',
     },
     foundation: {
       dataState: '后端基础数据',
@@ -1604,7 +1717,7 @@ const localizedContent = {
       procurementMetrics: 'Procurement metrics',
     },
     header: {
-      title: 'Procurement Workspace',
+      title: 'Procurement Dashboard',
       foundationTitle: 'Organization & Master Data',
       purchaseRequestsTitle: 'Purchase Requests',
       approvalsTitle: 'Approval Center',
@@ -1746,6 +1859,40 @@ const localizedContent = {
     boundary: {
       groupShared: 'Group Shared',
       companyIsolated: 'Company Isolated',
+    },
+    dashboard: {
+      dataState: 'Backend dashboard data',
+      scope: 'Dashboard Scope',
+      groupScope: 'Group Summary',
+      loading: 'Loading procurement dashboard',
+      unavailable: 'Procurement dashboard is unavailable',
+      empty: 'No data',
+      spendTrend: 'Spend Trend',
+      documentFunnel: 'Procurement Funnel',
+      statusDistribution: 'Status Distribution',
+      supplierDistribution: 'Supplier Distribution',
+      exceptionHighlights: 'Match Exception Highlights',
+      noExceptions: 'No three-way matching exceptions',
+      noTrend: 'No spend trend data',
+      noFunnel: 'No funnel data',
+      noStatus: 'No status distribution',
+      noSuppliers: 'No supplier distribution',
+      viewMatching: 'View Matching',
+      generatedAt: 'Generated',
+      documentCount: 'Documents',
+      issuedPoAmount: 'Issued PO Amount',
+      pendingApprovals: 'Pending Approvals',
+      activeRfqs: 'Active RFQs',
+      issuedPurchaseOrders: 'Issued POs',
+      receiptInvoiceFollowUp: 'Receipt/Invoice Follow-up',
+      matchingExceptions: 'Match Exceptions',
+      quotes: 'Quotes',
+      issuedPoCount: 'POs',
+      company: 'Company',
+      supplier: 'Supplier',
+      severity: 'Severity',
+      invoiceVariance: 'Invoice Variance',
+      lastCalculated: 'Last Calculated',
     },
     foundation: {
       dataState: 'Backend master data',
@@ -2147,10 +2294,6 @@ function localizeContext(context: DemoContext, language: Language): DemoContext 
   }
 }
 
-function toneOf(item: object) {
-  return 'tone' in item && typeof item.tone === 'string' ? item.tone : 'success'
-}
-
 function getInitialLanguage(): Language {
   return new URLSearchParams(window.location.search).get('lang') === 'en' ? 'en' : 'zh'
 }
@@ -2172,11 +2315,20 @@ function Workspace({
   const isPurchaseOrderRoute = location.pathname === '/purchase-orders'
   const isReceiptInvoiceRoute = location.pathname === '/receipts-invoices'
   const isThreeWayMatchingRoute = location.pathname === '/three-way-matching'
+  const isDashboardRoute =
+    !isFoundationRoute &&
+    !isPurchaseRequestRoute &&
+    !isApprovalRoute &&
+    !isRfqRoute &&
+    !isPurchaseOrderRoute &&
+    !isReceiptInvoiceRoute &&
+    !isThreeWayMatchingRoute
   const [isCreateDrawerOpen, setCreateDrawerOpen] = useState(false)
   const [isRfqCreateDrawerOpen, setRfqCreateDrawerOpen] = useState(false)
   const [isPoCreateDrawerOpen, setPoCreateDrawerOpen] = useState(false)
   const [receiptInvoiceCreateMode, setReceiptInvoiceCreateMode] = useState<ReceiptInvoiceCreateMode | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
+  const [dashboardScopeValue, setDashboardScopeValue] = useState<ProcurementDashboardScopeValue>('GROUP')
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
     queryFn: fetchHealth,
@@ -2238,6 +2390,14 @@ function Workspace({
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
+  const dashboardScope: ProcurementDashboardScope = dashboardScopeValue === 'GROUP' ? 'GROUP' : 'COMPANY'
+  const dashboardCompanyId = dashboardScope === 'COMPANY' ? dashboardScopeValue : undefined
+  const procurementDashboardQuery = useQuery({
+    queryKey: ['procurement-dashboard', dashboardScope, dashboardCompanyId],
+    queryFn: () => fetchProcurementDashboard(dashboardScope, dashboardCompanyId),
+    enabled: isDashboardRoute,
+    retry: 1,
+  })
 
   const messages = localizedContent[language]
   const rawContext = masterContextQuery.data?.data ?? data?.data.demoContext ?? demoContext
@@ -2252,8 +2412,6 @@ function Workspace({
   const selectedCompany = companies.find((company) => company.companyId === selectedCompanyId) ?? context.activeCompany
   const healthStatus = data?.data.status ?? (isLoading ? 'CHECKING' : 'OFFLINE')
   const purchaseRequests = purchaseRequestsQuery.data?.data ?? []
-  const supplierCount = suppliersQuery.data?.data.length ?? 0
-  const dashboardKpis = getDashboardKpis(language, purchaseRequests, supplierCount)
   const foundationLoading =
     masterContextQuery.isLoading ||
     companiesQuery.isLoading ||
@@ -2350,6 +2508,16 @@ function Workspace({
       setSelectedCompanyId(context.activeCompany.companyId)
     }
   }, [companies, context.activeCompany.companyId, selectedCompanyId])
+
+  useEffect(() => {
+    if (dashboardScopeValue === 'GROUP' || companies.length === 0) {
+      return
+    }
+
+    if (!companies.some((company) => company.companyId === dashboardScopeValue)) {
+      setDashboardScopeValue('GROUP')
+    }
+  }, [companies, dashboardScopeValue])
 
   useEffect(() => {
     if (!isPurchaseRequestRoute) {
@@ -2624,143 +2792,195 @@ function Workspace({
               users={usersQuery.data?.data ?? []}
             />
           ) : (
-            <>
-              <section className="kpi-grid" aria-label={messages.aria.procurementMetrics}>
-                {dashboardKpis.map((kpi) => (
-                  <article className="panel kpi" key={kpi.label}>
-                    <div>
-                      <span>{kpi.label}</span>
-                      {kpi.icon}
-                    </div>
-                    <strong>{kpi.value}</strong>
-                    <small className={toneOf(kpi)}>{kpi.note}</small>
-                  </article>
-                ))}
-              </section>
-
-              <section className="dashboard-grid">
-                <div className="left-column">
-                  <section className="panel chart-panel">
-                    <PanelTitle
-                      icon={<DashboardOutlined />}
-                      title={messages.panels.spendTrend}
-                      aside={messages.panels.companyView}
-                    />
-                    <ReactECharts option={getChartOption(messages.months)} style={{ height: 256 }} />
-                  </section>
-
-                  <section className="panel">
-                    <PanelTitle
-                      icon={<ProfileOutlined />}
-                      title={messages.panels.recentRequests}
-                      aside={messages.purchaseRequest.recentFromBackend}
-                    />
-                    <div className="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>{messages.table.request}</th>
-                            <th>{messages.table.category}</th>
-                            <th>{messages.table.company}</th>
-                            <th>{messages.table.amount}</th>
-                            <th>{messages.table.currentStep}</th>
-                            <th>{messages.table.status}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {purchaseRequests.length === 0 ? (
-                            <tr>
-                              <td colSpan={6}>
-                                {purchaseRequestsQuery.isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}
-                              </td>
-                            </tr>
-                          ) : (
-                            purchaseRequests.slice(0, 5).map((row) => (
-	                            <tr key={row.requestId}>
-	                              <td>
-	                                <TruncatedText className="text-strong" text={row.requestId} />
-	                              </td>
-	                              <td>
-	                                <TruncatedText text={categoryNameOf(row.categoryId, categoriesQuery.data?.data ?? [])} />
-	                              </td>
-	                              <td>
-	                                <TruncatedText text={companyNameOf(row.companyId, companies)} />
-	                              </td>
-	                              <td>{formatCurrency(row.totalAmount, row.currency, language)}</td>
-	                              <td>{currentStepOf(row.status, messages, row.approval)}</td>
-	                              <td>
-	                                <span
-	                                  className={`tag ${statusToneOf(row.status)}`}
-	                                >
-	                                  {formatPurchaseRequestStatus(row.status, messages)}
-	                                </span>
-                              </td>
-                            </tr>
-                          ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                </div>
-
-                <aside className="right-column">
-                  <section className="panel">
-                    <PanelTitle icon={<NodeIndexOutlined />} title={messages.panels.procurementFlow} />
-                    <div className="flow-list">
-                      {messages.flowStages.map((stage, index) => (
-                        <div className="flow-item" key={stage.title}>
-                          <span className="stage-index">{index + 1}</span>
-                          <div>
-	                            <TruncatedText className="text-strong" text={stage.title} />
-	                            <TruncatedText className="text-small" text={stage.description} />
-                          </div>
-                          {stage.count && <span className={`tag ${toneOf(stage)}`}>{stage.count}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="panel">
-                    <PanelTitle icon={<AlertOutlined />} title={messages.panels.risks} aside={messages.panels.today} />
-                    <div className="risk-list">
-                      {messages.riskItems.map((item) => (
-                        <div className="risk-item" key={item.title}>
-                          <span className="risk-icon">
-                            <SafetyCertificateOutlined />
-                          </span>
-                          <div>
-	                            <TruncatedText className="text-strong" text={item.title} />
-	                            <TruncatedText className="text-small" text={item.detail} />
-	                          </div>
-	                          <span className={`tag ${item.tone}`}>
-                            {item.tone === 'danger' ? messages.riskAction.danger : messages.riskAction.review}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="panel boundary-panel">
-                    <PanelTitle
-                      icon={<ApiOutlined />}
-                      title={messages.panels.dataBoundary}
-                      aside={messages.panels.skeletonRule}
-                    />
-                    <dl>
-                      <dt>{messages.boundary.groupShared}</dt>
-                      <dd>{context.dataBoundary.groupShared}</dd>
-                      <dt>{messages.boundary.companyIsolated}</dt>
-                      <dd>{context.dataBoundary.companyIsolated}</dd>
-                    </dl>
-                  </section>
-                </aside>
-              </section>
-            </>
+            <ProcurementDashboardView
+              companies={companies}
+              dashboard={procurementDashboardQuery.data?.data ?? null}
+              errorMessage={procurementDashboardQuery.error instanceof Error ? procurementDashboardQuery.error.message : null}
+              isError={procurementDashboardQuery.isError}
+              isLoading={procurementDashboardQuery.isLoading}
+              language={language}
+              messages={messages}
+              onScopeChange={setDashboardScopeValue}
+              scopeValue={dashboardScopeValue}
+            />
           )}
         </Content>
       </Layout>
     </Layout>
+  )
+}
+
+function ProcurementDashboardView({
+  companies,
+  dashboard,
+  errorMessage,
+  isError,
+  isLoading,
+  language,
+  messages,
+  onScopeChange,
+  scopeValue,
+}: {
+  companies: CompanyContext[]
+  dashboard: ProcurementDashboard | null
+  errorMessage: string | null
+  isError: boolean
+  isLoading: boolean
+  language: Language
+  messages: LocalizedMessages
+  onScopeChange: (scopeValue: ProcurementDashboardScopeValue) => void
+  scopeValue: ProcurementDashboardScopeValue
+}) {
+  const navigate = useNavigate()
+  const metrics = dashboardMetricsInOrder(dashboard?.summary ?? [])
+
+  return (
+    <div className="dashboard-page">
+      <section className="panel dashboard-scope-panel">
+        <PanelTitle
+          icon={<DashboardOutlined />}
+          title={messages.dashboard.scope}
+          aside={dashboard ? `${messages.dashboard.generatedAt}: ${formatDateTime(dashboard.generatedAt, language)}` : messages.dashboard.dataState}
+        />
+        <div className="dashboard-scope-switch">
+          <button
+            className={scopeValue === 'GROUP' ? 'company-option active' : 'company-option'}
+            onClick={() => onScopeChange('GROUP')}
+            type="button"
+          >
+            <BankOutlined />
+            <span>
+              <strong>{messages.dashboard.groupScope}</strong>
+              <small>{dashboard?.groupName ?? demoContext.groupName}</small>
+            </span>
+            <em>{messages.boundary.groupShared}</em>
+          </button>
+          {companies.map((company) => (
+            <button
+              className={scopeValue === company.companyId ? 'company-option active' : 'company-option'}
+              key={company.companyId}
+              onClick={() => onScopeChange(company.companyId)}
+              type="button"
+            >
+              <BankOutlined />
+              <span>
+                <strong>{company.companyName}</strong>
+                <small>{company.businessScope}</small>
+              </span>
+              <em>{messages.boundary.companyIsolated}</em>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {isError && <div className="data-alert">{errorMessage ?? messages.dashboard.unavailable}</div>}
+
+      {isLoading && !dashboard ? (
+        <section className="panel">
+          <div className="empty-state">{messages.dashboard.loading}</div>
+        </section>
+      ) : dashboard ? (
+        <>
+          <section className="kpi-grid" aria-label={messages.aria.procurementMetrics}>
+            {metrics.map((metric) => (
+              <article className="panel kpi" key={metric.key}>
+                <div>
+                  <span>{dashboardMetricLabel(metric, messages)}</span>
+                  {dashboardMetricIcon(metric.key)}
+                </div>
+                <strong>{formatDashboardMetric(metric, language)}</strong>
+                <small className={dashboardMetricTone(metric.key, metric.value)}>
+                  {dashboardMetricNote(metric, messages, language)}
+                </small>
+              </article>
+            ))}
+          </section>
+
+          <section className="dashboard-grid">
+            <div className="left-column">
+              <section className="panel chart-panel">
+                <PanelTitle icon={<DashboardOutlined />} title={messages.dashboard.spendTrend} aside={dashboard.scope === 'GROUP' ? messages.dashboard.groupScope : dashboard.companyName ?? ''} />
+                {dashboard.spendTrend.length === 0 ? (
+                  <div className="empty-state compact">{messages.dashboard.noTrend}</div>
+                ) : (
+                  <ReactECharts option={getDashboardSpendTrendOption(dashboard.spendTrend, language)} style={{ height: 256 }} />
+                )}
+              </section>
+
+              <section className="panel chart-panel">
+                <PanelTitle icon={<NodeIndexOutlined />} title={messages.dashboard.documentFunnel} />
+                {dashboard.documentFunnel.length === 0 ? (
+                  <div className="empty-state compact">{messages.dashboard.noFunnel}</div>
+                ) : (
+                  <ReactECharts option={getDashboardFunnelOption(dashboard.documentFunnel)} style={{ height: 286 }} />
+                )}
+              </section>
+
+              <section className="panel chart-panel">
+                <PanelTitle icon={<AuditOutlined />} title={messages.dashboard.statusDistribution} />
+                {dashboard.statusDistributions.length === 0 ? (
+                  <div className="empty-state compact">{messages.dashboard.noStatus}</div>
+                ) : (
+                  <ReactECharts option={getDashboardStatusOption(dashboard.statusDistributions)} style={{ height: 302 }} />
+                )}
+              </section>
+            </div>
+
+            <aside className="right-column">
+              <section className="panel chart-panel">
+                <PanelTitle icon={<TeamOutlined />} title={messages.dashboard.supplierDistribution} />
+                {dashboard.supplierDistribution.length === 0 ? (
+                  <div className="empty-state compact">{messages.dashboard.noSuppliers}</div>
+                ) : (
+                  <ReactECharts option={getDashboardSupplierOption(dashboard.supplierDistribution, language)} style={{ height: 292 }} />
+                )}
+              </section>
+
+              <section className="panel">
+                <PanelTitle icon={<AlertOutlined />} title={messages.dashboard.exceptionHighlights} aside={String(dashboard.exceptionHighlights.length)} />
+                {dashboard.exceptionHighlights.length === 0 ? (
+                  <div className="empty-state compact">{messages.dashboard.noExceptions}</div>
+                ) : (
+                  <div className="risk-list dashboard-exception-list">
+                    {dashboard.exceptionHighlights.map((exception) => (
+                      <div className="risk-item dashboard-exception" key={exception.matchId}>
+                        <span className="risk-icon">
+                          <AlertOutlined />
+                        </span>
+                        <div>
+                          <TruncatedText className="text-strong" text={exception.poTitle || exception.poId} />
+                          <TruncatedText
+                            className="text-small"
+                            text={`${exception.companyName} · ${exception.supplierName}`}
+                          />
+                          <span className="exception-meta">
+                            {messages.dashboard.invoiceVariance}: {formatCurrency(exception.invoiceVarianceAmount, exception.currency, language)}
+                          </span>
+                          <span className="exception-meta">
+                            {messages.dashboard.lastCalculated}: {formatDateTime(exception.lastCalculatedAt, language)}
+                          </span>
+                        </div>
+                        <span className={`tag ${exception.severity ? severityToneOf(exception.severity) : 'neutral'}`}>
+                          {exception.severity ? formatMatchSeverity(exception.severity, messages) : messages.dashboard.empty}
+                        </span>
+                      </div>
+                    ))}
+                    <button className="primary-button dashboard-link-button" onClick={() => navigate('/three-way-matching')} type="button">
+                      <SwapOutlined />
+                      <span>{messages.dashboard.viewMatching}</span>
+                    </button>
+                  </div>
+                )}
+              </section>
+            </aside>
+          </section>
+        </>
+      ) : (
+        <section className="panel">
+          <div className="empty-state">{messages.dashboard.empty}</div>
+        </section>
+      )}
+    </div>
   )
 }
 
@@ -3935,7 +4155,7 @@ function RfqView({
         procurementUserId: procurementUser?.userId ?? '',
         requestId: request?.requestId ?? '',
         supplierIds: supplierIds.length > 0 ? supplierIds : validSupplierIds.slice(0, 3),
-        title: current.title || (request ? `${request.title} RFQ` : ''),
+        title: current.title || (request ? defaultRfqTitle(request.title) : ''),
       }
       if (
         next.procurementUserId === current.procurementUserId &&
@@ -4042,7 +4262,7 @@ function RfqView({
       ...current,
       requestId,
       supplierIds: nextSuppliers.map((supplier) => supplier.supplierId),
-      title: request ? `${request.title} RFQ` : current.title,
+      title: request ? defaultRfqTitle(request.title) : current.title,
     }))
   }
 
@@ -7061,6 +7281,205 @@ function DisabledActionTooltip({
   )
 }
 
+function dashboardMetricsInOrder(metrics: DashboardMetric[]) {
+  const order = [
+    'issuedPoAmount',
+    'pendingApprovals',
+    'activeRfqs',
+    'issuedPurchaseOrders',
+    'receiptInvoiceFollowUp',
+    'matchingExceptions',
+  ]
+  const byKey = new Map(metrics.map((metric) => [metric.key, metric]))
+
+  return order
+    .map((key) => byKey.get(key))
+    .filter((metric): metric is DashboardMetric => Boolean(metric))
+}
+
+function dashboardMetricLabel(metric: DashboardMetric, messages: LocalizedMessages) {
+  const labels = messages.dashboard as Record<string, string>
+  return labels[metric.key] ?? metric.label
+}
+
+function dashboardMetricIcon(key: string) {
+  if (key === 'pendingApprovals') {
+    return <AuditOutlined />
+  }
+  if (key === 'activeRfqs') {
+    return <FileSearchOutlined />
+  }
+  if (key === 'matchingExceptions') {
+    return <AlertOutlined />
+  }
+  if (key === 'receiptInvoiceFollowUp') {
+    return <InboxOutlined />
+  }
+
+  return <ShoppingCartOutlined />
+}
+
+function dashboardMetricTone(key: string, value: number) {
+  if (key === 'matchingExceptions' && value > 0) {
+    return 'danger'
+  }
+  if ((key === 'pendingApprovals' || key === 'receiptInvoiceFollowUp' || key === 'activeRfqs') && value > 0) {
+    return 'warn'
+  }
+  return 'success'
+}
+
+function dashboardMetricNote(metric: DashboardMetric, messages: LocalizedMessages, language: Language) {
+  if (metric.currency) {
+    return metric.currency
+  }
+
+  return `${messages.dashboard.generatedAt}: ${formatDateTime(metric.generatedAt, language)}`
+}
+
+function formatDashboardMetric(metric: DashboardMetric, language: Language) {
+  if (metric.currency) {
+    return formatCurrency(metric.value, metric.currency, language)
+  }
+
+  return new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
+    maximumFractionDigits: 0,
+  }).format(metric.value)
+}
+
+function getDashboardSpendTrendOption(points: SpendTrendPoint[], language: Language) {
+  return {
+    color: ['#2f7a4d'],
+    grid: { bottom: 30, left: 58, right: 20, top: 24 },
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: (value: number) => formatCurrency(value, points[0]?.currency ?? 'CNY', language),
+    },
+    xAxis: {
+      axisLabel: { color: '#707771' },
+      axisLine: { lineStyle: { color: '#dde2dc' } },
+      axisTick: { show: false },
+      data: points.map((point) => point.period),
+      type: 'category',
+    },
+    yAxis: {
+      axisLabel: { color: '#707771' },
+      splitLine: { lineStyle: { color: '#edf0ec' } },
+      type: 'value',
+    },
+    series: [
+      {
+        barWidth: 34,
+        data: points.map((point) => point.amount),
+        itemStyle: { borderRadius: [4, 4, 0, 0] },
+        type: 'bar',
+      },
+    ],
+  }
+}
+
+function getDashboardFunnelOption(stages: DocumentFunnelStage[]) {
+  return {
+    color: ['#2f7a4d'],
+    grid: { bottom: 22, left: 98, right: 24, top: 22 },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      axisLabel: { color: '#707771' },
+      splitLine: { lineStyle: { color: '#edf0ec' } },
+      type: 'value',
+    },
+    yAxis: {
+      axisLabel: { color: '#707771' },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      data: stages.map((stage) => stage.label).reverse(),
+      type: 'category',
+    },
+    series: [
+      {
+        data: stages.map((stage) => stage.count).reverse(),
+        itemStyle: { borderRadius: [0, 4, 4, 0] },
+        type: 'bar',
+      },
+    ],
+  }
+}
+
+function getDashboardStatusOption(buckets: StatusDistributionBucket[]) {
+  const visibleBuckets = buckets.slice(0, 14)
+  return {
+    color: ['#2f7a4d'],
+    grid: { bottom: 86, left: 42, right: 16, top: 20 },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      axisLabel: {
+        color: '#707771',
+        interval: 0,
+        rotate: 34,
+      },
+      axisLine: { lineStyle: { color: '#dde2dc' } },
+      axisTick: { show: false },
+      data: visibleBuckets.map((bucket) => `${bucket.documentLabel}-${bucket.label}`),
+      type: 'category',
+    },
+    yAxis: {
+      axisLabel: { color: '#707771' },
+      splitLine: { lineStyle: { color: '#edf0ec' } },
+      type: 'value',
+    },
+    series: [
+      {
+        barWidth: 24,
+        data: visibleBuckets.map((bucket) => bucket.count),
+        itemStyle: { borderRadius: [4, 4, 0, 0] },
+        type: 'bar',
+      },
+    ],
+  }
+}
+
+function getDashboardSupplierOption(suppliers: SupplierDistributionItem[], language: Language) {
+  return {
+    color: ['#2f7a4d', '#8f7a45'],
+    grid: { bottom: 74, left: 58, right: 18, top: 24 },
+    legend: { bottom: 0, textStyle: { color: '#707771' } },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      axisLabel: {
+        color: '#707771',
+        interval: 0,
+        overflow: 'truncate',
+        rotate: 28,
+        width: 78,
+      },
+      axisLine: { lineStyle: { color: '#dde2dc' } },
+      axisTick: { show: false },
+      data: suppliers.map((supplier) => supplier.supplierName),
+      type: 'category',
+    },
+    yAxis: [
+      {
+        axisLabel: { color: '#707771' },
+        splitLine: { lineStyle: { color: '#edf0ec' } },
+        type: 'value',
+      },
+    ],
+    series: [
+      {
+        data: suppliers.map((supplier) => supplier.issuedPoAmount),
+        itemStyle: { borderRadius: [4, 4, 0, 0] },
+        name: language === 'zh' ? 'PO 金额' : 'PO Amount',
+        type: 'bar',
+      },
+      {
+        data: suppliers.map((supplier) => supplier.quoteCount),
+        name: language === 'zh' ? '报价数' : 'Quotes',
+        type: 'line',
+      },
+    ],
+  }
+}
+
 function formatCurrency(value: number, currency: string, language: Language) {
   return new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
     currency,
@@ -7157,70 +7576,6 @@ function buildPurchaseRequestFormDefaults(
     supplierId: supplier?.supplierId ?? '',
     title: '20 台笔记本采购',
   }
-}
-
-function getDashboardKpis(language: Language, requests: PurchaseRequestListItem[], supplierCount: number) {
-  const draftCount = requests.filter((request) => request.status === 'DRAFT').length
-  const submittedCount = requests.filter((request) => request.status === 'SUBMITTED').length
-  const totalAmount = requests.reduce((sum, request) => sum + Number(request.totalAmount), 0)
-
-  if (language === 'zh') {
-    return [
-      {
-        label: '采购申请',
-        value: String(requests.length),
-        note: '当前公司真实单据',
-        icon: <FileAddOutlined />,
-      },
-      {
-        label: '草稿待完善',
-        value: String(draftCount),
-        note: '申请人待提交',
-        icon: <ProfileOutlined />,
-        tone: draftCount > 0 ? 'warn' : 'success',
-      },
-      {
-        label: '已提交',
-        value: String(submittedCount),
-        note: '等待后续审批流',
-        icon: <AuditOutlined />,
-      },
-      {
-        label: '申请金额',
-        value: formatCurrency(totalAmount, 'CNY', language),
-        note: `供应商池 ${supplierCount}`,
-        icon: <ShoppingCartOutlined />,
-      },
-    ]
-  }
-
-  return [
-    {
-      label: 'Requests',
-      value: String(requests.length),
-      note: 'Backend records',
-      icon: <FileAddOutlined />,
-    },
-    {
-      label: 'Drafts',
-      value: String(draftCount),
-      note: 'Waiting for submit',
-      icon: <ProfileOutlined />,
-      tone: draftCount > 0 ? 'warn' : 'success',
-    },
-    {
-      label: 'Submitted',
-      value: String(submittedCount),
-      note: 'Ready for approval flow',
-      icon: <AuditOutlined />,
-    },
-    {
-      label: 'Request Amount',
-      value: formatCurrency(totalAmount, 'CNY', language),
-      note: `Supplier pool ${supplierCount}`,
-      icon: <ShoppingCartOutlined />,
-    },
-  ]
 }
 
 function formatPurchaseRequestStatus(status: PurchaseRequestStatus, messages: LocalizedMessages) {
@@ -7343,10 +7698,6 @@ function contextAmount(snapshot: Record<string, unknown>, key: string) {
   return 0
 }
 
-function companyNameOf(companyId: string, companies: CompanyContext[]) {
-  return companies.find((company) => company.companyId === companyId)?.companyName ?? companyId
-}
-
 function categoryNameOf(categoryId: string, categories: CategorySummary[]) {
   return categories.find((category) => category.categoryId === categoryId)?.categoryName ?? categoryId
 }
@@ -7402,8 +7753,13 @@ function buildRfqCreateFormDefaults(
     procurementUserId: buyer?.userId ?? '',
     requestId: request?.requestId ?? '',
     supplierIds: candidateSuppliers.slice(0, 3).map((supplier) => supplier.supplierId),
-    title: request ? `${request.title} RFQ` : '',
+    title: request ? defaultRfqTitle(request.title) : '',
   }
+}
+
+function defaultRfqTitle(requestTitle: string): string {
+  const normalizedTitle = requestTitle.trim()
+  return normalizedTitle.endsWith('询价') ? normalizedTitle : `${normalizedTitle}询价`
 }
 
 function buildRfqQuoteFormDefaults(detail?: RfqDetail, preferredSupplierId?: string): RfqQuoteFormState {
@@ -7749,34 +8105,6 @@ function PanelTitle({
       {aside && <span>{aside}</span>}
     </div>
   )
-}
-
-function getChartOption(months: readonly string[]) {
-  return {
-    color: ['#2f7a4d'],
-    grid: { left: 42, right: 24, top: 18, bottom: 28 },
-    tooltip: { trigger: 'axis' },
-    xAxis: {
-      type: 'category',
-      data: months,
-      axisTick: { show: false },
-      axisLine: { lineStyle: { color: '#dde2dc' } },
-      axisLabel: { color: '#707771' },
-    },
-    yAxis: {
-      type: 'value',
-      splitLine: { lineStyle: { color: '#edf0ec' } },
-      axisLabel: { color: '#707771' },
-    },
-    series: [
-      {
-        type: 'bar',
-        barWidth: 30,
-        data: [182, 205, 176, 286, 252, 312, 276, 346, 328, 398, 366, 412],
-        itemStyle: { borderRadius: [4, 4, 0, 0] },
-      },
-    ],
-  }
 }
 
 function App() {

@@ -44,7 +44,7 @@ class HealthControllerTest {
         DemoCompanyContext digital = new DemoCompanyContext(
             "company-digital",
             "星河数字科技有限公司",
-            "IT 设备、软件订阅、办公采购",
+            "信息技术设备、软件订阅、办公采购",
             true);
         DemoCompanyContext manufacturing = new DemoCompanyContext(
             "company-manufacturing",

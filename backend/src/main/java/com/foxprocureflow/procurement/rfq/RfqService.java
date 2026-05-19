@@ -118,7 +118,7 @@ public class RfqService {
         List<PurchaseRequestLineJpaEntity> lines = lineRepository.findByRequestIdOrderByLineNoAsc(request.requestId());
         String rfqId = nextRfqId();
         String title = blankToNull(request.title()) == null
-            ? "RFQ - " + purchaseRequest.getTitle()
+            ? defaultRfqTitle(purchaseRequest.getTitle())
             : request.title().trim();
 
         RfqJpaEntity rfq = rfqRepository.saveAndFlush(new RfqJpaEntity(
@@ -635,6 +635,14 @@ public class RfqService {
             return null;
         }
         return value.trim();
+    }
+
+    private static String defaultRfqTitle(String purchaseRequestTitle) {
+        String normalizedTitle = purchaseRequestTitle.trim();
+        if (normalizedTitle.endsWith("询价")) {
+            return normalizedTitle;
+        }
+        return normalizedTitle + "询价";
     }
 
     private static ResponseStatusException badRequest(String message) {

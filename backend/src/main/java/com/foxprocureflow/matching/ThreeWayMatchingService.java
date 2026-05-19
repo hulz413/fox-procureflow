@@ -269,7 +269,7 @@ public class ThreeWayMatchingService {
                 normalizeMoney(purchaseOrder.getTotalAmount()),
                 invoiceTotalAmount,
                 invoiceVarianceAmount,
-                "发票含税金额与 PO 含税金额不一致"));
+                "发票含税金额与采购订单含税金额不一致"));
         }
         return differences;
     }

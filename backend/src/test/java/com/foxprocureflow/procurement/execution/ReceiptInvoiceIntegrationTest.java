@@ -71,17 +71,17 @@ class ReceiptInvoiceIntegrationTest {
 
         mockMvc.perform(get("/api/receipts")
                 .param("companyId", "company-digital")
-                .param("poId", "PO-20260518-0302"))
+            .param("poId", "PO-20260518-0302"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[*].receiptId", hasItem("RCPT-20260519-0301")))
-            .andExpect(jsonPath("$.data[0].attachments[0].fileName").value("chengcai-office-supplies-delivery-2.jpg"));
+            .andExpect(jsonPath("$.data[0].attachments[0].fileName").value("诚采办公耗材补送到货签收照片.jpg"));
 
         mockMvc.perform(get("/api/invoices")
                 .param("companyId", "company-digital")
-                .param("poId", "PO-20260518-0302"))
+            .param("poId", "PO-20260518-0302"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[*].invoiceId", hasItem("INV-20260519-0301")))
-            .andExpect(jsonPath("$.data[0].attachments[0].fileName").value("chengcai-office-supplies-invoice.pdf"));
+            .andExpect(jsonPath("$.data[0].attachments[0].fileName").value("诚采办公耗材发票.pdf"));
     }
 
     @Test

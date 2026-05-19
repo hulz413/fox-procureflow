@@ -139,7 +139,7 @@ public class PurchaseOrderService {
             supplier.getRiskLevel(),
             rfq.getCategoryId(),
             rfq.getBudgetAccountId(),
-            "PO - " + rfq.getTitle(),
+            defaultPurchaseOrderTitle(rfq.getTitle()),
             normalizeMoney(quote.getQuoteAmount()),
             normalizeRate(quote.getTaxRate()),
             normalizeMoney(quote.getTaxAmount()),
@@ -170,7 +170,7 @@ public class PurchaseOrderService {
             PurchaseOrderAction.CREATED,
             null,
             PurchaseOrderStatus.DRAFT,
-            "Created from RFQ " + rfq.getRfqId() + " quote " + quote.getQuoteId()));
+            "基于询价单 " + rfq.getRfqId() + " 的选定报价 " + quote.getQuoteId() + " 创建采购订单"));
 
         return toDetailResponse(purchaseOrder, lines, schedule, List.of(record));
     }
@@ -547,6 +547,23 @@ public class PurchaseOrderService {
             return null;
         }
         return value.trim();
+    }
+
+    private static String defaultPurchaseOrderTitle(String rfqTitle) {
+        String sourceTitle = rfqTitle.trim();
+        if (sourceTitle.startsWith("RFQ - ")) {
+            sourceTitle = sourceTitle.substring("RFQ - ".length()).trim();
+        }
+        if (sourceTitle.startsWith("询价：")) {
+            sourceTitle = sourceTitle.substring("询价：".length()).trim();
+        }
+        if (sourceTitle.endsWith(" RFQ")) {
+            sourceTitle = sourceTitle.substring(0, sourceTitle.length() - " RFQ".length()).trim();
+        }
+        if (sourceTitle.endsWith("询价")) {
+            sourceTitle = sourceTitle.substring(0, sourceTitle.length() - "询价".length()).trim();
+        }
+        return "采购订单：" + sourceTitle;
     }
 
     private static ResponseStatusException badRequest(String message) {

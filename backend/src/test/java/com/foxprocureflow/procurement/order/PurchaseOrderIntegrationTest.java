@@ -302,7 +302,7 @@ class PurchaseOrderIntegrationTest {
         payload.put("companyId", "company-digital");
         payload.put("requestId", requestId);
         payload.put("procurementUserId", "user-digital-buyer");
-        payload.put("title", "IT 设备采购 RFQ");
+        payload.put("title", "信息技术设备采购询价");
         payload.put("supplierIds", List.of("supplier-bluechip", "supplier-yunzhou", "supplier-chengcai"));
         return payload;
     }

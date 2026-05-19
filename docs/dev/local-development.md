@@ -10,6 +10,17 @@
 - Docker
 - Docker Compose 插件或 `docker-compose`
 
+如果 Java 21 通过 Homebrew 安装，推荐使用 `openjdk@21`：
+
+```bash
+brew install openjdk@21
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+export PATH="$(brew --prefix openjdk@21)/bin:$PATH"
+java -version
+```
+
+若 `./gradlew` 报 `JAVA_HOME is set to an invalid directory` 或 macOS 的 `/usr/bin/java` 提示找不到 Java Runtime，先在当前 shell 中设置上面的 `JAVA_HOME` 和 `PATH`。
+
 ## 最短路径
 
 ```bash

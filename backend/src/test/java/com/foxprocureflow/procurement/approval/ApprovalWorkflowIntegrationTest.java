@@ -69,7 +69,23 @@ class ApprovalWorkflowIntegrationTest {
                 .param("approverId", "user-digital-approver"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[*].requestId", hasItem("PR-20260518-0102")))
+            .andExpect(jsonPath("$.data[*].requestId", hasItem("PR-20260519-0401")))
+            .andExpect(jsonPath("$.data[*].requestId", hasItem("PR-20260519-0402")))
             .andExpect(jsonPath("$.data[*].companyId", not(hasItem("company-manufacturing"))));
+
+        mockMvc.perform(get("/api/approvals/tasks")
+                .param("companyId", "company-digital")
+                .param("approverId", "user-digital-finance"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[*].requestId", hasItem("PR-20260519-0403")))
+            .andExpect(jsonPath("$.data[*].requestId", hasItem("PR-20260519-0404")));
+
+        mockMvc.perform(get("/api/approvals/tasks")
+                .param("companyId", "company-manufacturing")
+                .param("approverId", "user-mfg-approver"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[*].requestId", hasItem("PR-20260519-0501")))
+            .andExpect(jsonPath("$.data[*].requestId", hasItem("PR-20260519-0502")));
     }
 
     @Test
@@ -329,13 +345,13 @@ class ApprovalWorkflowIntegrationTest {
         payload.put("categoryId", "category-software-subscription");
         payload.put("budgetAccountId", "budget-digital-software");
         payload.put("supplierId", "supplier-yunzhou");
-        payload.put("title", "研发 IDE 企业订阅续费");
+        payload.put("title", "研发集成开发工具企业订阅续费");
         payload.put("description", "研发工具续费");
         payload.put("totalAmount", 38000.00);
         payload.put("currency", "CNY");
         payload.put("expectedDeliveryDate", "2026-06-01");
         payload.put("lineItems", List.of(Map.of(
-            "itemName", "IDE 企业订阅",
+            "itemName", "集成开发工具企业订阅",
             "specification", "研发团队年度授权",
             "quantity", 20,
             "unit", "席",
