@@ -17,6 +17,7 @@ import {
   NodeIndexOutlined,
   PlusOutlined,
   ProfileOutlined,
+  ReloadOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
   ShoppingCartOutlined,
@@ -101,6 +102,13 @@ type HealthEnvelope = ApiEnvelope<{
   checkedAt: string
   demoContext: DemoContext
 }>
+
+type DemoDataResetResult = {
+  startedAt: string
+  completedAt: string
+  migrationsExecuted: number
+  schemaVersion: string
+}
 
 type DemoContext = {
   groupId: string
@@ -1130,6 +1138,10 @@ async function fetchBudgetAccounts(companyId: string) {
   return fetchApi<BudgetAccountSummary[]>(`/api/master-data/companies/${companyId}/budget-accounts`)
 }
 
+async function resetDemoData() {
+  return postApi<DemoDataResetResult>('/api/demo-data/reset')
+}
+
 async function fetchPurchaseRequests(companyId: string) {
   return fetchApi<PurchaseRequestListItem[]>(`/api/purchase-requests?companyId=${encodeURIComponent(companyId)}`)
 }
@@ -1443,6 +1455,13 @@ export const localizedContent = {
       language: '切换语言',
       chinese: '中文',
       english: 'English',
+      resetDemoData: '重置演示数据',
+      resetDemoDataRunning: '正在重置演示数据',
+      resetDemoDataTitle: '重置演示数据？',
+      resetDemoDataDescription: '这会清空当前录入、审批、RFQ、PO、收货、发票和匹配结果，并按内置 seed 重新生成演示数据。',
+      resetDemoDataConfirm: '重置数据',
+      resetDemoDataSuccess: '演示数据已还原',
+      resetDemoDataFailure: '重置演示数据失败',
       logout: '退出登录',
     },
     panels: {
@@ -2093,6 +2112,13 @@ export const localizedContent = {
       language: 'Language',
       chinese: '中文',
       english: 'English',
+      resetDemoData: 'Reset demo data',
+      resetDemoDataRunning: 'Resetting demo data',
+      resetDemoDataTitle: 'Reset demo data?',
+      resetDemoDataDescription: 'This clears current requests, approvals, RFQs, POs, receipts, invoices, and matching results, then rebuilds the built-in seed data.',
+      resetDemoDataConfirm: 'Reset data',
+      resetDemoDataSuccess: 'Demo data restored',
+      resetDemoDataFailure: 'Failed to reset demo data',
       logout: 'Log out',
     },
     panels: {
@@ -2725,6 +2751,10 @@ function Workspace({
   const [dashboardScopeValue, setDashboardScopeValue] = useState<ProcurementDashboardScopeValue>('GROUP')
   const [isNotificationOpen, setNotificationOpen] = useState(false)
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([])
+  const [modal, modalContextHolder] = Modal.useModal()
+  const resetDemoDataMutation = useMutation({
+    mutationFn: resetDemoData,
+  })
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
     queryFn: fetchHealth,
@@ -2913,12 +2943,54 @@ function Workspace({
       ],
     },
     {
+      key: 'reset-demo-data',
+      icon: resetDemoDataMutation.isPending ? <LoadingOutlined /> : <ReloadOutlined />,
+      label: resetDemoDataMutation.isPending
+        ? messages.userMenu.resetDemoDataRunning
+        : messages.userMenu.resetDemoData,
+      disabled: resetDemoDataMutation.isPending,
+      danger: true,
+    },
+    { type: 'divider' },
+    {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: messages.userMenu.logout,
       danger: true,
     },
   ]
+
+  const confirmDemoDataReset = () => {
+    modal.confirm({
+      title: messages.userMenu.resetDemoDataTitle,
+      content: messages.userMenu.resetDemoDataDescription,
+      okText: messages.userMenu.resetDemoDataConfirm,
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          const response = await resetDemoDataMutation.mutateAsync()
+          setCreateDrawerOpen(false)
+          setRfqCreateDrawerOpen(false)
+          setPoCreateDrawerOpen(false)
+          setReceiptInvoiceCreateMode(null)
+          setDismissedNotificationIds([])
+          setNotificationOpen(false)
+          navigate('/', { replace: true })
+          await queryClient.invalidateQueries()
+          modal.success({
+            title: messages.userMenu.resetDemoDataSuccess,
+            content: `${messages.userMenu.resetDemoDataSuccess} · v${response.data.schemaVersion}`,
+          })
+        } catch (error) {
+          modal.error({
+            title: messages.userMenu.resetDemoDataFailure,
+            content: error instanceof Error ? error.message : messages.userMenu.resetDemoDataFailure,
+          })
+          throw error
+        }
+      },
+    })
+  }
 
   const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'language:zh' && language !== 'zh') {
@@ -2927,6 +2999,10 @@ function Workspace({
 
     if (key === 'language:en' && language !== 'en') {
       onLanguageChange()
+    }
+
+    if (key === 'reset-demo-data') {
+      confirmDemoDataReset()
     }
   }
 
@@ -3045,7 +3121,9 @@ function Workspace({
   }
 
   return (
-    <Layout className="app-shell">
+    <>
+      {modalContextHolder}
+      <Layout className="app-shell">
       <Sider className="sidebar" width={244}>
         <div className="brand">
           <div className="brand-icon">
@@ -3310,7 +3388,8 @@ function Workspace({
           )}
         </Content>
       </Layout>
-    </Layout>
+      </Layout>
+    </>
   )
 }
 

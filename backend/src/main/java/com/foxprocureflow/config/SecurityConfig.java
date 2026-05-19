@@ -47,6 +47,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/three-way-matching/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/three-way-matching/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/ai-assistant/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/demo-data/reset").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated())
             .build();
