@@ -94,6 +94,7 @@ stop_launchctl_job "$BACKEND_LABEL" "backend"
 stop_launchctl_job "$FRONTEND_LABEL" "frontend"
 stop_pid_file "$PID_DIR/backend.pid" "backend"
 stop_pid_file "$PID_DIR/frontend.pid" "frontend"
+rm -f "$PID_DIR/backend.env" "$PID_DIR/frontend.env" "$PID_DIR/backend.run.sh" "$PID_DIR/frontend.run.sh"
 stop_port_listener "$BACKEND_PORT" "backend"
 stop_port_listener "$FRONTEND_PORT" "frontend"
 

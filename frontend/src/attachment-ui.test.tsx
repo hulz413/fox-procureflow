@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   AttachmentInlineAction,
   AttachmentList,
+  NotificationPanel,
   ReceiptInvoiceAttachmentFields,
   localizedContent,
   shouldConfirmReceiptInvoiceDrawerClose,
@@ -132,5 +133,44 @@ describe('attachment UI', () => {
     expect(shouldConfirmReceiptInvoiceDrawerClose('invoice', true)).toBe(true)
     expect(shouldConfirmReceiptInvoiceDrawerClose('detail', true)).toBe(false)
     expect(shouldConfirmReceiptInvoiceDrawerClose('receipt', false)).toBe(false)
+  })
+
+  it('dismisses a demo notification from the notification panel', () => {
+    const onDismiss = vi.fn()
+    const onSelect = vi.fn()
+    const notification = messages.notificationCenter.items[0]
+    render(
+      <NotificationPanel
+        messages={messages}
+        notifications={[notification]}
+        onDismiss={onDismiss}
+        onSelect={onSelect}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: `${messages.notificationCenter.dismiss}: ${notification.title}` }))
+
+    expect(screen.getByText(notification.title)).toBeInTheDocument()
+    expect(onDismiss).toHaveBeenCalledWith(notification.id)
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('opens a demo notification target from the notification panel', () => {
+    const onDismiss = vi.fn()
+    const onSelect = vi.fn()
+    const notification = messages.notificationCenter.items[1]
+    render(
+      <NotificationPanel
+        messages={messages}
+        notifications={[notification]}
+        onDismiss={onDismiss}
+        onSelect={onSelect}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: `${notification.title}: ${notification.description}` }))
+
+    expect(onDismiss).toHaveBeenCalledWith(notification.id)
+    expect(onSelect).toHaveBeenCalledWith(notification)
   })
 })

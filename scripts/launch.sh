@@ -10,6 +10,7 @@ PID_DIR="${FOX_LOCAL_PID_DIR:-$ROOT_DIR/.local/pids}"
 DETACH_MODE=0
 BACKEND_LABEL="com.foxprocureflow.backend"
 FRONTEND_LABEL="com.foxprocureflow.frontend"
+ROOT_ENV_KEYS=()
 
 usage() {
   cat <<'USAGE'
@@ -60,6 +61,7 @@ load_root_env() {
     key="${key#"${key%%[![:space:]]*}"}"
     key="${key%"${key##*[![:space:]]}"}"
     [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    ROOT_ENV_KEYS+=("$key")
     [[ "${!key+x}" == "x" ]] && continue
     export "$key=$value"
   done < "$env_file"
@@ -192,6 +194,39 @@ stop_existing_listener() {
   fi
 }
 
+write_detached_env_file() {
+  local env_file="$1"
+  local key
+
+  : > "$env_file"
+  chmod 600 "$env_file"
+  printf 'export PATH=%q\n' "$PATH" >> "$env_file"
+  printf 'export JAVA_HOME=%q\n' "${JAVA_HOME:-}" >> "$env_file"
+  for key in "${ROOT_ENV_KEYS[@]}"; do
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    [[ "${!key+x}" == "x" ]] || continue
+    printf 'export %s=%q\n' "$key" "${!key}" >> "$env_file"
+  done
+}
+
+write_detached_run_file() {
+  local run_file="$1"
+  local env_file="$2"
+  local workdir="$3"
+  local pid_file="$4"
+  local command="$5"
+
+  cat > "$run_file" <<SCRIPT
+#!/usr/bin/env bash
+set -euo pipefail
+source "$env_file"
+cd "$workdir"
+echo \$\$ > "$pid_file"
+exec $command
+SCRIPT
+  chmod 700 "$run_file"
+}
+
 submit_detached_job() {
   local label="$1"
   local name="$2"
@@ -199,25 +234,22 @@ submit_detached_job() {
   local log_file="$4"
   local pid_file="$5"
   local command="$6"
-  local quoted_path quoted_java_home
-
-  printf -v quoted_path '%q' "$PATH"
-  printf -v quoted_java_home '%q' "${JAVA_HOME:-}"
+  local env_file="$PID_DIR/${name}.env"
+  local run_file="$PID_DIR/${name}.run.sh"
 
   mkdir -p "$LOG_DIR" "$PID_DIR"
   : > "$log_file"
+  write_detached_env_file "$env_file"
+  write_detached_run_file "$run_file" "$env_file" "$workdir" "$pid_file" "$command"
 
   if command -v launchctl >/dev/null 2>&1; then
     launchctl remove "$label" >/dev/null 2>&1 || true
-    launchctl submit -l "$label" -o "$log_file" -e "$log_file" -- /bin/bash -lc "export PATH=$quoted_path JAVA_HOME=$quoted_java_home; cd '$workdir' && echo \\\$\\\$ > '$pid_file' && exec $command"
+    launchctl submit -l "$label" -o "$log_file" -e "$log_file" -- /bin/bash "$run_file"
     echo "Started ${name} with launchctl label ${label}."
     return
   fi
 
-  (
-    cd "$workdir"
-    nohup /bin/bash -lc "export PATH=$quoted_path JAVA_HOME=$quoted_java_home; echo \\\$\\\$ > '$pid_file' && exec $command" > "$log_file" 2>&1 < /dev/null &
-  )
+  nohup /bin/bash "$run_file" > "$log_file" 2>&1 < /dev/null &
   echo "Started ${name} with nohup."
 }
 

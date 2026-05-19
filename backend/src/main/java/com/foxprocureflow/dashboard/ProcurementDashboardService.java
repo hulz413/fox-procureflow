@@ -151,7 +151,7 @@ public class ProcurementDashboardService {
 
     private List<SpendTrendPoint> spendTrend(MapSqlParameterSource params) {
         return jdbcTemplate.query("""
-            SELECT DATE_FORMAT(COALESCE(issued_at, updated_at, created_at), '%Y-%m') AS period,
+            SELECT DATE_FORMAT(COALESCE(issued_at, updated_at, created_at), '%Y-%m-%d') AS period,
                    COALESCE(SUM(total_amount), 0) AS amount,
                    COALESCE(MAX(currency), :defaultCurrency) AS currency,
                    COUNT(*) AS document_count

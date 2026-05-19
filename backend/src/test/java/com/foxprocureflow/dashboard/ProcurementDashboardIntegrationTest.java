@@ -72,6 +72,7 @@ class ProcurementDashboardIntegrationTest {
             .andExpect(jsonPath("$.data.companyIds", hasItem("company-manufacturing")))
             .andExpect(jsonPath("$.data.summary[?(@.key=='issuedPoAmount')].value", hasItem(377307.00)))
             .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(4)))
+            .andExpect(jsonPath("$.data.spendTrend.length()").value(5))
             .andExpect(jsonPath("$.data.exceptionHighlights[*].companyId", hasItem("company-digital")))
             .andExpect(jsonPath("$.data.exceptionHighlights[*].companyId", hasItem("company-manufacturing")));
 
@@ -105,11 +106,14 @@ class ProcurementDashboardIntegrationTest {
     @Test
     void returnsLifecycleTrendFunnelStatusSupplierAndExceptionDatasets() throws Exception {
         mockMvc.perform(get("/api/procurement-dashboard")
-                .param("scope", "COMPANY")
-                .param("companyId", "company-manufacturing"))
+            .param("scope", "COMPANY")
+            .param("companyId", "company-manufacturing"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.spendTrend[0].period").value("2026-05"))
-            .andExpect(jsonPath("$.data.spendTrend[0].amount").value(109836.00))
+            .andExpect(jsonPath("$.data.spendTrend.length()").value(2))
+            .andExpect(jsonPath("$.data.spendTrend[0].period").value("2026-05-18"))
+            .andExpect(jsonPath("$.data.spendTrend[0].amount").value(28024.00))
+            .andExpect(jsonPath("$.data.spendTrend[1].period").value("2026-05-19"))
+            .andExpect(jsonPath("$.data.spendTrend[1].amount").value(81812.00))
             .andExpect(jsonPath("$.data.documentFunnel[?(@.key=='issuedPurchaseOrders')].count", hasItem(2)))
             .andExpect(jsonPath("$.data.documentFunnel[?(@.key=='matchedPurchaseOrders')].count", hasItem(0)))
             .andExpect(jsonPath("$.data.statusDistributions[?(@.documentType=='approval')].status", hasItem("APPROVED")))

@@ -203,6 +203,183 @@ h1 {
   width: 34px;
 }
 
+.notification-trigger {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.notification-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--pf-danger);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.notification-popover .ant-popover-inner {
+  padding: 0;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  box-shadow: 0 16px 36px rgba(31, 39, 35, 0.16);
+}
+
+.notification-panel {
+  width: min(360px, calc(100vw - 32px));
+  color: var(--pf-text);
+}
+
+.notification-panel-header {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--pf-border);
+}
+
+.notification-panel-header span {
+  min-width: 24px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--pf-primary);
+  background: var(--pf-primary-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.notification-list {
+  display: grid;
+  gap: 0;
+}
+
+.notification-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 9px;
+  padding: 8px;
+  border-bottom: 1px solid var(--pf-border);
+  background: #fff;
+}
+
+.notification-item:last-child {
+  border-bottom: 0;
+}
+
+.notification-item-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--pf-primary);
+  background: var(--pf-primary-soft);
+}
+
+.notification-item.warning .notification-item-icon {
+  color: var(--pf-warning);
+  background: #f5f1e8;
+}
+
+.notification-item.success .notification-item-icon {
+  color: var(--pf-success);
+  background: #edf4ef;
+}
+
+.notification-open {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  padding: 4px;
+  border: 0;
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-open:hover,
+.notification-open:focus-visible {
+  background: var(--pf-primary-soft);
+  outline: none;
+}
+
+.notification-item-body {
+  min-width: 0;
+}
+
+.notification-item strong,
+.notification-item p,
+.notification-item small {
+  display: block;
+  min-width: 0;
+}
+
+.notification-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.notification-item p {
+  margin: 4px 0 0;
+  color: var(--pf-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.notification-item small {
+  margin-top: 6px;
+  color: var(--pf-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.notification-dismiss {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--pf-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.notification-dismiss:hover,
+.notification-dismiss:focus-visible {
+  color: var(--pf-danger);
+  background: #f6eeee;
+  outline: none;
+}
+
+.notification-empty {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  color: var(--pf-muted);
+  font-size: 13px;
+}
+
 .primary-button {
   height: 34px;
   padding: 0 12px;
@@ -284,6 +461,37 @@ h1 {
   border: 1px solid var(--pf-border);
   border-radius: 8px;
   background: #fff;
+}
+
+.ai-loading-state {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #dce7de;
+  border-radius: 7px;
+  color: var(--pf-primary);
+  background: var(--pf-primary-soft);
+}
+
+.ai-loading-icon {
+  font-size: 20px;
+}
+
+.ai-loading-state strong,
+.ai-loading-state span {
+  display: block;
+}
+
+.ai-loading-state strong {
+  font-size: 13px;
+}
+
+.ai-loading-state span {
+  margin-top: 2px;
+  color: var(--pf-muted);
+  font-size: 12px;
 }
 
 .ai-meta {
@@ -390,6 +598,13 @@ h1 {
 .user-menu-button:focus-visible {
   outline: 2px solid #bfd0c5;
   outline-offset: 2px;
+}
+
+.app-shell :where(input, select, textarea):focus,
+.app-shell :where(input, select, textarea):focus-visible {
+  border-color: var(--pf-primary);
+  outline: 2px solid rgba(47, 122, 77, 0.28);
+  outline-offset: 1px;
 }
 
 .user-menu-profile {
@@ -1373,14 +1588,13 @@ tbody tr:last-child td {
 
 .approval-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 0.6fr) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 520px);
   gap: 10px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--pf-border);
 }
 
 .approval-toolbar > label,
-.approval-toolbar > div,
 .approval-actions label {
   min-width: 0;
   display: grid;
@@ -1388,7 +1602,6 @@ tbody tr:last-child td {
 }
 
 .approval-toolbar label > span,
-.approval-toolbar > div > span,
 .approval-actions label > span {
   color: var(--pf-muted);
   font-size: 12px;
@@ -1429,12 +1642,6 @@ tbody tr:last-child td {
 
 .approval-approver-select .ant-select-selection-search-input {
   min-height: 34px;
-}
-
-.approval-toolbar strong {
-  min-height: 36px;
-  display: flex;
-  align-items: center;
 }
 
 .approval-task-table th:nth-child(1) {

@@ -5,6 +5,7 @@ import {
   BankOutlined,
   BellOutlined,
   CheckCircleOutlined,
+  CloseOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   DeleteOutlined,
@@ -12,6 +13,7 @@ import {
   FileSearchOutlined,
   InboxOutlined,
   LogoutOutlined,
+  LoadingOutlined,
   NodeIndexOutlined,
   PlusOutlined,
   ProfileOutlined,
@@ -24,7 +26,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { keepPreviousData, QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Avatar, ConfigProvider, Drawer, Dropdown, Layout, Modal, Select, Tooltip } from 'antd'
+import { Avatar, ConfigProvider, Drawer, Dropdown, Layout, Modal, Popover, Select, Tooltip } from 'antd'
 import type { MenuProps, ThemeConfig } from 'antd'
 import enUS from 'antd/locale/en_US'
 import zhCN from 'antd/locale/zh_CN'
@@ -1361,6 +1363,38 @@ export const localizedContent = {
       newReceipt: '登记收货',
       newInvoice: '登记发票',
     },
+    notificationCenter: {
+      title: '通知',
+      empty: '暂无通知',
+      dismiss: '关闭通知',
+      countLabel: '未读通知',
+      items: [
+        {
+          id: 'approval-pr-0401',
+          path: '/approvals',
+          title: '审批任务新增 4 条',
+          description: '周明远有新的信息技术类采购申请待审批。',
+          time: '刚刚',
+          tone: 'approval',
+        },
+        {
+          id: 'matching-po-0302',
+          path: '/three-way-matching',
+          title: '三单匹配出现异常',
+          description: 'PO-20260518-0302 发票金额比 PO 高 ¥2,300。',
+          time: '10 分钟前',
+          tone: 'warning',
+        },
+        {
+          id: 'rfq-workstation-ready',
+          path: '/rfqs',
+          title: '移动工作站 RFQ 可比价',
+          description: '蓝芯、云舟、诚采三家报价已齐，可进入报价对比。',
+          time: '今天 11:45',
+          tone: 'success',
+        },
+      ],
+    },
     ai: {
       title: 'AI 采购助手',
       dataState: 'AI 建议',
@@ -1371,6 +1405,7 @@ export const localizedContent = {
       explainQuotes: '解释报价',
       explainMatching: '解释异常',
       generating: 'AI 生成中',
+      generatingDescription: '正在生成建议，请稍候',
       unavailable: 'AI 助手暂不可用',
       disabledNoIntent: '先输入采购需求',
       disabledNoActor: '当前公司没有可用用户',
@@ -1746,6 +1781,7 @@ export const localizedContent = {
       quoteFailed: '报价保存失败',
       approvedRequest: '已审批申请',
       noApprovedRequest: '暂无已通过审批的申请',
+      noAvailableApprovedRequest: '暂无可新建 RFQ 的已审批申请',
       procurementUser: '采购员',
       suppliers: '候选供应商',
       invitedSuppliers: '受邀供应商',
@@ -1782,6 +1818,7 @@ export const localizedContent = {
       discardDetailContent: '当前报价内容还没有保存，关闭后本次输入会丢失。',
       discardDetailConfirm: '放弃报价',
       saveQuotePendingReason: '报价保存中',
+      createPendingReason: 'RFQ 创建中',
     },
     purchaseOrder: {
       dataState: '后端 PO 数据',
@@ -1976,6 +2013,38 @@ export const localizedContent = {
       newReceipt: 'Record Receipt',
       newInvoice: 'Record Invoice',
     },
+    notificationCenter: {
+      title: 'Notifications',
+      empty: 'No notifications',
+      dismiss: 'Dismiss notification',
+      countLabel: 'Unread notifications',
+      items: [
+        {
+          id: 'approval-pr-0401',
+          path: '/approvals',
+          title: '4 new approval tasks',
+          description: 'Zhou Mingyuan has new IT purchase requests awaiting approval.',
+          time: 'Just now',
+          tone: 'approval',
+        },
+        {
+          id: 'matching-po-0302',
+          path: '/three-way-matching',
+          title: 'Three-way match exception',
+          description: 'PO-20260518-0302 invoice amount is ¥2,300 above PO.',
+          time: '10 min ago',
+          tone: 'warning',
+        },
+        {
+          id: 'rfq-workstation-ready',
+          path: '/rfqs',
+          title: 'Workstation RFQ ready',
+          description: 'Bluechip, Yunzhou, and Chengcai quotes are ready to compare.',
+          time: 'Today 11:45',
+          tone: 'success',
+        },
+      ],
+    },
     ai: {
       title: 'AI Procurement Assistant',
       dataState: 'AI advice',
@@ -1986,6 +2055,7 @@ export const localizedContent = {
       explainQuotes: 'Explain Quotes',
       explainMatching: 'Explain Exception',
       generating: 'AI is generating',
+      generatingDescription: 'Generating advice, please wait',
       unavailable: 'AI assistant unavailable',
       disabledNoIntent: 'Enter a procurement need first',
       disabledNoActor: 'No available user in the current company',
@@ -2361,6 +2431,7 @@ export const localizedContent = {
       quoteFailed: 'Quote failed',
       approvedRequest: 'Approved Request',
       noApprovedRequest: 'No approved requests',
+      noAvailableApprovedRequest: 'No approved requests available for a new RFQ',
       procurementUser: 'Buyer',
       suppliers: 'Candidate Suppliers',
       invitedSuppliers: 'Invited Suppliers',
@@ -2397,6 +2468,7 @@ export const localizedContent = {
       discardDetailContent: 'This quote has unsaved changes. Closing will discard your input.',
       discardDetailConfirm: 'Discard quote',
       saveQuotePendingReason: 'Saving quote',
+      createPendingReason: 'Creating RFQ',
     },
     purchaseOrder: {
       dataState: 'Backend POs',
@@ -2566,6 +2638,7 @@ export const localizedContent = {
 } as const
 
 type LocalizedMessages = (typeof localizedContent)[Language]
+type NotificationItem = LocalizedMessages['notificationCenter']['items'][number]
 
 const englishContext = {
   groupName: 'Xinghe Holdings Group',
@@ -2650,6 +2723,8 @@ function Workspace({
   const [receiptInvoiceCreateMode, setReceiptInvoiceCreateMode] = useState<ReceiptInvoiceCreateMode | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const [dashboardScopeValue, setDashboardScopeValue] = useState<ProcurementDashboardScopeValue>('GROUP')
+  const [isNotificationOpen, setNotificationOpen] = useState(false)
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([])
   const { data, isError, isLoading } = useQuery({
     queryKey: ['backend-health'],
     queryFn: fetchHealth,
@@ -2733,6 +2808,9 @@ function Workspace({
   })
 
   const messages = localizedContent[language]
+  const visibleNotifications = messages.notificationCenter.items.filter(
+    (notification) => !dismissedNotificationIds.includes(notification.id),
+  )
   const rawContext = masterContextQuery.data?.data ?? data?.data.demoContext ?? demoContext
   const context = localizeContext(rawContext, language)
   const companies = localizeContext(
@@ -2955,6 +3033,16 @@ function Workspace({
     : isRfqRoute
       ? messages.actions.newRfq
       : messages.actions.newRequest
+  const dismissNotification = (notificationId: string) => {
+    setDismissedNotificationIds((current) =>
+      current.includes(notificationId) ? current : [...current, notificationId],
+    )
+  }
+
+  const openNotificationTarget = (notification: NotificationItem) => {
+    setNotificationOpen(false)
+    navigate(notification.path)
+  }
 
   return (
     <Layout className="app-shell">
@@ -3031,11 +3119,38 @@ function Workspace({
                 <SearchOutlined />
               </button>
             </Tooltip>
-            <Tooltip title={messages.aria.notifications} trigger={['hover', 'focus']}>
-              <button type="button" className="icon-button" aria-label={messages.aria.notifications}>
-                <BellOutlined />
-              </button>
-            </Tooltip>
+            <Popover
+              content={(
+                <NotificationPanel
+                  messages={messages}
+                  notifications={visibleNotifications}
+                  onDismiss={dismissNotification}
+                  onSelect={openNotificationTarget}
+                />
+              )}
+              onOpenChange={setNotificationOpen}
+              open={isNotificationOpen}
+              placement="bottomRight"
+              rootClassName="notification-popover"
+              trigger="click"
+            >
+              <span className="notification-trigger">
+                <Tooltip title={messages.aria.notifications} trigger={['hover', 'focus']}>
+                  <button
+                    type="button"
+                    className="icon-button notification-button"
+                    aria-label={`${messages.aria.notifications}: ${visibleNotifications.length}`}
+                  >
+                    <BellOutlined />
+                  </button>
+                </Tooltip>
+                {visibleNotifications.length > 0 && (
+                  <span className="notification-count" aria-label={`${messages.notificationCenter.countLabel}: ${visibleNotifications.length}`}>
+                    {visibleNotifications.length}
+                  </span>
+                )}
+              </span>
+            </Popover>
             {!isFoundationRoute && !isSupplierPoolRoute && !isThreeWayMatchingRoute && (
               <button className="primary-button" onClick={handleNewRequestClick} type="button">
                 {primaryActionIcon}
@@ -3636,6 +3751,7 @@ function PurchaseRequestView({
     if (aiDraftDisabledReason) {
       return
     }
+    setAiDraftResponse(null)
     aiDraftMutation.mutate({
       actorId: form.requesterId,
       companyId: selectedCompanyId,
@@ -3647,6 +3763,7 @@ function PurchaseRequestView({
     if (!selectedDetail) {
       return
     }
+    setAiRiskResponse(null)
     aiRiskMutation.mutate({
       actorId: selectedDetail.approval?.currentApproverId ?? selectedDetail.requesterId,
       companyId: selectedDetail.companyId,
@@ -3873,16 +3990,18 @@ function PurchaseRequestView({
             </label>
             <DisabledActionTooltip className="form-wide" title={aiDraftDisabledReason}>
               <button
+                aria-busy={aiDraftMutation.isPending}
                 className="line-add-button"
                 disabled={Boolean(aiDraftDisabledReason)}
                 onClick={requestAiDraft}
                 type="button"
               >
-                <ApiOutlined />
-                <span>{messages.ai.generateDraft}</span>
+                {aiDraftMutation.isPending ? <LoadingOutlined /> : <ApiOutlined />}
+                <span>{aiDraftMutation.isPending ? messages.ai.generating : messages.ai.generateDraft}</span>
               </button>
             </DisabledActionTooltip>
             <AiResultPanel
+              isLoading={aiDraftMutation.isPending}
               language={language}
               messages={messages}
               response={aiDraftResponse}
@@ -4131,16 +4250,18 @@ function PurchaseRequestView({
                   <div className="ai-action-row">
                     <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
                     <button
+                      aria-busy={aiRiskMutation.isPending}
                       className="line-add-button"
                       disabled={aiRiskMutation.isPending}
                       onClick={requestAiRisk}
                       type="button"
                     >
-                      <ApiOutlined />
-                      <span>{messages.ai.reviewRisk}</span>
+                      {aiRiskMutation.isPending ? <LoadingOutlined /> : <ApiOutlined />}
+                      <span>{aiRiskMutation.isPending ? messages.ai.generating : messages.ai.reviewRisk}</span>
                     </button>
                   </div>
                   <AiResultPanel
+                    isLoading={aiRiskMutation.isPending}
                     language={language}
                     messages={messages}
                     response={aiRiskResponse}
@@ -4373,6 +4494,7 @@ function ApprovalCenterView({
     if (!detail) {
       return
     }
+    setAiRiskResponse(null)
     aiRiskMutation.mutate({
       actorId: selectedApproverId || detail.requesterId,
       companyId: detail.companyId,
@@ -4443,10 +4565,6 @@ function ApprovalCenterView({
               value={selectedApproverId || undefined}
             />
           </label>
-          <div>
-            <span>{messages.approval.activeCompany}</span>
-            <strong>{selectedCompany.companyName}</strong>
-          </div>
         </div>
         {(isError || tasksQuery.isError) && <div className="data-alert">{messages.approval.unavailable}</div>}
         <div className="table-wrap">
@@ -4571,16 +4689,18 @@ function ApprovalCenterView({
             <div className="ai-action-row">
               <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
               <button
+                aria-busy={aiRiskMutation.isPending}
                 className="line-add-button"
                 disabled={aiRiskMutation.isPending}
                 onClick={requestAiRisk}
                 type="button"
               >
-                <ApiOutlined />
-                <span>{messages.ai.reviewRisk}</span>
+                {aiRiskMutation.isPending ? <LoadingOutlined /> : <ApiOutlined />}
+                <span>{aiRiskMutation.isPending ? messages.ai.generating : messages.ai.reviewRisk}</span>
               </button>
             </div>
             <AiResultPanel
+              isLoading={aiRiskMutation.isPending}
               language={language}
               messages={messages}
               response={aiRiskResponse}
@@ -4684,7 +4804,10 @@ function RfqView({
   const [isQuoteDirty, setQuoteDirty] = useState(false)
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
   const [aiRfqResponse, setAiRfqResponse] = useState<AiAssistantResponse | null>(null)
-  const approvedRequests = purchaseRequests.filter((request) => request.approval?.status === 'APPROVED')
+  const rfqRequestIds = new Set(rfqs.map((rfq) => rfq.requestId))
+  const approvedRequests = purchaseRequests.filter(
+    (request) => request.approval?.status === 'APPROVED' && !rfqRequestIds.has(request.requestId),
+  )
   const buyers = users.filter(
     (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
   )
@@ -4843,6 +4966,11 @@ function RfqView({
     : isQuoteUploading
       ? messages.rfq.uploadingAttachment
       : undefined
+  const createRfqDisabledReason = createMutation.isPending
+    ? messages.rfq.createPendingReason
+    : approvedRequests.length === 0
+      ? messages.rfq.noAvailableApprovedRequest
+      : undefined
   const aiRfqDisabledReason = aiRfqMutation.isPending
     ? messages.ai.generating
     : comparisonRows.length < 2
@@ -4871,7 +4999,10 @@ function RfqView({
   const handleCreateRfq = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!createForm.requestId || !createForm.procurementUserId || createForm.supplierIds.length === 0) {
-      setFeedback({ message: messages.rfq.noApprovedRequest, tone: 'danger' })
+      setFeedback({
+        message: approvedRequests.length === 0 ? messages.rfq.noAvailableApprovedRequest : messages.rfq.noApprovedRequest,
+        tone: 'danger',
+      })
       return
     }
 
@@ -4962,6 +5093,7 @@ function RfqView({
     if (!detail || aiRfqDisabledReason) {
       return
     }
+    setAiRfqResponse(null)
     aiRfqMutation.mutate({
       actorId: detail.procurementUserId,
       companyId: selectedCompanyId,
@@ -5124,7 +5256,7 @@ function RfqView({
                 onChange={(event) => handleCreateRequestChange(event.target.value)}
               >
                 {approvedRequests.length === 0 ? (
-                  <option value="">{messages.rfq.noApprovedRequest}</option>
+                  <option value="">{messages.rfq.noAvailableApprovedRequest}</option>
                 ) : (
                   approvedRequests.map((request) => (
                     <option key={request.requestId} value={request.requestId}>
@@ -5184,10 +5316,12 @@ function RfqView({
                 </div>
               </dl>
             )}
-            <button className="primary-button form-wide" disabled={createMutation.isPending} type="submit">
-              <FileSearchOutlined />
-              <span>{messages.rfq.create}</span>
-            </button>
+            <DisabledActionTooltip className="form-wide" title={createRfqDisabledReason}>
+              <button className="primary-button form-wide" disabled={Boolean(createRfqDisabledReason)} type="submit">
+                <FileSearchOutlined />
+                <span>{messages.rfq.create}</span>
+              </button>
+            </DisabledActionTooltip>
             {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
           </form>
         ) : detail ? (
@@ -5410,17 +5544,19 @@ function RfqView({
                 <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
                 <DisabledActionTooltip title={aiRfqDisabledReason}>
                   <button
+                    aria-busy={aiRfqMutation.isPending}
                     className="line-add-button"
                     disabled={Boolean(aiRfqDisabledReason)}
                     onClick={requestAiRfqExplanation}
                     type="button"
                   >
-                    <ApiOutlined />
-                    <span>{messages.ai.explainQuotes}</span>
+                    {aiRfqMutation.isPending ? <LoadingOutlined /> : <ApiOutlined />}
+                    <span>{aiRfqMutation.isPending ? messages.ai.generating : messages.ai.explainQuotes}</span>
                   </button>
                 </DisabledActionTooltip>
               </div>
               <AiResultPanel
+                isLoading={aiRfqMutation.isPending}
                 language={language}
                 messages={messages}
                 response={aiRfqResponse}
@@ -6421,6 +6557,7 @@ function ThreeWayMatchingView({
     if (!detail || !actionActor || aiMatchingDisabledReason) {
       return
     }
+    setAiMatchingResponse(null)
     aiMatchingMutation.mutate({
       actorId: actionActor.userId,
       companyId: selectedCompanyId,
@@ -6595,17 +6732,19 @@ function ThreeWayMatchingView({
                 <PanelTitle icon={<ApiOutlined />} title={messages.ai.title} aside={messages.ai.dataState} />
                 <DisabledActionTooltip title={aiMatchingDisabledReason}>
                   <button
+                    aria-busy={aiMatchingMutation.isPending}
                     className="line-add-button"
                     disabled={Boolean(aiMatchingDisabledReason)}
                     onClick={requestAiMatchingExplanation}
                     type="button"
                   >
-                    <ApiOutlined />
-                    <span>{messages.ai.explainMatching}</span>
+                    {aiMatchingMutation.isPending ? <LoadingOutlined /> : <ApiOutlined />}
+                    <span>{aiMatchingMutation.isPending ? messages.ai.generating : messages.ai.explainMatching}</span>
                   </button>
                 </DisabledActionTooltip>
               </div>
               <AiResultPanel
+                isLoading={aiMatchingMutation.isPending}
                 language={language}
                 messages={messages}
                 response={aiMatchingResponse}
@@ -8570,38 +8709,53 @@ function DisabledActionTooltip({
 }
 
 function AiResultPanel({
+  isLoading = false,
   language,
   messages,
   response,
   title,
 }: {
+  isLoading?: boolean
   language: Language
   messages: LocalizedMessages
   response: AiAssistantResponse | null
   title?: string
 }) {
-  if (!response) {
+  if (!response && !isLoading) {
     return null
   }
 
   return (
-    <section className="ai-result-panel">
+    <section aria-busy={isLoading} className="ai-result-panel">
       <PanelTitle icon={<ApiOutlined />} title={title ?? messages.ai.result} aside={messages.ai.dataState} />
-      <dl className="ai-meta">
-        <div>
-          <dt>{messages.ai.invocation}</dt>
-          <dd>{response.invocationId}</dd>
+      {isLoading ? (
+        <div className="ai-loading-state" role="status">
+          <LoadingOutlined className="ai-loading-icon" />
+          <div>
+            <strong>{messages.ai.generating}</strong>
+            <span>{messages.ai.generatingDescription}</span>
+          </div>
         </div>
-        <div>
-          <dt>{messages.ai.model}</dt>
-          <dd>{response.model}</dd>
-        </div>
-        <div>
-          <dt>{messages.ai.generatedAt}</dt>
-          <dd>{formatDateTime(response.generatedAt, language)}</dd>
-        </div>
-      </dl>
-      <AiResultBody language={language} messages={messages} response={response} />
+      ) : null}
+      {response ? (
+        <>
+          <dl className="ai-meta">
+            <div>
+              <dt>{messages.ai.invocation}</dt>
+              <dd>{response.invocationId}</dd>
+            </div>
+            <div>
+              <dt>{messages.ai.model}</dt>
+              <dd>{response.model}</dd>
+            </div>
+            <div>
+              <dt>{messages.ai.generatedAt}</dt>
+              <dd>{formatDateTime(response.generatedAt, language)}</dd>
+            </div>
+          </dl>
+          <AiResultBody language={language} messages={messages} response={response} />
+        </>
+      ) : null}
     </section>
   )
 }
@@ -8783,6 +8937,76 @@ function dashboardMetricIcon(key: string) {
   return <ShoppingCartOutlined />
 }
 
+export function NotificationPanel({
+  messages,
+  notifications,
+  onDismiss,
+  onSelect,
+}: {
+  messages: LocalizedMessages
+  notifications: readonly NotificationItem[]
+  onDismiss: (notificationId: string) => void
+  onSelect: (notification: NotificationItem) => void
+}) {
+  return (
+    <section className="notification-panel" aria-label={messages.notificationCenter.title}>
+      <div className="notification-panel-header">
+        <strong>{messages.notificationCenter.title}</strong>
+        <span>{notifications.length}</span>
+      </div>
+      {notifications.length === 0 ? (
+        <div className="notification-empty">{messages.notificationCenter.empty}</div>
+      ) : (
+        <div className="notification-list">
+          {notifications.map((notification) => (
+            <article className={`notification-item ${notification.tone}`} key={notification.id}>
+              <button
+                aria-label={`${notification.title}: ${notification.description}`}
+                className="notification-open"
+                onClick={() => {
+                  onDismiss(notification.id)
+                  onSelect(notification)
+                }}
+                type="button"
+              >
+                <span className="notification-item-icon">{notificationIconOf(notification.tone)}</span>
+                <span className="notification-item-body">
+                  <strong>{notification.title}</strong>
+                  <p>{notification.description}</p>
+                  <small>{notification.time}</small>
+                </span>
+              </button>
+              <button
+                aria-label={`${messages.notificationCenter.dismiss}: ${notification.title}`}
+                className="notification-dismiss"
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onDismiss(notification.id)
+                }}
+                type="button"
+              >
+                <CloseOutlined />
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function notificationIconOf(tone: NotificationItem['tone']) {
+  if (tone === 'warning') {
+    return <AlertOutlined />
+  }
+  if (tone === 'success') {
+    return <CheckCircleOutlined />
+  }
+
+  return <AuditOutlined />
+}
+
 function dashboardMetricTone(key: string, value: number) {
   if (key === 'matchingExceptions' && value > 0) {
     return 'danger'
@@ -8812,6 +9036,8 @@ function formatDashboardMetric(metric: DashboardMetric, language: Language) {
 }
 
 function getDashboardSpendTrendOption(points: SpendTrendPoint[], language: Language) {
+  const periodLabels = points.map((point) => formatDashboardTrendPeriod(point.period))
+
   return {
     color: ['#2f7a4d'],
     grid: { bottom: 30, left: 58, right: 20, top: 24 },
@@ -8823,7 +9049,7 @@ function getDashboardSpendTrendOption(points: SpendTrendPoint[], language: Langu
       axisLabel: { color: '#707771' },
       axisLine: { lineStyle: { color: '#dde2dc' } },
       axisTick: { show: false },
-      data: points.map((point) => point.period),
+      data: periodLabels,
       type: 'category',
     },
     yAxis: {
@@ -8840,6 +9066,14 @@ function getDashboardSpendTrendOption(points: SpendTrendPoint[], language: Langu
       },
     ],
   }
+}
+
+function formatDashboardTrendPeriod(period: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(period)) {
+    return period.slice(5).replace('-', '/')
+  }
+
+  return period
 }
 
 function getDashboardFunnelOption(stages: DocumentFunnelStage[]) {
