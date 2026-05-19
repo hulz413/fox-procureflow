@@ -1269,6 +1269,7 @@ const localizedContent = {
     header: {
       title: '采购看板',
       foundationTitle: '组织与主数据',
+      supplierPoolTitle: '供应商池',
       purchaseRequestsTitle: '采购申请',
       approvalsTitle: '审批中心',
       rfqTitle: '询报价',
@@ -1358,7 +1359,7 @@ const localizedContent = {
       { label: '采购订单', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: '收货发票', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '三单匹配', icon: <SwapOutlined />, path: '/three-way-matching' },
-      { label: '供应商池', icon: <TeamOutlined />, count: '5' },
+      { label: '供应商池', icon: <TeamOutlined />, count: '5', path: '/suppliers' },
       { label: '主数据', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
@@ -1507,6 +1508,42 @@ const localizedContent = {
       inactive: '停用',
       groupLevel: '集团级',
       shared: '共享',
+    },
+    supplierPool: {
+      dataState: '后端供应商数据',
+      loading: '加载供应商池',
+      unavailable: '供应商池暂不可用',
+      empty: '暂无供应商',
+      noResults: '没有符合条件的供应商',
+      list: '供应商列表',
+      detail: '供应商详情',
+      sharedPool: '集团共享供应商池',
+      filter: '筛选供应商',
+      keyword: '关键词',
+      keywordPlaceholder: '搜索名称、服务、地区或品类',
+      category: '采购品类',
+      risk: '风险等级',
+      status: '状态',
+      allCategories: '全部品类',
+      allRisks: '全部风险',
+      allStatuses: '全部状态',
+      clearFilters: '清空筛选',
+      resultCount: '结果',
+      visibleSuppliers: '当前供应商',
+      totalSuppliers: '供应商总数',
+      coveredCategories: '覆盖品类',
+      selectedCompany: '当前公司语境',
+      companyHint: '公司切换仅改变演示语境，供应商池保持集团共享',
+      groupBoundary: '供应商池属于集团共享参考数据',
+      companyBoundary: '采购申请、RFQ、PO、收货、发票和三单匹配仍按公司隔离',
+      serviceScope: '服务范围',
+      location: '地区',
+      sharedScope: '共享范围',
+      supplierId: '供应商编号',
+      active: '启用',
+      inactive: '停用',
+      groupSharedValue: '集团共享',
+      inspect: '查看',
     },
     purchaseRequest: {
       dataState: '真实后端数据',
@@ -1843,6 +1880,7 @@ const localizedContent = {
     header: {
       title: 'Procurement Dashboard',
       foundationTitle: 'Organization & Master Data',
+      supplierPoolTitle: 'Supplier Pool',
       purchaseRequestsTitle: 'Purchase Requests',
       approvalsTitle: 'Approval Center',
       rfqTitle: 'RFQ',
@@ -1932,7 +1970,7 @@ const localizedContent = {
       { label: 'Purchase Orders', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: 'Receiving & Invoices', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '3-Way Match', icon: <SwapOutlined />, path: '/three-way-matching' },
-      { label: 'Supplier Pool', icon: <TeamOutlined />, count: '5' },
+      { label: 'Supplier Pool', icon: <TeamOutlined />, count: '5', path: '/suppliers' },
       { label: 'Master Data', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
@@ -2081,6 +2119,42 @@ const localizedContent = {
       inactive: 'Inactive',
       groupLevel: 'Group Level',
       shared: 'Shared',
+    },
+    supplierPool: {
+      dataState: 'Backend supplier data',
+      loading: 'Loading supplier pool',
+      unavailable: 'Supplier pool unavailable',
+      empty: 'No suppliers',
+      noResults: 'No suppliers match the filters',
+      list: 'Supplier List',
+      detail: 'Supplier Detail',
+      sharedPool: 'Group Shared Supplier Pool',
+      filter: 'Filter Suppliers',
+      keyword: 'Keyword',
+      keywordPlaceholder: 'Search name, service, location, or category',
+      category: 'Procurement Category',
+      risk: 'Risk Level',
+      status: 'Status',
+      allCategories: 'All Categories',
+      allRisks: 'All Risks',
+      allStatuses: 'All Statuses',
+      clearFilters: 'Clear Filters',
+      resultCount: 'Results',
+      visibleSuppliers: 'Visible Suppliers',
+      totalSuppliers: 'Total Suppliers',
+      coveredCategories: 'Covered Categories',
+      selectedCompany: 'Current Company Context',
+      companyHint: 'Company switching changes context only; the supplier pool stays group shared',
+      groupBoundary: 'Supplier pool is group shared reference data',
+      companyBoundary: 'Requests, RFQs, POs, receipts, invoices, and matching remain company isolated',
+      serviceScope: 'Service Scope',
+      location: 'Location',
+      sharedScope: 'Shared Scope',
+      supplierId: 'Supplier ID',
+      active: 'Active',
+      inactive: 'Inactive',
+      groupSharedValue: 'Group Shared',
+      inspect: 'View',
     },
     purchaseRequest: {
       dataState: 'Backend data',
@@ -2469,6 +2543,7 @@ function Workspace({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isFoundationRoute = location.pathname === '/master-data'
+  const isSupplierPoolRoute = location.pathname === '/suppliers'
   const isPurchaseRequestRoute = location.pathname === '/purchase-requests'
   const isApprovalRoute = location.pathname === '/approvals'
   const isRfqRoute = location.pathname === '/rfqs'
@@ -2477,6 +2552,7 @@ function Workspace({
   const isThreeWayMatchingRoute = location.pathname === '/three-way-matching'
   const isDashboardRoute =
     !isFoundationRoute &&
+    !isSupplierPoolRoute &&
     !isPurchaseRequestRoute &&
     !isApprovalRoute &&
     !isRfqRoute &&
@@ -2580,6 +2656,11 @@ function Workspace({
     departmentsQuery.isLoading ||
     usersQuery.isLoading ||
     budgetAccountsQuery.isLoading
+  const supplierPoolLoading =
+    masterContextQuery.isLoading ||
+    companiesQuery.isLoading ||
+    suppliersQuery.isLoading ||
+    categoriesQuery.isLoading
   const foundationError =
     masterContextQuery.isError ||
     companiesQuery.isError ||
@@ -2588,6 +2669,11 @@ function Workspace({
     departmentsQuery.isError ||
     usersQuery.isError ||
     budgetAccountsQuery.isError
+  const supplierPoolError =
+    masterContextQuery.isError ||
+    companiesQuery.isError ||
+    suppliersQuery.isError ||
+    categoriesQuery.isError
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'profile',
@@ -2761,26 +2847,18 @@ function Workspace({
         </div>
 
         <nav className="nav-list" aria-label={messages.aria.modules}>
-          {messages.navItems.map((item) =>
-            'path' in item ? (
-              <NavLink
-                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-                end={item.path === '/'}
-                key={item.label}
-                to={item.path}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                <span>{item.label}</span>
-                {'count' in item && <strong>{String(item.count)}</strong>}
-              </NavLink>
-            ) : (
-              <div className="nav-item" key={item.label}>
-                <span className="nav-icon">{item.icon}</span>
-                <span>{item.label}</span>
-                {'count' in item && <strong>{String(item.count)}</strong>}
-              </div>
-            ),
-          )}
+          {messages.navItems.map((item) => (
+            <NavLink
+              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+              end={item.path === '/'}
+              key={item.label}
+              to={item.path}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              <span>{item.label}</span>
+              {'count' in item && <strong>{String(item.count)}</strong>}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="boundary-note">
@@ -2795,6 +2873,8 @@ function Workspace({
             <h1>
               {isFoundationRoute
                 ? messages.header.foundationTitle
+                : isSupplierPoolRoute
+                  ? messages.header.supplierPoolTitle
                 : isPurchaseRequestRoute
                   ? messages.header.purchaseRequestsTitle
                   : isApprovalRoute
@@ -2810,7 +2890,7 @@ function Workspace({
                           : messages.header.title}
             </h1>
           </div>
-          <div className={isFoundationRoute ? 'top-actions compact' : 'top-actions'}>
+          <div className={isFoundationRoute || isSupplierPoolRoute ? 'top-actions compact' : 'top-actions'}>
             <Tooltip title={messages.aria.search} trigger={['hover', 'focus']}>
               <button type="button" className="icon-button" aria-label={messages.aria.search}>
                 <SearchOutlined />
@@ -2821,7 +2901,7 @@ function Workspace({
                 <BellOutlined />
               </button>
             </Tooltip>
-            {!isFoundationRoute && !isThreeWayMatchingRoute && (
+            {!isFoundationRoute && !isSupplierPoolRoute && !isThreeWayMatchingRoute && (
               <button className="primary-button" onClick={handleNewRequestClick} type="button">
                 {primaryActionIcon}
                 <span>{primaryActionLabel}</span>
@@ -2849,7 +2929,21 @@ function Workspace({
             <StatusPill status={healthStatus} isError={isError} label={messages.status.backend} />
           </section>
 
-          {isFoundationRoute ? (
+          {isSupplierPoolRoute ? (
+            <SupplierPoolView
+              categories={categoriesQuery.data?.data ?? []}
+              companies={companies}
+              context={context}
+              isError={supplierPoolError}
+              isLoading={supplierPoolLoading}
+              language={language}
+              messages={messages}
+              onCompanyChange={setSelectedCompanyId}
+              selectedCompany={selectedCompany}
+              selectedCompanyId={selectedCompanyId}
+              suppliers={suppliersQuery.data?.data ?? []}
+            />
+          ) : isFoundationRoute ? (
             <FoundationDataView
               budgetAccounts={budgetAccountsQuery.data?.data ?? []}
               categories={categoriesQuery.data?.data ?? []}
@@ -7440,6 +7534,312 @@ function ApprovalTimeline({
   )
 }
 
+function SupplierPoolView({
+  categories,
+  companies,
+  context,
+  isError,
+  isLoading,
+  language,
+  messages,
+  onCompanyChange,
+  selectedCompany,
+  selectedCompanyId,
+  suppliers,
+}: {
+  categories: CategorySummary[]
+  companies: CompanyContext[]
+  context: DemoContext
+  isError: boolean
+  isLoading: boolean
+  language: Language
+  messages: LocalizedMessages
+  onCompanyChange: (companyId: string) => void
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  suppliers: SupplierSummary[]
+}) {
+  const [keyword, setKeyword] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [riskLevel, setRiskLevel] = useState('')
+  const [supplierStatus, setSupplierStatus] = useState('')
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null)
+  const normalizedKeyword = keyword.trim().toLowerCase()
+  const riskLevels = Array.from(new Set(suppliers.map((supplier) => supplier.riskLevel))).sort()
+  const supplierStatuses = Array.from(new Set(suppliers.map((supplier) => supplier.status))).sort()
+  const filteredSuppliers = suppliers.filter((supplier) => {
+    const searchableText = [
+      supplier.supplierName,
+      supplier.serviceScope,
+      supplier.location,
+      supplier.riskLevel,
+      supplier.status,
+      supplier.sharedScope,
+      ...supplier.categories.flatMap((category) => [category.categoryName, category.businessScope]),
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    const matchesKeyword = normalizedKeyword.length === 0 || searchableText.includes(normalizedKeyword)
+    const matchesCategory =
+      categoryId.length === 0 || supplier.categories.some((category) => category.categoryId === categoryId)
+    const matchesRisk = riskLevel.length === 0 || supplier.riskLevel === riskLevel
+    const matchesStatus = supplierStatus.length === 0 || supplier.status === supplierStatus
+
+    return matchesKeyword && matchesCategory && matchesRisk && matchesStatus
+  })
+  const hasFilters =
+    normalizedKeyword.length > 0 ||
+    categoryId.length > 0 ||
+    riskLevel.length > 0 ||
+    supplierStatus.length > 0
+  const selectedSupplier = selectedSupplierId
+    ? suppliers.find((supplier) => supplier.supplierId === selectedSupplierId) ?? null
+    : null
+  const emptyText = isLoading
+    ? messages.supplierPool.loading
+    : isError
+      ? messages.supplierPool.unavailable
+      : suppliers.length === 0
+        ? messages.supplierPool.empty
+        : messages.supplierPool.noResults
+
+  const clearFilters = () => {
+    setKeyword('')
+    setCategoryId('')
+    setRiskLevel('')
+    setSupplierStatus('')
+  }
+
+  return (
+    <section className="supplier-pool-page">
+      <section className="panel supplier-pool-overview">
+        <PanelTitle icon={<TeamOutlined />} title={messages.supplierPool.sharedPool} aside={messages.supplierPool.dataState} />
+        <div className="foundation-summary supplier-pool-summary">
+          <div className="summary-block">
+            <span>{messages.boundary.groupShared}</span>
+            <strong>{context.groupName}</strong>
+            <small>{messages.supplierPool.groupBoundary}</small>
+          </div>
+          <div className="summary-block">
+            <span>{messages.supplierPool.selectedCompany}</span>
+            <strong>{selectedCompany.companyName}</strong>
+            <small>{messages.supplierPool.companyHint}</small>
+          </div>
+          <div className="summary-block">
+            <span>{messages.supplierPool.visibleSuppliers}</span>
+            <strong>{filteredSuppliers.length}</strong>
+            <small>{`${messages.supplierPool.totalSuppliers}: ${suppliers.length}`}</small>
+          </div>
+          <div className="summary-block">
+            <span>{messages.supplierPool.coveredCategories}</span>
+            <strong>{categories.length}</strong>
+            <small>{context.supplierPoolScope}</small>
+          </div>
+        </div>
+
+        <div className="company-switch" aria-label={messages.foundation.companySelector}>
+          {companies.map((company) => (
+            <button
+              className={company.companyId === selectedCompanyId ? 'company-option active' : 'company-option'}
+              key={company.companyId}
+              onClick={() => onCompanyChange(company.companyId)}
+              type="button"
+            >
+              <BankOutlined />
+              <span>
+                <strong>{company.companyName}</strong>
+                <small>{company.businessScope}</small>
+              </span>
+              <em>{company.active ? messages.foundation.active : messages.foundation.inactive}</em>
+            </button>
+          ))}
+        </div>
+
+        <div className="boundary-matrix">
+          <div>
+            <span>{messages.boundary.groupShared}</span>
+            <strong>{messages.supplierPool.groupBoundary}</strong>
+          </div>
+          <div>
+            <span>{messages.boundary.companyIsolated}</span>
+            <strong>{messages.supplierPool.companyBoundary}</strong>
+          </div>
+        </div>
+        {isError && <div className="data-alert">{messages.supplierPool.unavailable}</div>}
+      </section>
+
+      <section className="panel supplier-pool-list-panel">
+        <PanelTitle
+          icon={<ProfileOutlined />}
+          title={messages.supplierPool.list}
+          aside={`${messages.supplierPool.resultCount}: ${filteredSuppliers.length}/${suppliers.length}`}
+        />
+        <div className="supplier-filter-bar" aria-label={messages.supplierPool.filter}>
+          <label className="supplier-filter-keyword">
+            <span>{messages.supplierPool.keyword}</span>
+            <input
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder={messages.supplierPool.keywordPlaceholder}
+              type="search"
+              value={keyword}
+            />
+          </label>
+          <label>
+            <span>{messages.supplierPool.category}</span>
+            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+              <option value="">{messages.supplierPool.allCategories}</option>
+              {categories.map((category) => (
+                <option key={category.categoryId} value={category.categoryId}>
+                  {category.categoryName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{messages.supplierPool.risk}</span>
+            <select value={riskLevel} onChange={(event) => setRiskLevel(event.target.value)}>
+              <option value="">{messages.supplierPool.allRisks}</option>
+              {riskLevels.map((value) => (
+                <option key={value} value={value}>
+                  {formatRiskLevel(value, language)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{messages.supplierPool.status}</span>
+            <select value={supplierStatus} onChange={(event) => setSupplierStatus(event.target.value)}>
+              <option value="">{messages.supplierPool.allStatuses}</option>
+              {supplierStatuses.map((value) => (
+                <option key={value} value={value}>
+                  {formatSupplierStatus(value, messages)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="secondary-button" disabled={!hasFilters} onClick={clearFilters} type="button">
+            <DeleteOutlined />
+            <span>{messages.supplierPool.clearFilters}</span>
+          </button>
+        </div>
+
+        <div className="table-wrap">
+          <table className="foundation-table supplier-pool-table">
+            <thead>
+              <tr>
+                <th>{messages.foundation.supplierPool}</th>
+                <th>{messages.supplierPool.serviceScope}</th>
+                <th>{messages.supplierPool.location}</th>
+                <th>{messages.supplierPool.risk}</th>
+                <th>{messages.supplierPool.status}</th>
+                <th>{messages.supplierPool.coveredCategories}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSuppliers.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>{emptyText}</td>
+                </tr>
+              ) : (
+                filteredSuppliers.map((supplier) => (
+                  <tr key={supplier.supplierId}>
+                    <td>
+                      <button
+                        className={supplier.supplierId === selectedSupplierId ? 'row-link active' : 'row-link'}
+                        onClick={() => setSelectedSupplierId(supplier.supplierId)}
+                        type="button"
+                      >
+                        <span>{supplier.supplierName}</span>
+                      </button>
+                      <small>{supplier.supplierId}</small>
+                    </td>
+                    <td>{supplier.serviceScope}</td>
+                    <td>{supplier.location}</td>
+                    <td>
+                      <span className={`tag ${riskToneOf(supplier.riskLevel)}`}>
+                        {formatRiskLevel(supplier.riskLevel, language)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="tag neutral">{formatSupplierStatus(supplier.status, messages)}</span>
+                    </td>
+                    <td>{supplier.categories.map((category) => category.categoryName).join(' / ')}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <Drawer
+        className="request-drawer supplier-detail-drawer"
+        destroyOnClose={false}
+        onClose={() => setSelectedSupplierId(null)}
+        open={selectedSupplier !== null}
+        size="large"
+        title={messages.supplierPool.detail}
+      >
+        {selectedSupplier && (
+          <div className="request-detail">
+            <div className="detail-heading">
+              <div>
+                <strong>{selectedSupplier.supplierName}</strong>
+                <span>{selectedSupplier.supplierId}</span>
+              </div>
+              <span className={`tag ${riskToneOf(selectedSupplier.riskLevel)}`}>
+                {formatRiskLevel(selectedSupplier.riskLevel, language)}
+              </span>
+            </div>
+            <dl className="detail-grid">
+              <div>
+                <dt>{messages.supplierPool.serviceScope}</dt>
+                <dd>{selectedSupplier.serviceScope}</dd>
+              </div>
+              <div>
+                <dt>{messages.supplierPool.location}</dt>
+                <dd>{selectedSupplier.location}</dd>
+              </div>
+              <div>
+                <dt>{messages.supplierPool.status}</dt>
+                <dd>{formatSupplierStatus(selectedSupplier.status, messages)}</dd>
+              </div>
+              <div>
+                <dt>{messages.supplierPool.sharedScope}</dt>
+                <dd>{formatSupplierSharedScope(selectedSupplier.sharedScope, messages)}</dd>
+              </div>
+            </dl>
+            <section className="line-items-card supplier-category-card">
+              <div className="line-items-heading">
+                <span>{messages.supplierPool.coveredCategories}</span>
+                <strong>{selectedSupplier.categories.length}</strong>
+              </div>
+              <div className="supplier-category-tags">
+                {selectedSupplier.categories.map((category) => (
+                  <span className="tag" key={category.categoryId}>
+                    {category.categoryName}
+                  </span>
+                ))}
+              </div>
+            </section>
+            <div className="boundary-matrix supplier-detail-boundary">
+              <div>
+                <span>{messages.boundary.groupShared}</span>
+                <strong>{messages.supplierPool.groupBoundary}</strong>
+              </div>
+              <div>
+                <span>{messages.boundary.companyIsolated}</span>
+                <strong>{messages.supplierPool.companyBoundary}</strong>
+              </div>
+            </div>
+          </div>
+        )}
+      </Drawer>
+    </section>
+  )
+}
+
 function FoundationDataView({
   budgetAccounts,
   categories,
@@ -8144,6 +8544,20 @@ function riskToneOf(riskLevel: string) {
   return riskLevel === 'medium' ? 'warn' : ''
 }
 
+function formatSupplierStatus(status: string, messages: LocalizedMessages) {
+  if (status === 'active') {
+    return messages.supplierPool.active
+  }
+  if (status === 'inactive') {
+    return messages.supplierPool.inactive
+  }
+  return status
+}
+
+function formatSupplierSharedScope(sharedScope: string, messages: LocalizedMessages) {
+  return sharedScope === 'group-shared' ? messages.supplierPool.groupSharedValue : sharedScope
+}
+
 function createLineKey() {
   return `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -8767,6 +9181,10 @@ function App() {
             />
             <Route
               path="/master-data"
+              element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
+            />
+            <Route
+              path="/suppliers"
               element={<Workspace language={language} onLanguageChange={toggleLanguage} />}
             />
             <Route
