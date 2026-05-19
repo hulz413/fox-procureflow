@@ -20,6 +20,12 @@ export default defineConfig([
     },
     rules: {
       'react-hooks/set-state-in-effect': 'off',
+      'react-refresh/only-export-components': [
+        'error',
+        {
+          allowExportNames: ['localizedContent', 'shouldConfirmReceiptInvoiceDrawerClose'],
+        },
+      ],
     },
   },
 ])

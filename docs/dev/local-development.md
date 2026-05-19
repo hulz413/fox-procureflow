@@ -1,6 +1,6 @@
 # 本地开发
 
-本文档说明 Fox Procureflow 骨架阶段的本地启动方式、默认端口、环境变量和验证路径。
+本文档说明 Fox Procureflow 完整 MVP 的本地启动方式、默认端口、环境变量和验证路径。演示叙事和人工检查路径见 [MVP 演示运行手册](mvp-demo-runbook.md)。
 
 ## 工具要求
 
@@ -27,21 +27,48 @@ java -version
 
 ```bash
 cp .env.example .env
-./scripts/launch.sh
+./scripts/launch.sh --detach
 ```
 
-`scripts/launch.sh` 是日常开发聚合启动入口。它会按顺序尝试：
+`scripts/launch.sh --detach` 是推荐的本地演示启动入口。它会按顺序尝试：
 
 1. 启动 `infra/docker-compose.yml` 中的 MySQL、MongoDB、Redis、RabbitMQ 和 MinIO。
 2. 启动 `backend/` 中的 Spring Boot 服务。
 3. 启动 `frontend/` 中的 Vite 开发服务器。
-4. 输出前端、健康接口和 Swagger UI 地址。
+4. 在后台启动后端和前端，日志写入 `.local/logs/`。
+5. 输出前端、健康接口、Swagger UI、RabbitMQ Management、MinIO Console、smoke check 和停止命令。
 
 脚本会读取仓库根目录 `.env`，并把其中未被当前 shell 覆盖的变量传给 Docker Compose、后端和前端开发服务。
 
-当前采购申请和审批流切片的运行硬依赖是 MySQL。MongoDB、Redis、RabbitMQ 和 MinIO 已在 Compose 中预留，用于后段动态上下文/AI 审计、缓存/看板、事件化三单匹配和真实附件上传；前中期业务切片不应因为这些服务未被业务代码使用而扩大实现范围。
+如果需要在当前终端前台查看后端和前端日志，可以不带 `--detach`：
 
-如果本机缺少 Java 或 Docker Compose，脚本会给出下一步提示。也可以用下面的分步命令手动启动。
+```bash
+./scripts/launch.sh
+```
+
+前台模式会在命令结束时清理本次启动的后端/前端进程；演示和日常使用优先用 `--detach`，避免关闭终端或结束任务后页面打不开。
+
+停止后台演示服务：
+
+```bash
+./scripts/stop-demo.sh
+```
+
+如果需要同时停止 Docker 基础设施：
+
+```bash
+STOP_INFRA=1 ./scripts/stop-demo.sh
+```
+
+当前核心采购闭环的运行硬依赖是 MySQL。MongoDB 用于 AI 调用审计，MinIO 用于 RFQ 报价单、收货凭证和供应商发票文件上传/下载。Redis 和 RabbitMQ 仍不是当前 MVP 演示的硬依赖，不应因为工程化验证而扩大业务实现范围。
+
+如果本机缺少 Java、Node.js、npm、Docker 或 Docker Compose，脚本会给出下一步提示，并提醒当前环境不能视为 demo-ready。服务启动完成后运行只读 smoke check：
+
+```bash
+./scripts/smoke-check.sh
+```
+
+也可以用下面的分步命令手动启动。
 
 ## AI 采购助手配置
 
@@ -147,23 +174,24 @@ http://localhost:5173
 | Backend | `8080` | Spring Boot API |
 | MySQL | `3306` | 核心交易和组织数据 |
 | MongoDB | `27017` | 后段动态表单、AI 审计和富上下文快照预留 |
-| Redis | `6379` | 后段缓存、待办数量和看板指标预留 |
-| RabbitMQ | `5672` / `15672` | 后段事件总线和管理界面预留 |
-| MinIO | `9000` / `9001` | 后段真实附件上传和对象存储控制台预留 |
+| Redis | `6379` | 缓存、待办数量和看板指标后续增强，不是当前演示硬依赖 |
+| RabbitMQ | `5672` / `15672` | 事件总线和管理界面后续增强，不是当前演示硬依赖 |
+| MinIO | `9000` / `9001` | RFQ 报价单、收货凭证和供应商发票真实附件上传/下载 |
 
 ## 数据边界约定
 
-骨架阶段只落工程和演示上下文，不实现真实业务流程。
+当前 MVP 已具备真实采购业务闭环，本地开发和演示必须保持集团共享数据与公司级交易数据的边界。
 
 - 集团共享数据：供应商池、采购品类模板、集团级看板汇总。
 - 公司隔离数据：采购申请、审批实例、RFQ、PO、收货、发票、三单匹配结果。
 
-后续核心业务表必须预留公司隔离字段。后端默认使用 Spring Data JPA 访问 MySQL，但通过 repository/service 边界保留未来引入 MyBatis Plus、原生 SQL 或 read model 的空间。
+后端默认使用 Spring Data JPA 访问 MySQL，并通过 repository/service 边界保留未来引入 MyBatis Plus、原生 SQL 或 read model 的空间。
 
 ## 验证命令
 
 ```bash
 cd frontend
+npm run lint
 npm run build
 ```
 
@@ -172,4 +200,8 @@ cd backend
 ./gradlew test
 ```
 
-当前骨架不包含 Prometheus、Grafana、Jaeger、Zipkin 或 Keycloak。
+```bash
+./scripts/smoke-check.sh
+```
+
+当前 MVP 不包含 Prometheus、Grafana、Jaeger、Zipkin 或 Keycloak。

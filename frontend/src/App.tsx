@@ -1436,7 +1436,7 @@ export const localizedContent = {
       { label: '采购订单', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: '收货发票', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '三单匹配', icon: <SwapOutlined />, path: '/three-way-matching' },
-      { label: '供应商池', icon: <TeamOutlined />, count: '5', path: '/suppliers' },
+      { label: '供应商池', icon: <TeamOutlined />, path: '/suppliers' },
       { label: '主数据', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
@@ -2051,7 +2051,7 @@ export const localizedContent = {
       { label: 'Purchase Orders', icon: <ShoppingCartOutlined />, path: '/purchase-orders' },
       { label: 'Receiving & Invoices', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '3-Way Match', icon: <SwapOutlined />, path: '/three-way-matching' },
-      { label: 'Supplier Pool', icon: <TeamOutlined />, count: '5', path: '/suppliers' },
+      { label: 'Supplier Pool', icon: <TeamOutlined />, path: '/suppliers' },
       { label: 'Master Data', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
@@ -2711,6 +2711,18 @@ function Workspace({
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
+  const fulfillmentPurchaseOrdersQuery = useQuery({
+    queryKey: ['receipts-invoices', 'purchase-orders', selectedCompanyId],
+    queryFn: () => fetchFulfillmentPurchaseOrders(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
+  const threeWayMatchesQuery = useQuery({
+    queryKey: ['three-way-matching', selectedCompanyId],
+    queryFn: () => fetchThreeWayMatches(selectedCompanyId),
+    enabled: selectedCompanyId.length > 0,
+    retry: 1,
+  })
   const dashboardScope: ProcurementDashboardScope = dashboardScopeValue === 'GROUP' ? 'GROUP' : 'COMPANY'
   const dashboardCompanyId = dashboardScope === 'COMPANY' ? dashboardScopeValue : undefined
   const procurementDashboardQuery = useQuery({
@@ -2733,6 +2745,40 @@ function Workspace({
   const selectedCompany = companies.find((company) => company.companyId === selectedCompanyId) ?? context.activeCompany
   const healthStatus = data?.data.status ?? (isLoading ? 'CHECKING' : 'OFFLINE')
   const purchaseRequests = purchaseRequestsQuery.data?.data ?? []
+  const suppliers = suppliersQuery.data?.data ?? []
+  const categories = categoriesQuery.data?.data ?? []
+  const departments = departmentsQuery.data?.data ?? []
+  const users = usersQuery.data?.data ?? []
+  const budgetAccounts = budgetAccountsQuery.data?.data ?? []
+  const rfqs = rfqsQuery.data?.data ?? []
+  const purchaseOrders = purchaseOrdersQuery.data?.data ?? []
+  const fulfillmentPurchaseOrders = fulfillmentPurchaseOrdersQuery.data?.data ?? []
+  const threeWayMatches = threeWayMatchesQuery.data?.data ?? []
+  const activeApprovalCount = purchaseRequests.filter((request) => request.approval?.status === 'IN_PROGRESS').length
+  const masterDataCount =
+    companies.length +
+    departments.length +
+    users.length +
+    suppliers.length +
+    categories.length +
+    budgetAccounts.length
+  const dashboardNavCount =
+    purchaseRequests.length +
+    rfqs.length +
+    purchaseOrders.length +
+    fulfillmentPurchaseOrders.length +
+    threeWayMatches.length
+  const navCounts = new Map<string, number>([
+    ['/', dashboardNavCount],
+    ['/purchase-requests', purchaseRequests.length],
+    ['/approvals', activeApprovalCount],
+    ['/rfqs', rfqs.length],
+    ['/purchase-orders', purchaseOrders.length],
+    ['/receipts-invoices', fulfillmentPurchaseOrders.length],
+    ['/three-way-matching', threeWayMatches.length],
+    ['/suppliers', suppliers.length],
+    ['/master-data', masterDataCount],
+  ])
   const foundationLoading =
     masterContextQuery.isLoading ||
     companiesQuery.isLoading ||
@@ -2932,18 +2978,22 @@ function Workspace({
         </div>
 
         <nav className="nav-list" aria-label={messages.aria.modules}>
-          {messages.navItems.map((item) => (
-            <NavLink
-              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-              end={item.path === '/'}
-              key={item.label}
-              to={item.path}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-              {'count' in item && <strong>{String(item.count)}</strong>}
-            </NavLink>
-          ))}
+          {messages.navItems.map((item) => {
+            const count = navCounts.get(item.path) ?? 0
+
+            return (
+              <NavLink
+                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+                end={item.path === '/'}
+                key={item.label}
+                to={item.path}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span>{item.label}</span>
+                <strong aria-label={`${item.label} ${count}`}>{count}</strong>
+              </NavLink>
+            )
+          })}
         </nav>
 
         <div className="boundary-note">
@@ -3016,7 +3066,7 @@ function Workspace({
 
           {isSupplierPoolRoute ? (
             <SupplierPoolView
-              categories={categoriesQuery.data?.data ?? []}
+              categories={categories}
               companies={companies}
               context={context}
               isError={supplierPoolError}
@@ -3026,15 +3076,15 @@ function Workspace({
               onCompanyChange={setSelectedCompanyId}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              suppliers={suppliersQuery.data?.data ?? []}
+              suppliers={suppliers}
             />
           ) : isFoundationRoute ? (
             <FoundationDataView
-              budgetAccounts={budgetAccountsQuery.data?.data ?? []}
-              categories={categoriesQuery.data?.data ?? []}
+              budgetAccounts={budgetAccounts}
+              categories={categories}
               companies={companies}
               context={context}
-              departments={departmentsQuery.data?.data ?? []}
+              departments={departments}
               isError={foundationError}
               isLoading={foundationLoading}
               language={language}
@@ -3042,13 +3092,13 @@ function Workspace({
               onCompanyChange={setSelectedCompanyId}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              suppliers={suppliersQuery.data?.data ?? []}
-              users={usersQuery.data?.data ?? []}
+              suppliers={suppliers}
+              users={users}
             />
           ) : isPurchaseRequestRoute ? (
               <PurchaseRequestView
-                budgetAccounts={budgetAccountsQuery.data?.data ?? []}
-                categories={categoriesQuery.data?.data ?? []}
+                budgetAccounts={budgetAccounts}
+                categories={categories}
                 isError={purchaseRequestsQuery.isError}
                 isLoading={purchaseRequestsQuery.isLoading}
                 language={language}
@@ -3061,23 +3111,23 @@ function Workspace({
               purchaseRequests={purchaseRequests}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              suppliers={suppliersQuery.data?.data ?? []}
-              users={usersQuery.data?.data ?? []}
+              suppliers={suppliers}
+              users={users}
             />
           ) : isApprovalRoute ? (
             <ApprovalCenterView
-              categories={categoriesQuery.data?.data ?? []}
+              categories={categories}
               isError={foundationError}
               isLoading={foundationLoading}
               language={language}
               messages={messages}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              users={usersQuery.data?.data ?? []}
+              users={users}
             />
           ) : isRfqRoute ? (
             <RfqView
-              categories={categoriesQuery.data?.data ?? []}
+              categories={categories}
               isCreateOpen={isRfqCreateDrawerOpen}
               isError={rfqsQuery.isError || purchaseRequestsQuery.isError}
               isLoading={rfqsQuery.isLoading}
@@ -3088,15 +3138,15 @@ function Workspace({
                 void queryClient.invalidateQueries({ queryKey: ['rfqs'] })
               }}
               purchaseRequests={purchaseRequests}
-              rfqs={rfqsQuery.data?.data ?? []}
+              rfqs={rfqs}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              suppliers={suppliersQuery.data?.data ?? []}
-              users={usersQuery.data?.data ?? []}
+              suppliers={suppliers}
+              users={users}
             />
           ) : isPurchaseOrderRoute ? (
             <PurchaseOrderView
-              categories={categoriesQuery.data?.data ?? []}
+              categories={categories}
               isCreateOpen={isPoCreateDrawerOpen}
               isError={purchaseOrdersQuery.isError || rfqsQuery.isError}
               isLoading={purchaseOrdersQuery.isLoading}
@@ -3106,11 +3156,11 @@ function Workspace({
               onRefresh={() => {
                 void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
               }}
-              purchaseOrders={purchaseOrdersQuery.data?.data ?? []}
-              rfqs={rfqsQuery.data?.data ?? []}
+              purchaseOrders={purchaseOrders}
+              rfqs={rfqs}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              users={usersQuery.data?.data ?? []}
+              users={users}
             />
           ) : isReceiptInvoiceRoute ? (
             <ReceiptsInvoicesView
@@ -3120,7 +3170,7 @@ function Workspace({
               onCreateModeChange={setReceiptInvoiceCreateMode}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              users={usersQuery.data?.data ?? []}
+              users={users}
             />
           ) : isThreeWayMatchingRoute ? (
             <ThreeWayMatchingView
@@ -3128,7 +3178,7 @@ function Workspace({
               messages={messages}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
-              users={usersQuery.data?.data ?? []}
+              users={users}
             />
           ) : (
             <ProcurementDashboardView
@@ -5560,6 +5610,8 @@ function PurchaseOrderView({
     onSuccess: (_response, variables) => {
       setFeedback({ message: messages.purchaseOrder.publishSuccess, tone: 'success' })
       void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+      void queryClient.invalidateQueries({ queryKey: ['receipts-invoices'] })
+      void queryClient.invalidateQueries({ queryKey: ['three-way-matching'] })
       void queryClient.invalidateQueries({ queryKey: ['purchase-order-detail', variables.poId] })
     },
   })
@@ -5577,6 +5629,8 @@ function PurchaseOrderView({
       setCancelReason('')
       setFeedback({ message: messages.purchaseOrder.cancelSuccess, tone: 'success' })
       void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+      void queryClient.invalidateQueries({ queryKey: ['receipts-invoices'] })
+      void queryClient.invalidateQueries({ queryKey: ['three-way-matching'] })
       void queryClient.invalidateQueries({ queryKey: ['purchase-order-detail', variables.poId] })
     },
   })
@@ -6788,6 +6842,7 @@ function ReceiptsInvoicesView({
       onCreateModeChange(null)
       void queryClient.invalidateQueries({ queryKey: ['receipts'] })
       void queryClient.invalidateQueries({ queryKey: ['receipts-invoices'] })
+      void queryClient.invalidateQueries({ queryKey: ['three-way-matching'] })
     },
   })
 
@@ -6805,6 +6860,7 @@ function ReceiptsInvoicesView({
       onCreateModeChange(null)
       void queryClient.invalidateQueries({ queryKey: ['invoices'] })
       void queryClient.invalidateQueries({ queryKey: ['receipts-invoices'] })
+      void queryClient.invalidateQueries({ queryKey: ['three-way-matching'] })
     },
   })
 
