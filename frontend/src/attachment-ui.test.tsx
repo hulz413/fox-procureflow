@@ -6,12 +6,12 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   AttachmentInlineAction,
   AttachmentList,
-  GlobalSearchDialog,
-  NotificationPanel,
   ReceiptInvoiceAttachmentFields,
-  localizedContent,
-  shouldConfirmReceiptInvoiceDrawerClose,
-} from './App'
+} from './shared/ui/procurementWidgets'
+import { GlobalSearchDialog } from './features/global-search/GlobalSearchDialog'
+import { shouldConfirmReceiptInvoiceDrawerClose } from './features/receipts-invoices/receiptInvoiceGuards'
+import { localizedContent } from './i18n/localizedContent'
+import { NotificationPanel } from './shared/ui/NotificationPanel'
 import { canDemoPersonaUsePrimaryAction, demoUserCanViewDashboard, demoUserHasRoleCapability } from './demoRoleCapabilities'
 
 const messages = localizedContent.zh
