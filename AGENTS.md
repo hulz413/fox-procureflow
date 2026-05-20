@@ -18,6 +18,9 @@
 - 前端 Vite/Vitest 工具链需要 Node.js `>=20.19` 或 `>=22.12`；如果本机默认 `node -v` 是 `20.11.x`，`npm run dev` 会因 `node:util.styleText` 缺失而导致页面无法打开。先切到满足版本的 Node，再启动前端。
 - 本机 Java 21 通过 Homebrew `openjdk@21` 提供；运行 Gradle 或后端前若 shell 找不到 Java，使用 `JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"`，并把 `$(brew --prefix openjdk@21)/bin` 放到 `PATH` 前面。
 - 在默认本地端口启动服务前，先检查并停止旧的 `8080` 后端进程和 `5173` 前端进程，再启动当前代码。
+- 交付、commit 或结束一轮需要用户继续试用页面的工作前，不要只留下当前终端会话里的 `./gradlew bootRun` 或 `npm run dev`。这类临时进程会在工具会话结束、被清理或中断后消失，导致前端还在但后端 `8080` 不可用。
+- 如果工作中为了验证临时停止或重启过 `8080`/`5173`，收尾时必须用 `./scripts/launch.sh --detach` 恢复由 launchctl/后台脚本托管的前后端，并运行 `./scripts/smoke-check.sh` 确认 `8080`、`5173`、Swagger 和核心只读 API 全部可用。
+- 若用户只要求代码修改、不需要保持本地服务运行，可以在最终回复里明确说明服务已停止或未启动；否则默认保持 demo 服务可用。
 
 ## 前端实现约束
 
