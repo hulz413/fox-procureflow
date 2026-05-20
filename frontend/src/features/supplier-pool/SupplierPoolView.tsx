@@ -128,7 +128,6 @@ export function SupplierPoolView({
             onCompanyChange={onCompanyChange}
             selectedCompany={selectedCompany}
             selectedCompanyId={selectedCompanyId}
-            statusLabel={(company) => company.active ? messages.foundation.active : messages.foundation.inactive}
           />
           <div className="summary-block">
             <span>{messages.supplierPool.visibleSuppliers}</span>

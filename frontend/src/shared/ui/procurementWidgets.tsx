@@ -615,17 +615,14 @@ export function CompanyContextSelector({
   onCompanyChange,
   selectedCompany,
   selectedCompanyId,
-  statusLabel,
 }: {
   companies: CompanyContext[]
   label: string
   onCompanyChange: (companyId: string) => void
   selectedCompany: CompanyContext
   selectedCompanyId: string
-  statusLabel: (company: CompanyContext) => string
 }) {
   const companyOptions = companies.map((company) => ({
-    active: company.active,
     businessScope: company.businessScope,
     companyId: company.companyId,
     companyName: company.companyName,
@@ -646,7 +643,6 @@ export function CompanyContextSelector({
             <div className="company-select-option">
               <strong>{company.label}</strong>
               <span>{company.businessScope}</span>
-              <em>{statusLabel(company as CompanyContext)}</em>
             </div>
           )
         }}
