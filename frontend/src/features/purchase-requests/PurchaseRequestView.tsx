@@ -61,7 +61,7 @@ export function PurchaseRequestView({
   const [aiRiskResponse, setAiRiskResponse] = useState<AiAssistantResponse | null>(null)
   const createSubmitIntentRef = useRef<'draft' | 'submit'>('draft')
   const [form, setForm] = useState<PurchaseRequestFormState>(() =>
-    buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers, activeDemoUser),
+    buildPurchaseRequestFormDefaults(selectedCompanyId),
   )
   const purchaseRequestPagination = useListPagination(purchaseRequests, selectedCompanyId)
 
@@ -90,51 +90,61 @@ export function PurchaseRequestView({
       setAiDraftResponse(null)
       setAiRiskResponse(null)
       setDetailDrawerOpen(false)
-      setForm(buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers, activeDemoUser))
+      setForm(buildPurchaseRequestFormDefaults(selectedCompanyId))
     }
-  }, [activeDemoUser, budgetAccounts, categories, isCreateOpen, messages.ai.draftDefaultIntent, selectedCompanyId, suppliers, users])
+  }, [isCreateOpen, messages.ai.draftDefaultIntent, selectedCompanyId])
 
   useEffect(() => {
     setForm((current) => {
-      const currentRequester = users.find((user) => user.userId === current.requesterId)
-      const demoRequester =
-        activeDemoUser?.companyId === selectedCompanyId &&
-        demoUserHasRoleCapability(activeDemoUser, [APPLICANT_ROLE_ID])
-          ? activeDemoUser
-          : undefined
-      const applicant = users.find((user) => demoUserHasExactRole(user, [APPLICANT_ROLE_ID]))
-      const requester =
-        demoUserHasRoleCapability(currentRequester, [APPLICANT_ROLE_ID])
-          ? currentRequester
-          : demoRequester ?? applicant ?? users.find((user) => user.active) ?? users[0]
-      const currentCategory = categories.find((category) => category.categoryId === current.categoryId)
-      const defaultCategory = currentCategory ?? categories[0]
-      const budgetForCurrentCategory = budgetAccounts.find(
-        (account) =>
-          account.budgetAccountId === current.budgetAccountId &&
-          account.categoryId === defaultCategory?.categoryId &&
-          account.active,
+      const requester = users.find(
+        (user) =>
+          user.userId === current.requesterId &&
+          user.active &&
+          demoUserHasRoleCapability(user, [APPLICANT_ROLE_ID]),
       )
-      const budgetAccount =
-        budgetForCurrentCategory ??
-        budgetAccounts.find((account) => account.categoryId === defaultCategory?.categoryId && account.active) ??
-        budgetAccounts.find((account) => account.active) ??
-        budgetAccounts[0]
-      const categoryId = budgetAccount?.categoryId ?? defaultCategory?.categoryId ?? ''
-      const supplierIds = preferredSupplierIdsForCategory(categoryId, suppliers, current.supplierIds)
-
-      return {
+      const currentCategory = categories.find((category) => category.categoryId === current.categoryId)
+      const budgetForCurrentCategory =
+        currentCategory &&
+        budgetAccounts.find(
+          (account) =>
+            account.budgetAccountId === current.budgetAccountId &&
+            account.categoryId === currentCategory.categoryId &&
+            account.active,
+        )
+      const supplierIds = currentCategory
+        ? current.supplierIds.filter((supplierId) =>
+            suppliers.some(
+              (supplier) =>
+                supplier.supplierId === supplierId &&
+                supplier.categories.some((category) => category.categoryId === currentCategory.categoryId),
+            ),
+          )
+        : []
+      const next = {
         ...current,
-        budgetAccountId: budgetAccount?.budgetAccountId ?? '',
-        categoryId,
+        budgetAccountId: budgetForCurrentCategory ? current.budgetAccountId : '',
+        categoryId: currentCategory?.categoryId ?? '',
         companyId: selectedCompanyId,
         departmentId: requester?.departmentId ?? '',
         requesterId: requester?.userId ?? '',
         supplierIds,
       }
-    })
-  }, [activeDemoUser, budgetAccounts, categories, selectedCompanyId, suppliers, users])
 
+      if (
+        next.budgetAccountId === current.budgetAccountId &&
+        next.categoryId === current.categoryId &&
+        next.companyId === current.companyId &&
+        next.departmentId === current.departmentId &&
+        next.requesterId === current.requesterId &&
+        next.supplierIds.length === current.supplierIds.length &&
+        next.supplierIds.every((supplierId, index) => supplierId === current.supplierIds[index])
+      ) {
+        return current
+      }
+
+      return next
+    })
+  }, [budgetAccounts, categories, selectedCompanyId, suppliers, users])
   const detailQuery = useQuery({
     queryKey: ['purchase-request', selectedRequestId],
     queryFn: () => fetchPurchaseRequestDetail(selectedRequestId ?? ''),
@@ -259,11 +269,11 @@ export function PurchaseRequestView({
           draft.lineItems && draft.lineItems.length > 0
             ? draft.lineItems.map((line) =>
                 createPurchaseRequestFormLine({
-                  estimatedUnitPrice: Number(line.estimatedUnitPrice ?? 0),
+                  estimatedUnitPrice: typeof line.estimatedUnitPrice === 'number' ? line.estimatedUnitPrice : '',
                   itemName: line.itemName ?? '',
-                  quantity: Number(line.quantity ?? 1),
+                  quantity: typeof line.quantity === 'number' ? line.quantity : '',
                   specification: line.specification ?? '',
-                  unit: line.unit ?? '件',
+                  unit: line.unit ?? '',
                 }),
               )
             : current.lineItems,
@@ -350,11 +360,20 @@ export function PurchaseRequestView({
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  const aiDraftActorId =
+    form.requesterId ||
+    (activeDemoUser?.companyId === selectedCompanyId &&
+    demoUserHasRoleCapability(activeDemoUser, [APPLICANT_ROLE_ID])
+      ? activeDemoUser.userId
+      : '') ||
+    users.find((user) => user.active && demoUserHasExactRole(user, [APPLICANT_ROLE_ID]))?.userId ||
+    users.find((user) => user.active)?.userId ||
+    ''
   const aiDraftDisabledReason = aiDraftMutation.isPending
     ? messages.ai.generating
     : !aiIntent.trim()
       ? messages.ai.disabledNoIntent
-      : !form.requesterId
+      : !aiDraftActorId
         ? messages.ai.disabledNoActor
         : undefined
 
@@ -364,7 +383,7 @@ export function PurchaseRequestView({
     }
     setAiDraftResponse(null)
     aiDraftMutation.mutate({
-      actorId: form.requesterId,
+      actorId: aiDraftActorId,
       companyId: selectedCompanyId,
       intent: aiIntent,
     })
@@ -431,6 +450,8 @@ export function PurchaseRequestView({
     }))
   }
 
+  const parseOptionalNumber = (value: string) => (value === '' ? '' : Number(value))
+
   const handleRequesterChange = (requesterId: string) => {
     setCreateDirty(true)
     const requester = users.find((user) => user.userId === requesterId)
@@ -476,9 +497,9 @@ export function PurchaseRequestView({
       totalAmount,
       lineItems: form.lineItems.map((line) => ({
         estimatedAmount: lineAmountOf(line),
-        estimatedUnitPrice: line.estimatedUnitPrice,
+        estimatedUnitPrice: Number(line.estimatedUnitPrice),
         itemName: line.itemName,
-        quantity: line.quantity,
+        quantity: Number(line.quantity),
         specification: line.specification,
         unit: line.unit,
       })),
@@ -692,6 +713,7 @@ export function PurchaseRequestView({
           <label>
             <span>{messages.purchaseRequest.requester}</span>
             <select required value={form.requesterId} onChange={(event) => handleRequesterChange(event.target.value)}>
+              <option value="" disabled>{messages.purchaseRequest.selectRequester}</option>
               {users.map((user) => (
                 <option key={user.userId} value={user.userId}>
                   {user.displayName}
@@ -702,6 +724,7 @@ export function PurchaseRequestView({
           <label>
             <span>{messages.purchaseRequest.category}</span>
             <select required value={form.categoryId} onChange={(event) => handleCategoryChange(event.target.value)}>
+              <option value="" disabled>{messages.purchaseRequest.selectCategory}</option>
               {categories.map((category) => (
                 <option key={category.categoryId} value={category.categoryId}>
                   {category.categoryName}
@@ -712,6 +735,7 @@ export function PurchaseRequestView({
           <label>
             <span>{messages.purchaseRequest.budgetAccount}</span>
             <select required value={form.budgetAccountId} onChange={(event) => updateForm('budgetAccountId', event.target.value)}>
+              <option value="" disabled>{messages.purchaseRequest.selectBudgetAccount}</option>
               {filteredBudgetAccounts.map((account) => (
                 <option key={account.budgetAccountId} value={account.budgetAccountId}>
                   {account.accountName}
@@ -723,6 +747,8 @@ export function PurchaseRequestView({
             <span>{messages.purchaseRequest.supplier}</span>
             <Select
               allowClear
+              className="procure-multi-select"
+              maxTagCount="responsive"
               mode="multiple"
               onChange={(value) => updateForm('supplierIds', value)}
               options={filteredSuppliers.map((supplier) => ({
@@ -730,6 +756,7 @@ export function PurchaseRequestView({
                 value: supplier.supplierId,
               }))}
               placeholder={messages.purchaseRequest.noSupplier}
+              popupClassName="procure-multi-select-dropdown"
               value={form.supplierIds}
             />
           </label>
@@ -793,7 +820,7 @@ export function PurchaseRequestView({
                           step="0.01"
                           type="number"
                           value={line.quantity}
-                          onChange={(event) => updateLineItem(line.lineKey, 'quantity', Number(event.target.value))}
+                          onChange={(event) => updateLineItem(line.lineKey, 'quantity', parseOptionalNumber(event.target.value))}
                         />
                       </td>
                       <td>
@@ -813,7 +840,7 @@ export function PurchaseRequestView({
                           type="number"
                           value={line.estimatedUnitPrice}
                           onChange={(event) =>
-                            updateLineItem(line.lineKey, 'estimatedUnitPrice', Number(event.target.value))
+                            updateLineItem(line.lineKey, 'estimatedUnitPrice', parseOptionalNumber(event.target.value))
                           }
                         />
                       </td>

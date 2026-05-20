@@ -603,12 +603,15 @@ export function RfqView({
             <label className="form-wide">
               <span>{messages.rfq.suppliers}</span>
               <Select
+                className="procure-multi-select"
+                maxTagCount="responsive"
                 mode="multiple"
                 options={selectableSuppliers.map((supplier) => ({
                   label: supplier.supplierName,
                   value: supplier.supplierId,
                 }))}
                 onChange={(value) => updateCreateForm('supplierIds', value)}
+                popupClassName="procure-multi-select-dropdown"
                 value={createForm.supplierIds}
               />
             </label>

@@ -217,7 +217,16 @@ export function AiResultPanel({
 
   return (
     <section aria-busy={isLoading} className="ai-result-panel">
-      <PanelTitle icon={<ApiOutlined />} title={title ?? messages.ai.result} />
+      <PanelTitle
+        actions={response ? (
+          <div className="ai-title-actions">
+            <time dateTime={response.generatedAt}>{formatDateTime(response.generatedAt, language)}</time>
+            <b className="ai-model-pill" title={`${messages.ai.model}: ${response.model}`}>{response.model}</b>
+          </div>
+        ) : undefined}
+        icon={<ApiOutlined />}
+        title={title ?? messages.ai.result}
+      />
       {isLoading ? (
         <div className="ai-loading-state" role="status">
           <LoadingOutlined className="ai-loading-icon" />
@@ -228,23 +237,7 @@ export function AiResultPanel({
         </div>
       ) : null}
       {response ? (
-        <>
-          <dl className="ai-meta">
-            <div>
-              <dt>{messages.ai.invocation}</dt>
-              <dd>{response.invocationId}</dd>
-            </div>
-            <div>
-              <dt>{messages.ai.model}</dt>
-              <dd>{response.model}</dd>
-            </div>
-            <div>
-              <dt>{messages.ai.generatedAt}</dt>
-              <dd>{formatDateTime(response.generatedAt, language)}</dd>
-            </div>
-          </dl>
-          <AiResultBody language={language} messages={messages} response={response} />
-        </>
+        <AiResultBody language={language} messages={messages} response={response} />
       ) : null}
     </section>
   )

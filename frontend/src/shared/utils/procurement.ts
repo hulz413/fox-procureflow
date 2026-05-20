@@ -1,4 +1,3 @@
-import { APPLICANT_ROLE_ID, demoUserHasExactRole, demoUserHasRoleCapability } from '../../demoRoleCapabilities'
 import type { Language, DemoPersona, UserSummary, CategorySummary, SupplierSummary, BudgetAccountSummary, PurchaseRequestStatus, ApprovalInstanceStatus, ApprovalNodeStatus, ApprovalAction, RfqStatus, PurchaseOrderStatus, PurchaseOrderAction, ApprovalSummary, PurchaseRequestListItem, PurchaseRequestDetail, PurchaseRequestFormState, PurchaseRequestFormLine, RfqQuoteAttachment, RfqListItem, RfqDetail, UploadedAttachment, RfqCreateFormState, RfqQuoteFormState, PurchaseOrderCreateFormState, ReceiptProgressStatus, InvoiceProgressStatus, InvoiceAmountStatus, ThreeWayMatchStatus, ThreeWayMatchSeverity, ThreeWayMatchDifferenceType, ThreeWayMatchActionType, ExceptionHighlight, FulfillmentPurchaseOrder, ReceiptCreateFormState, InvoiceCreateFormState } from '../../domain/types'
 import { apiBaseUrl } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
@@ -65,19 +64,22 @@ export function createPurchaseRequestFormLine(
   overrides: Partial<Omit<PurchaseRequestFormLine, 'lineKey'>> = {},
 ): PurchaseRequestFormLine {
   return {
-    estimatedUnitPrice: 0,
+    estimatedUnitPrice: '',
     itemName: '',
     lineKey: createLineKey(),
-    quantity: 1,
+    quantity: '',
     specification: '',
-    unit: '件',
+    unit: '',
     ...overrides,
   }
 }
 
 export function lineAmountOf(line: PurchaseRequestFormLine) {
-  const quantity = Number.isFinite(line.quantity) ? line.quantity : 0
-  const unitPrice = Number.isFinite(line.estimatedUnitPrice) ? line.estimatedUnitPrice : 0
+  const quantity = typeof line.quantity === 'number' && Number.isFinite(line.quantity) ? line.quantity : 0
+  const unitPrice =
+    typeof line.estimatedUnitPrice === 'number' && Number.isFinite(line.estimatedUnitPrice)
+      ? line.estimatedUnitPrice
+      : 0
 
   return roundAmount(quantity * unitPrice)
 }
@@ -100,47 +102,18 @@ export function userForDemoPersona(persona: DemoPersona, users: UserSummary[], c
 
 export function buildPurchaseRequestFormDefaults(
   selectedCompanyId: string,
-  users: UserSummary[],
-  categories: CategorySummary[],
-  budgetAccounts: BudgetAccountSummary[],
-  suppliers: SupplierSummary[],
-  preferredRequester?: UserSummary,
 ): PurchaseRequestFormState {
-  const requester =
-    (preferredRequester?.companyId === selectedCompanyId &&
-    demoUserHasRoleCapability(preferredRequester, [APPLICANT_ROLE_ID])
-      ? preferredRequester
-      : undefined) ??
-    users.find((user) => demoUserHasExactRole(user, [APPLICANT_ROLE_ID])) ??
-    users.find((user) => user.active) ??
-    users[0]
-  const defaultCategory = categories[0]
-  const budgetAccount =
-    budgetAccounts.find((account) => account.categoryId === defaultCategory?.categoryId && account.active) ??
-    budgetAccounts.find((account) => account.active) ??
-    budgetAccounts[0]
-  const categoryId = budgetAccount?.categoryId ?? defaultCategory?.categoryId ?? ''
-  const supplierIds = preferredSupplierIdsForCategory(categoryId, suppliers)
-
   return {
-    budgetAccountId: budgetAccount?.budgetAccountId ?? '',
-    categoryId,
+    budgetAccountId: '',
+    categoryId: '',
     companyId: selectedCompanyId,
-    departmentId: requester?.departmentId ?? '',
-    description: '研发团队扩编使用',
-    expectedDeliveryDate: '2026-06-15',
-    lineItems: [
-      createPurchaseRequestFormLine({
-        estimatedUnitPrice: 9300,
-        itemName: '商务笔记本电脑',
-        quantity: 20,
-        specification: '14 英寸 / 32G / 1T SSD',
-        unit: '台',
-      }),
-    ],
-    requesterId: requester?.userId ?? '',
-    supplierIds,
-    title: '20 台笔记本采购',
+    departmentId: '',
+    description: '',
+    expectedDeliveryDate: '',
+    lineItems: [createPurchaseRequestFormLine()],
+    requesterId: '',
+    supplierIds: [],
+    title: '',
   }
 }
 

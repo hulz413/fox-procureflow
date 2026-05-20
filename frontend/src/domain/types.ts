@@ -317,9 +317,9 @@ export type PurchaseRequestFormLine = {
   lineKey: string
   itemName: string
   specification: string
-  quantity: number
+  quantity: number | ''
   unit: string
-  estimatedUnitPrice: number
+  estimatedUnitPrice: number | ''
 }
 
 export type RfqSupplier = {
