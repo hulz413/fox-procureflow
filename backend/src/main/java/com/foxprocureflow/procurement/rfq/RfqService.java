@@ -101,7 +101,7 @@ public class RfqService {
         requireCompany(request.companyId());
         requireUserInCompany(request.companyId(), request.procurementUserId());
 
-        PurchaseRequestJpaEntity purchaseRequest = purchaseRequestRepository.findByRequestId(request.requestId())
+        PurchaseRequestJpaEntity purchaseRequest = purchaseRequestRepository.findByRequestIdAndDeletedAtIsNull(request.requestId())
             .orElseThrow(() -> notFound("Unknown requestId: " + request.requestId()));
         if (!request.companyId().equals(purchaseRequest.getCompanyId())) {
             throw badRequest("requestId does not belong to companyId: " + request.companyId());

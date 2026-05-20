@@ -186,7 +186,7 @@ INSERT IGNORE INTO rfq_quote_attachments (
 )
 SELECT attachment_id, quote_id, rfq_id, supplier_id, file_name, description, content_type, size_bytes, storage_object_key, created_at
 FROM (
-    SELECT 'RFQ-20260519-0601-Q01-A01' AS attachment_id, 'RFQ-20260519-0601-Q01' AS quote_id, 'RFQ-20260519-0601' AS rfq_id, 'supplier-bluechip' AS supplier_id, '蓝芯会议室智能屏报价单.pdf' AS file_name, '蓝芯智能协作屏报价单元数据', 'application/pdf' AS content_type, 76000 AS size_bytes, NULL AS storage_object_key, '2026-05-19 14:18:00' AS created_at
+    SELECT 'RFQ-20260519-0601-Q01-A01' AS attachment_id, 'RFQ-20260519-0601-Q01' AS quote_id, 'RFQ-20260519-0601' AS rfq_id, 'supplier-bluechip' AS supplier_id, '蓝芯会议室智能屏报价单.pdf' AS file_name, '蓝芯智能协作屏报价单元数据' AS description, 'application/pdf' AS content_type, 76000 AS size_bytes, NULL AS storage_object_key, '2026-05-19 14:18:00' AS created_at
     UNION ALL SELECT 'RFQ-20260519-0602-Q01-A01', 'RFQ-20260519-0602-Q01', 'RFQ-20260519-0602', 'supplier-yunzhou', '云舟研发显示器报价单.pdf', '云舟研发显示器报价单元数据', 'application/pdf', 83000, NULL, '2026-05-19 14:24:00'
     UNION ALL SELECT 'RFQ-20260519-0602-Q02-A01', 'RFQ-20260519-0602-Q02', 'RFQ-20260519-0602', 'supplier-chengcai', '诚采研发显示器报价单.pdf', '诚采研发显示器报价单元数据', 'application/pdf', 79000, NULL, '2026-05-19 14:32:00'
 ) AS seeded_attachments

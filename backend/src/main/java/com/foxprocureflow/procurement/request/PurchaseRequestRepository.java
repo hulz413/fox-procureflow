@@ -8,11 +8,15 @@ public interface PurchaseRequestRepository extends JpaRepository<PurchaseRequest
 
     Optional<PurchaseRequestJpaEntity> findByRequestId(String requestId);
 
+    Optional<PurchaseRequestJpaEntity> findByRequestIdAndDeletedAtIsNull(String requestId);
+
     Optional<PurchaseRequestJpaEntity> findFirstByRequestIdStartingWithOrderByRequestIdDesc(String requestIdPrefix);
 
     List<PurchaseRequestJpaEntity> findByCompanyIdOrderByCreatedAtDesc(String companyId);
 
-    List<PurchaseRequestJpaEntity> findByCompanyIdAndStatusOrderByCreatedAtDesc(
+    List<PurchaseRequestJpaEntity> findByCompanyIdAndDeletedAtIsNullOrderByCreatedAtDesc(String companyId);
+
+    List<PurchaseRequestJpaEntity> findByCompanyIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
         String companyId,
         PurchaseRequestStatus status
     );

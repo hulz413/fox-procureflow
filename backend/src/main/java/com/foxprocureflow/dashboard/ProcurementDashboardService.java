@@ -226,7 +226,7 @@ public class ProcurementDashboardService {
 
     private List<DocumentFunnelStage> documentFunnel(MapSqlParameterSource params) {
         return List.of(
-            new DocumentFunnelStage("purchaseRequests", "采购申请", count("SELECT COUNT(*) FROM purchase_requests WHERE company_id IN (:companyIds)", params)),
+            new DocumentFunnelStage("purchaseRequests", "采购申请", count("SELECT COUNT(*) FROM purchase_requests WHERE company_id IN (:companyIds) AND deleted_at IS NULL", params)),
             new DocumentFunnelStage("approvedRequests", "审批通过", count("SELECT COUNT(*) FROM approval_instances WHERE company_id IN (:companyIds) AND status = 'APPROVED'", params)),
             new DocumentFunnelStage("comparableRfqs", "可比价 RFQ", count("SELECT COUNT(*) FROM rfqs WHERE company_id IN (:companyIds) AND status = 'COMPARISON_READY'", params)),
             new DocumentFunnelStage("issuedPurchaseOrders", "已发布 PO", count("SELECT COUNT(*) FROM purchase_orders WHERE company_id IN (:companyIds) AND status = 'ISSUED'", params)),
@@ -254,13 +254,15 @@ public class ProcurementDashboardService {
         String documentLabel,
         String tableName
     ) {
+        String activeRecordCondition = "purchase_requests".equals(tableName) ? "AND deleted_at IS NULL" : "";
         List<StatusDistributionBucket> rows = jdbcTemplate.query("""
                 SELECT status, COUNT(*) AS bucket_count
                 FROM %s
                 WHERE company_id IN (:companyIds)
+                  %s
                 GROUP BY status
                 ORDER BY status
-                """.formatted(tableName),
+                """.formatted(tableName, activeRecordCondition),
             params,
             (rs, rowNum) -> new StatusDistributionBucket(
                 documentType,

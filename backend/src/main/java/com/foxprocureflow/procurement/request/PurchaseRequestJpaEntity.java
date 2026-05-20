@@ -71,6 +71,14 @@ public class PurchaseRequestJpaEntity {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    private LocalDateTime deletedAt;
+
+    @Column(length = 64)
+    private String deletedBy;
+
+    @Column(length = 255)
+    private String deleteReason;
+
     protected PurchaseRequestJpaEntity() {
     }
 
@@ -112,6 +120,14 @@ public class PurchaseRequestJpaEntity {
         this.status = PurchaseRequestStatus.SUBMITTED;
         this.submittedAt = LocalDateTime.now();
         this.updatedAt = this.submittedAt;
+    }
+
+    void deleteDraft(String actorId, String reason) {
+        LocalDateTime now = LocalDateTime.now();
+        this.deletedAt = now;
+        this.deletedBy = actorId;
+        this.deleteReason = reason;
+        this.updatedAt = now;
     }
 
     public String getRequestId() {
@@ -180,5 +196,13 @@ public class PurchaseRequestJpaEntity {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public String getDeletedBy() {
+        return deletedBy;
     }
 }

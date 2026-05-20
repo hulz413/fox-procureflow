@@ -14,10 +14,12 @@ import com.foxprocureflow.identity.persistence.DemoSupplierJpaEntity;
 import com.foxprocureflow.identity.persistence.DemoSupplierRepository;
 import com.foxprocureflow.identity.persistence.DemoUserJpaEntity;
 import com.foxprocureflow.identity.persistence.DemoUserRepository;
+import com.foxprocureflow.identity.persistence.DemoUserRoleRepository;
 import com.foxprocureflow.procurement.approval.ApprovalDtos.ApprovalSummaryResponse;
 import com.foxprocureflow.procurement.approval.ApprovalService;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.CreateDraftLineRequest;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.CreateDraftRequest;
+import com.foxprocureflow.procurement.request.PurchaseRequestDtos.DeleteDraftResponse;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.PurchaseRequestDetailResponse;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.PurchaseRequestLineResponse;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.PurchaseRequestListItemResponse;
@@ -39,6 +41,7 @@ public class PurchaseRequestService {
 
     private static final TypeReference<Map<String, Object>> FIELD_SNAPSHOT_TYPE = new TypeReference<>() {
     };
+    private static final String ADMIN_ROLE_ID = "role-admin";
 
     private final PurchaseRequestRepository purchaseRequestRepository;
     private final PurchaseRequestLineRepository lineRepository;
@@ -49,6 +52,7 @@ public class PurchaseRequestService {
     private final DemoBudgetAccountRepository budgetAccountRepository;
     private final DemoSupplierRepository supplierRepository;
     private final DemoSupplierCategoryRepository supplierCategoryRepository;
+    private final DemoUserRoleRepository userRoleRepository;
     private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
 
@@ -62,6 +66,7 @@ public class PurchaseRequestService {
         DemoBudgetAccountRepository budgetAccountRepository,
         DemoSupplierRepository supplierRepository,
         DemoSupplierCategoryRepository supplierCategoryRepository,
+        DemoUserRoleRepository userRoleRepository,
         ApprovalService approvalService,
         ObjectMapper objectMapper
     ) {
@@ -74,6 +79,7 @@ public class PurchaseRequestService {
         this.budgetAccountRepository = budgetAccountRepository;
         this.supplierRepository = supplierRepository;
         this.supplierCategoryRepository = supplierCategoryRepository;
+        this.userRoleRepository = userRoleRepository;
         this.approvalService = approvalService;
         this.objectMapper = objectMapper;
     }
@@ -114,7 +120,7 @@ public class PurchaseRequestService {
 
     @Transactional
     public PurchaseRequestDetailResponse submit(String requestId) {
-        PurchaseRequestJpaEntity request = purchaseRequestRepository.findByRequestId(requestId)
+        PurchaseRequestJpaEntity request = purchaseRequestRepository.findByRequestIdAndDeletedAtIsNull(requestId)
             .orElseThrow(() -> notFound("Unknown requestId: " + requestId));
         if (request.getStatus() != PurchaseRequestStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only DRAFT purchase requests can be submitted");
@@ -128,12 +134,26 @@ public class PurchaseRequestService {
         return toDetailResponse(saved, lines, approval);
     }
 
+    @Transactional
+    public DeleteDraftResponse deleteDraft(String requestId, String actorId, String reason) {
+        PurchaseRequestJpaEntity request = purchaseRequestRepository.findByRequestIdAndDeletedAtIsNull(requestId)
+            .orElseThrow(() -> notFound("Unknown requestId: " + requestId));
+        if (request.getStatus() != PurchaseRequestStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only DRAFT purchase requests can be deleted");
+        }
+
+        validateDraftDeleteActor(request, actorId);
+        request.deleteDraft(actorId.trim(), blankToNull(reason));
+        PurchaseRequestJpaEntity saved = purchaseRequestRepository.save(request);
+        return new DeleteDraftResponse(saved.getRequestId(), true, saved.getDeletedAt(), saved.getDeletedBy());
+    }
+
     @Transactional(readOnly = true)
     public List<PurchaseRequestListItemResponse> list(String companyId, PurchaseRequestStatus status) {
         requireCompany(companyId);
         List<PurchaseRequestJpaEntity> requests = status == null
-            ? purchaseRequestRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
-            : purchaseRequestRepository.findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, status);
+            ? purchaseRequestRepository.findByCompanyIdAndDeletedAtIsNullOrderByCreatedAtDesc(companyId)
+            : purchaseRequestRepository.findByCompanyIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(companyId, status);
         List<String> requestIds = requests.stream()
             .map(PurchaseRequestJpaEntity::getRequestId)
             .toList();
@@ -156,12 +176,32 @@ public class PurchaseRequestService {
 
     @Transactional(readOnly = true)
     public PurchaseRequestDetailResponse detail(String requestId) {
-        PurchaseRequestJpaEntity request = purchaseRequestRepository.findByRequestId(requestId)
+        PurchaseRequestJpaEntity request = purchaseRequestRepository.findByRequestIdAndDeletedAtIsNull(requestId)
             .orElseThrow(() -> notFound("Unknown requestId: " + requestId));
         return toDetailResponse(
             request,
             lineRepository.findByRequestIdOrderByLineNoAsc(requestId),
             approvalService.findSummaryByRequestId(requestId));
+    }
+
+    private void validateDraftDeleteActor(PurchaseRequestJpaEntity request, String actorId) {
+        String normalizedActorId = blankToNull(actorId);
+        if (normalizedActorId == null) {
+            throw badRequest("actorId is required to delete a purchase request draft");
+        }
+
+        DemoUserJpaEntity actor = userRepository.findByUserId(normalizedActorId)
+            .orElseThrow(() -> notFound("Unknown actorId: " + normalizedActorId));
+        if (!actor.isActive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Inactive users cannot delete purchase request drafts");
+        }
+
+        if (normalizedActorId.equals(request.getRequesterId())
+            || userRoleRepository.existsByUserIdAndRoleIdIn(normalizedActorId, List.of(ADMIN_ROLE_ID))) {
+            return;
+        }
+
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the requester or an administrator can delete a draft");
     }
 
     private void validateMasterData(CreateDraftRequest request) {

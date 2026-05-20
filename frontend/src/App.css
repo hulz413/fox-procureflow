@@ -1759,6 +1759,13 @@ tbody tr:last-child td {
   font-size: 12px;
 }
 
+.detail-heading .tag {
+  flex: 0 0 auto;
+  display: inline-flex;
+  margin-top: 0;
+  overflow: visible;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2018,7 +2025,8 @@ tbody tr:last-child td {
 }
 
 .request-drawer .ant-drawer-body {
-  padding: 18px;
+  padding: 20px;
+  background: #fafbf9;
 }
 
 .ant-drawer-right.ant-drawer-open > .ant-drawer-content-wrapper {
@@ -2047,7 +2055,106 @@ tbody tr:last-child td {
 }
 
 .request-drawer .request-detail {
+  display: grid;
+  align-content: start;
+  gap: 12px;
   padding: 0;
+}
+
+.request-drawer .request-detail > .detail-grid,
+.request-drawer .request-detail > .detail-description {
+  margin: 0;
+}
+
+.request-drawer .detail-grid {
+  gap: 12px;
+}
+
+.request-drawer .detail-grid div {
+  padding: 12px;
+  background: #fff;
+}
+
+.request-drawer .detail-grid dd {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.request-drawer .panel-title {
+  min-height: 52px;
+  background: #fff;
+}
+
+.request-drawer .panel-title strong {
+  min-width: 0;
+}
+
+.request-drawer .panel-title > span {
+  flex: 0 1 auto;
+  max-width: 52%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request-drawer .approval-section {
+  background: #fff;
+}
+
+.request-drawer .approval-section > .supplier-invite-list,
+.request-drawer .approval-section > .quote-form,
+.request-drawer .approval-section > .detail-grid,
+.request-drawer .approval-section > .timeline,
+.request-drawer .approval-section > .timeline-list,
+.request-drawer .approval-section > .approval-path,
+.request-drawer .approval-section > .approval-actions {
+  margin: 12px;
+  padding: 0;
+}
+
+.request-drawer .approval-section > .detail-grid {
+  margin-bottom: 12px;
+}
+
+.request-drawer .table-wrap {
+  max-width: 100%;
+}
+
+.request-drawer .request-table {
+  min-width: 760px;
+  table-layout: auto;
+}
+
+.request-drawer .request-table th,
+.request-drawer .request-table td {
+  height: auto;
+  min-height: 46px;
+  padding: 10px 12px;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+.request-drawer .request-table th:first-child,
+.request-drawer .request-table td:first-child {
+  padding-left: 14px;
+}
+
+.request-drawer .request-table th:last-child,
+.request-drawer .request-table td:last-child {
+  padding-right: 14px;
+}
+
+.request-drawer .ai-card {
+  background: #fff;
+}
+
+.request-drawer .ai-card > .panel-title,
+.request-drawer .ai-action-row > .panel-title,
+.request-drawer .ai-result-panel > .panel-title {
+  min-height: 38px;
+  background: transparent;
 }
 
 .approval-grid {
@@ -2282,6 +2389,10 @@ tbody tr:last-child td {
   padding: 12px;
 }
 
+.request-drawer .action-row {
+  grid-template-columns: auto minmax(240px, 1fr) auto;
+}
+
 .button-action-row {
   display: flex;
   align-items: center;
@@ -2322,6 +2433,10 @@ tbody tr:last-child td {
   margin-top: 14px;
   border: 1px solid var(--pf-border);
   border-radius: 8px 8px 0 0;
+}
+
+.request-drawer .matching-detail .panel-title {
+  margin-top: 0;
 }
 
 .compact-detail-table {
@@ -2497,6 +2612,34 @@ tbody tr:last-child td {
   color: var(--pf-danger);
 }
 
+.request-drawer .supplier-invite-list {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.request-drawer .supplier-chip {
+  min-height: 92px;
+  gap: 8px 12px;
+  padding: 12px;
+}
+
+.request-drawer .supplier-chip strong {
+  grid-column: 1 / -1;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.request-drawer .supplier-chip > span {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.request-drawer .supplier-chip em {
+  grid-column: auto;
+  grid-row: auto;
+  justify-self: end;
+  min-width: 72px;
+}
+
 .quote-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2618,6 +2761,15 @@ tbody tr:last-child td {
   font-size: 11px;
 }
 
+.request-drawer .attachment-row {
+  grid-template-columns: 20px minmax(0, 1fr) minmax(72px, auto) auto;
+  min-height: 42px;
+}
+
+.request-drawer .attachment-row small {
+  justify-self: end;
+}
+
 .attachment-inline-list {
   display: grid;
   gap: 4px;
@@ -2721,6 +2873,8 @@ tbody tr:last-child td {
   .approval-grid,
   .request-grid,
   .request-form,
+  .request-drawer .detail-grid,
+  .request-drawer .action-row,
   .quote-form {
     grid-template-columns: 1fr;
   }
@@ -2818,6 +2972,33 @@ tbody tr:last-child td {
 
   .workspace {
     padding: 12px;
+  }
+
+  .request-drawer .ant-drawer-body {
+    padding: 12px;
+  }
+
+  .request-drawer .panel-title {
+    min-height: 48px;
+    padding: 10px 12px;
+  }
+
+  .request-drawer .panel-title > span {
+    max-width: 100%;
+  }
+
+  .request-drawer .approval-section > .supplier-invite-list,
+  .request-drawer .approval-section > .quote-form,
+  .request-drawer .approval-section > .detail-grid,
+  .request-drawer .approval-section > .timeline,
+  .request-drawer .approval-section > .timeline-list,
+  .request-drawer .approval-section > .approval-path,
+  .request-drawer .approval-section > .approval-actions {
+    margin: 10px;
+  }
+
+  .request-drawer .request-table {
+    min-width: 680px;
   }
 
   .status-strip > span {

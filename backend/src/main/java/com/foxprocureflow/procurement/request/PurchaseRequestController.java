@@ -2,11 +2,13 @@ package com.foxprocureflow.procurement.request;
 
 import com.foxprocureflow.common.api.ApiEnvelope;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.CreateDraftRequest;
+import com.foxprocureflow.procurement.request.PurchaseRequestDtos.DeleteDraftResponse;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.PurchaseRequestDetailResponse;
 import com.foxprocureflow.procurement.request.PurchaseRequestDtos.PurchaseRequestListItemResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +37,16 @@ public class PurchaseRequestController {
     @PostMapping("/{requestId}/submit")
     public ApiEnvelope<PurchaseRequestDetailResponse> submit(@PathVariable String requestId) {
         return ApiEnvelope.ok(purchaseRequestService.submit(requestId));
+    }
+
+    @Operation(summary = "Delete a purchase request draft")
+    @DeleteMapping("/{requestId}")
+    public ApiEnvelope<DeleteDraftResponse> deleteDraft(
+        @PathVariable String requestId,
+        @RequestParam String actorId,
+        @RequestParam(required = false) String reason
+    ) {
+        return ApiEnvelope.ok(purchaseRequestService.deleteDraft(requestId, actorId, reason));
     }
 
     @Operation(summary = "List company-scoped purchase requests")

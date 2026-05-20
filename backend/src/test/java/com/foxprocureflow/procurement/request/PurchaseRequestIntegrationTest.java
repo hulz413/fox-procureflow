@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -133,6 +134,53 @@ class PurchaseRequestIntegrationTest {
     }
 
     @Test
+    void deletesOnlyRequesterOwnedDrafts() throws Exception {
+        String requestId = createDraft(digitalLaptopDraft());
+
+        mockMvc.perform(delete("/api/purchase-requests/{requestId}", requestId)
+                .param("actorId", "user-mfg-applicant"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message", containsString("Only the requester")));
+
+        mockMvc.perform(delete("/api/purchase-requests/{requestId}", requestId)
+                .param("actorId", "user-digital-applicant")
+                .param("reason", "录入重复"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.requestId").value(requestId))
+            .andExpect(jsonPath("$.data.deleted").value(true))
+            .andExpect(jsonPath("$.data.deletedBy").value("user-digital-applicant"));
+
+        assertThat(purchaseRequestRepository.findByRequestId(requestId))
+            .get()
+            .extracting(PurchaseRequestJpaEntity::getDeletedAt)
+            .isNotNull();
+
+        mockMvc.perform(get("/api/purchase-requests/{requestId}", requestId))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/purchase-requests").param("companyId", "company-digital"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[*].requestId", not(hasItem(requestId))));
+    }
+
+    @Test
+    void doesNotDeleteSubmittedRequests() throws Exception {
+        String requestId = createDraft(digitalLaptopDraft());
+        mockMvc.perform(post("/api/purchase-requests/{requestId}/submit", requestId))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/purchase-requests/{requestId}", requestId)
+                .param("actorId", "user-digital-admin"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message", containsString("Only DRAFT")));
+
+        assertThat(purchaseRequestRepository.findByRequestId(requestId))
+            .get()
+            .extracting(PurchaseRequestJpaEntity::getDeletedAt)
+            .isNull();
+    }
+
+    @Test
     void createsDraftWithMultiplePreferredSuppliersInSnapshot() throws Exception {
         MvcResult created = mockMvc.perform(post("/api/purchase-requests/drafts")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -203,6 +251,7 @@ class PurchaseRequestIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$['paths']['/api/purchase-requests/drafts']").exists())
             .andExpect(jsonPath("$['paths']['/api/purchase-requests/{requestId}/submit']").exists())
+            .andExpect(jsonPath("$['paths']['/api/purchase-requests/{requestId}'].delete").exists())
             .andExpect(jsonPath("$['paths']['/api/purchase-requests']").exists())
             .andExpect(jsonPath("$['paths']['/api/purchase-requests/{requestId}']").exists())
             .andExpect(jsonPath("$['paths']['/api/approvals/tasks']").exists())

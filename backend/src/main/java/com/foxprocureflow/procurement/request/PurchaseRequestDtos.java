@@ -101,4 +101,12 @@ public final class PurchaseRequestDtos {
         String categoryId
     ) {
     }
+
+    public record DeleteDraftResponse(
+        String requestId,
+        boolean deleted,
+        LocalDateTime deletedAt,
+        String deletedBy
+    ) {
+    }
 }

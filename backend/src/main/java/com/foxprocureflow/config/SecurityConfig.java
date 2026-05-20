@@ -29,6 +29,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/master-data/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/purchase-requests/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/purchase-requests/**").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/api/purchase-requests/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/approvals/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/approvals/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/rfqs/**").permitAll()

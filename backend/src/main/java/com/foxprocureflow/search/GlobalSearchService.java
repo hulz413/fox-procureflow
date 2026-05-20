@@ -124,6 +124,7 @@ public class GlobalSearchService {
             LEFT JOIN demo_procurement_categories category ON category.category_id = pr.category_id
             LEFT JOIN demo_suppliers supplier ON supplier.supplier_id = pr.supplier_id
             WHERE pr.company_id = :companyId
+              AND pr.deleted_at IS NULL
               AND (LOWER(pr.request_id) LIKE :like
                 OR LOWER(pr.title) LIKE :like
                 OR LOWER(pr.status) LIKE :like
@@ -171,6 +172,7 @@ public class GlobalSearchService {
             LEFT JOIN demo_users approver ON approver.user_id = active_node.approver_id
             LEFT JOIN demo_suppliers supplier ON supplier.supplier_id = request.supplier_id
             WHERE approval.company_id = :companyId
+              AND request.deleted_at IS NULL
               AND (LOWER(approval.approval_id) LIKE :like
                 OR LOWER(approval.request_id) LIKE :like
                 OR LOWER(request.title) LIKE :like

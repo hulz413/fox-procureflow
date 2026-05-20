@@ -1293,6 +1293,14 @@ async function submitPurchaseRequest(requestId: string) {
   return postApi<PurchaseRequestDetail>(`/api/purchase-requests/${encodeURIComponent(requestId)}/submit`)
 }
 
+async function deletePurchaseRequestDraft(requestId: string, actorId: string) {
+  const params = new URLSearchParams({ actorId })
+  return requestApi<{ requestId: string; deleted: boolean }>(
+    `/api/purchase-requests/${encodeURIComponent(requestId)}?${params.toString()}`,
+    { method: 'DELETE' },
+  )
+}
+
 async function fetchApprovalTasks(companyId: string, approverId: string) {
   return fetchApi<ApprovalTask[]>(
     `/api/approvals/tasks?companyId=${encodeURIComponent(companyId)}&approverId=${encodeURIComponent(approverId)}`,
@@ -1916,8 +1924,14 @@ export const localizedContent = {
       recentFromBackend: '后端申请数据',
       createSuccess: '草稿已保存',
       submitSuccess: '申请已提交',
+      deleteDraft: '删除草稿',
+      deleteSuccess: '草稿已删除',
       createFailed: '保存失败',
       submitFailed: '提交失败',
+      deleteFailed: '删除失败',
+      deleteConfirmTitle: '删除这条草稿？',
+      deleteConfirmContent: '删除后这条草稿将从采购申请列表中移除，已提交申请不能删除。',
+      deleteConfirm: '删除草稿',
       discardTitle: '放弃本次编辑？',
       discardContent: '当前申请还没有保存，关闭后本次修改会丢失。',
       discardConfirm: '放弃编辑',
@@ -2627,8 +2641,14 @@ export const localizedContent = {
       recentFromBackend: 'Backend request data',
       createSuccess: 'Draft saved',
       submitSuccess: 'Request submitted',
+      deleteDraft: 'Delete Draft',
+      deleteSuccess: 'Draft deleted',
       createFailed: 'Save failed',
       submitFailed: 'Submit failed',
+      deleteFailed: 'Delete failed',
+      deleteConfirmTitle: 'Delete this draft?',
+      deleteConfirmContent: 'The draft will be removed from the purchase request list. Submitted requests cannot be deleted.',
+      deleteConfirm: 'Delete Draft',
       discardTitle: 'Discard edits?',
       discardContent: 'This request has unsaved changes. Closing will discard your edits.',
       discardConfirm: 'Discard',
@@ -4246,6 +4266,25 @@ function PurchaseRequestView({
     },
   })
 
+  const deleteDraftMutation = useMutation({
+    mutationFn: ({ actorId, requestId }: { actorId: string; requestId: string }) =>
+      deletePurchaseRequestDraft(requestId, actorId),
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.purchaseRequest.deleteFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setFeedback({ message: messages.purchaseRequest.deleteSuccess, tone: 'success' })
+      setSelectedRequestId(undefined)
+      setDetailDrawerOpen(false)
+      setAiRiskResponse(null)
+      onRefresh()
+      queryClient.removeQueries({ queryKey: ['purchase-request', response.data.requestId] })
+    },
+  })
+
   const aiDraftMutation = useMutation({
     mutationFn: previewAiPurchaseRequestDraft,
     onError: (error) => {
@@ -4340,15 +4379,26 @@ function PurchaseRequestView({
         </button>
       </div>
     ) : selectedDetail?.status === 'DRAFT' ? (
-      <button
-        className="primary-button"
-        disabled={submitMutation.isPending}
-        onClick={() => submitMutation.mutate(selectedDetail.requestId)}
-        type="button"
-      >
-        <CheckCircleOutlined />
-        <span>{messages.purchaseRequest.submit}</span>
-      </button>
+      <div className="drawer-action-group">
+        <button
+          className="secondary-button danger"
+          disabled={deleteDraftMutation.isPending || submitMutation.isPending}
+          onClick={confirmDeleteDraft}
+          type="button"
+        >
+          <DeleteOutlined />
+          <span>{messages.purchaseRequest.deleteDraft}</span>
+        </button>
+        <button
+          className="primary-button"
+          disabled={deleteDraftMutation.isPending || submitMutation.isPending}
+          onClick={() => submitMutation.mutate(selectedDetail.requestId)}
+          type="button"
+        >
+          <CheckCircleOutlined />
+          <span>{messages.purchaseRequest.submit}</span>
+        </button>
+      </div>
     ) : null
 
   const updateForm = <Key extends keyof PurchaseRequestFormState>(key: Key, value: PurchaseRequestFormState[Key]) => {
@@ -4385,6 +4435,26 @@ function PurchaseRequestView({
       actorId: selectedDetail.approval?.currentApproverId ?? selectedDetail.requesterId,
       companyId: selectedDetail.companyId,
       requestId: selectedDetail.requestId,
+    })
+  }
+
+  function confirmDeleteDraft() {
+    if (!selectedDetail) {
+      return
+    }
+
+    const actorId = activeDemoUser?.userId ?? selectedDetail.requesterId
+    modal.confirm({
+      mousePosition: getViewportCenter(),
+      centered: true,
+      cancelText: messages.purchaseRequest.continueEdit,
+      content: messages.purchaseRequest.deleteConfirmContent,
+      focusable: { autoFocusButton: 'cancel' },
+      okButtonProps: { danger: true, loading: deleteDraftMutation.isPending },
+      okText: messages.purchaseRequest.deleteConfirm,
+      onOk: () => deleteDraftMutation.mutateAsync({ actorId, requestId: selectedDetail.requestId }),
+      rootClassName: 'procure-confirm-modal',
+      title: messages.purchaseRequest.deleteConfirmTitle,
     })
   }
 
@@ -6192,7 +6262,7 @@ function RfqView({
             </dl>
 
             <section className="approval-section">
-              <PanelTitle icon={<TeamOutlined />} title={messages.rfq.invitedSuppliers} aside={messages.rfq.noPo} />
+              <PanelTitle icon={<TeamOutlined />} title={messages.rfq.invitedSuppliers} />
               <div className="supplier-invite-list">
                 {detail.suppliers.map((supplier) => {
                   const quote = quoteBySupplier.get(supplier.supplierId)
