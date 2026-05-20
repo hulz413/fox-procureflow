@@ -129,7 +129,10 @@ class MasterDataIntegrationTest {
 
         mockMvc.perform(get("/api/master-data/suppliers"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-yunzhou")));
+            .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-yunzhou")))
+            .andExpect(jsonPath("$.data[?(@.status=='inactive')].supplierId", hasItem("supplier-borui-spares")))
+            .andExpect(jsonPath("$.data[?(@.status=='inactive')].supplierId", hasItem("supplier-lianyunda-logistics")))
+            .andExpect(jsonPath("$.data[?(@.status=='inactive')].supplierId", hasItem("supplier-xingqiao-electronics")));
 
         mockMvc.perform(get("/api/master-data/suppliers").param("categoryId", "category-it-hardware"))
             .andExpect(status().isOk())

@@ -302,7 +302,9 @@ export function FulfillmentDetail({
       <dl className="detail-grid">
         <div>
           <dt>{messages.purchaseOrder.supplier}</dt>
-          <dd>{po.supplierName}</dd>
+          <dd>
+            <TruncatedText text={po.supplierName} />
+          </dd>
         </div>
         <div>
           <dt>{messages.rfq.totalAmount}</dt>
@@ -485,8 +487,8 @@ export function AttachmentList({
         return (
           <div className="attachment-row" key={attachment.attachmentId || `${attachment.originalFileName}-${index}`}>
             <FileAddOutlined />
-            <span>{attachment.originalFileName}</span>
-            <small>{attachment.storageStatus}</small>
+            <span title={attachment.originalFileName}>{attachment.originalFileName}</span>
+            <small title={attachment.storageStatus}>{attachment.storageStatus}</small>
             <DisabledActionTooltip title={disabledReason}>
               <button
                 className="icon-action"
@@ -541,7 +543,7 @@ export function AttachmentInlineAction({
         type="button"
       >
         <FileAddOutlined />
-        <span>{attachment.fileName}</span>
+        <span title={attachment.fileName}>{attachment.fileName}</span>
       </button>
     </DisabledActionTooltip>
   )
@@ -789,8 +791,8 @@ export function CompanyContextSelector({
           const company = option.data as (typeof companyOptions)[number]
           return (
             <div className="company-select-option">
-              <strong>{company.label}</strong>
-              <span>{company.businessScope}</span>
+              <strong title={company.label}>{company.label}</strong>
+              <span title={company.businessScope}>{company.businessScope}</span>
             </div>
           )
         }}
@@ -799,7 +801,7 @@ export function CompanyContextSelector({
         value={selectedCompanyId}
         onChange={onCompanyChange}
       />
-      <small>{selectedCompany.businessScope}</small>
+      <small title={selectedCompany.businessScope}>{selectedCompany.businessScope}</small>
     </div>
   )
 }

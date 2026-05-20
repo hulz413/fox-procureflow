@@ -2,7 +2,7 @@ import { ApiOutlined, DatabaseOutlined, ProfileOutlined, SafetyCertificateOutlin
 import type { Language, DemoContext, CompanyContext, DepartmentSummary, UserSummary, CategorySummary, SupplierSummary, BudgetAccountSummary } from '../../domain/types'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { formatCurrency, formatRiskLevel, riskToneOf } from '../../shared/utils/procurement'
-import { PanelTitle } from '../../shared/ui/common'
+import { TruncatedText, PanelTitle } from '../../shared/ui/common'
 import { CompanyContextSelector } from '../../shared/ui/procurementWidgets'
 
 export function FoundationDataView({
@@ -45,8 +45,8 @@ export function FoundationDataView({
         <div className="foundation-summary">
           <div className="summary-block">
             <span>{messages.boundary.groupShared}</span>
-            <strong>{context.groupName}</strong>
-            <small>{context.supplierPoolScope}</small>
+            <strong title={context.groupName}>{context.groupName}</strong>
+            <small title={context.supplierPoolScope}>{context.supplierPoolScope}</small>
           </div>
           <CompanyContextSelector
             companies={companies}
@@ -92,17 +92,19 @@ export function FoundationDataView({
                 suppliers.map((supplier) => (
                   <tr key={supplier.supplierId}>
                     <td>
-                      <strong>{supplier.supplierName}</strong>
-                      <small>{supplier.supplierId}</small>
+                      <TruncatedText className="text-strong" text={supplier.supplierName} />
+                      <TruncatedText className="text-small" text={supplier.supplierId} />
                     </td>
-                    <td>{supplier.serviceScope}</td>
-                    <td>{supplier.location}</td>
+                    <td title={supplier.serviceScope}>{supplier.serviceScope}</td>
+                    <td title={supplier.location}>{supplier.location}</td>
                     <td>
                       <span className={`tag ${riskToneOf(supplier.riskLevel)}`}>
                         {formatRiskLevel(supplier.riskLevel, language)}
                       </span>
                     </td>
-                    <td>{supplier.categories.map((category) => category.categoryName).join(' / ')}</td>
+                    <td title={supplier.categories.map((category) => category.categoryName).join(' / ')}>
+                      {supplier.categories.map((category) => category.categoryName).join(' / ')}
+                    </td>
                   </tr>
                 ))
               )}
@@ -112,7 +114,7 @@ export function FoundationDataView({
       </section>
 
       <section className="panel">
-        <PanelTitle icon={<ProfileOutlined />} title={messages.foundation.departmentsUsers} aside={selectedCompany.companyName} />
+        <PanelTitle icon={<ProfileOutlined />} title={messages.foundation.departmentsUsers} />
         <div className="foundation-columns">
           <div className="reference-list">
             {departments.length === 0 ? (
@@ -120,8 +122,8 @@ export function FoundationDataView({
             ) : (
               departments.map((department) => (
                 <div className="reference-row" key={department.departmentId}>
-                  <strong>{department.departmentName}</strong>
-                  <span>{department.functionScope}</span>
+                  <strong title={department.departmentName}>{department.departmentName}</strong>
+                  <span title={department.functionScope}>{department.functionScope}</span>
                 </div>
               ))
             )}
@@ -145,11 +147,13 @@ export function FoundationDataView({
                   users.map((user) => (
                     <tr key={user.userId}>
                       <td>
-                        <strong>{user.displayName}</strong>
-                        <small>{user.positionTitle}</small>
+                        <TruncatedText className="text-strong" text={user.displayName} />
+                        <TruncatedText className="text-small" text={user.positionTitle} />
                       </td>
-                      <td>{user.departmentName}</td>
-                      <td>{user.roles.map((role) => role.roleName).join(' / ')}</td>
+                      <td title={user.departmentName}>{user.departmentName}</td>
+                      <td title={user.roles.map((role) => role.roleName).join(' / ')}>
+                        {user.roles.map((role) => role.roleName).join(' / ')}
+                      </td>
                       <td>
                         <span className="tag">{user.active ? messages.foundation.active : messages.foundation.inactive}</span>
                       </td>
@@ -170,8 +174,8 @@ export function FoundationDataView({
           ) : (
             categories.map((category) => (
               <div className="reference-row" key={category.categoryId}>
-                <strong>{category.categoryName}</strong>
-                <span>{category.businessScope}</span>
+                <strong title={category.categoryName}>{category.categoryName}</strong>
+                <span title={category.businessScope}>{category.businessScope}</span>
               </div>
             ))
           )}
@@ -200,9 +204,9 @@ export function FoundationDataView({
                 budgetAccounts.map((account) => (
                   <tr key={account.budgetAccountId}>
                     <td>
-                      <strong>{account.accountName}</strong>
+                      <TruncatedText className="text-strong" text={account.accountName} />
                     </td>
-                    <td>{account.categoryName}</td>
+                    <td title={account.categoryName}>{account.categoryName}</td>
                     <td>{formatCurrency(account.annualBudgetAmount, account.currency, language)}</td>
                     <td>{formatCurrency(account.availableAmount, account.currency, language)}</td>
                     <td>

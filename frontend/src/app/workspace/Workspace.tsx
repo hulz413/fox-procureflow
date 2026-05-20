@@ -4,7 +4,7 @@ import { Avatar, Dropdown, Layout, Modal, Popover, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { canDemoPersonaUsePrimaryAction, demoUserCanViewDashboard } from '../../demoRoleCapabilities'
+import { ADMIN_ROLE_ID, canDemoPersonaUsePrimaryAction, demoUserCanViewDashboard, demoUserHasExactRole } from '../../demoRoleCapabilities'
 import { demoPersonaMenuOrder, demoPersonas, demoContext } from '../../domain/types'
 import type { Language, DemoPersonaKey, ReceiptInvoiceCreateMode, ProcurementDashboardScope, ProcurementDashboardScopeValue, GlobalSearchResult } from '../../domain/types'
 import { fetchHealth, fetchMasterDataContext, fetchCompanies, fetchDepartments, fetchUsers, fetchSuppliers, fetchCategories, fetchBudgetAccounts, resetDemoData, fetchPurchaseRequests, fetchRfqs, fetchPurchaseOrders, fetchProcurementDashboard } from '../../api/client'
@@ -131,9 +131,6 @@ export function Workspace({
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
-  const dashboardScope: ProcurementDashboardScope = dashboardScopeValue === 'GROUP' ? 'GROUP' : 'COMPANY'
-  const dashboardCompanyId = dashboardScope === 'COMPANY' ? dashboardScopeValue : undefined
-
   const messages = localizedContent[language]
   const visibleNotifications = messages.notificationCenter.items.filter(
     (notification) => !dismissedNotificationIds.includes(notification.id),
@@ -182,6 +179,12 @@ export function Workspace({
     allDemoUsers[0]
   const selectedDemoUserId = selectedDemoUser?.userId
   const canViewDashboard = demoUserCanViewDashboard(selectedDemoUser)
+  const canUseGroupDashboard = demoUserHasExactRole(selectedDemoUser, [ADMIN_ROLE_ID])
+  const effectiveDashboardScopeValue: ProcurementDashboardScopeValue = canUseGroupDashboard
+    ? dashboardScopeValue
+    : selectedCompanyId
+  const dashboardScope: ProcurementDashboardScope = effectiveDashboardScopeValue === 'GROUP' ? 'GROUP' : 'COMPANY'
+  const dashboardCompanyId = dashboardScope === 'COMPANY' ? effectiveDashboardScopeValue : undefined
   const procurementDashboardQuery = useQuery({
     queryKey: ['procurement-dashboard', dashboardScope, dashboardCompanyId, selectedDemoUserId],
     queryFn: () => fetchProcurementDashboard(dashboardScope, selectedDemoUserId ?? '', dashboardCompanyId),
@@ -779,7 +782,6 @@ export function Workspace({
               isCreateOpen={isCreateDrawerOpen}
               onCreateClose={() => setCreateDrawerOpen(false)}
               purchaseRequests={purchaseRequests}
-              selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               suppliers={suppliers}
               users={users}
@@ -787,12 +789,13 @@ export function Workspace({
           ) : isApprovalRoute ? (
             <ApprovalCenterView
               activeDemoUser={selectedDemoUser}
+              budgetAccounts={budgetAccounts}
               categories={categories}
+              departments={departments}
               isError={foundationError}
               isLoading={foundationLoading}
               language={language}
               messages={messages}
-              selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               suppliers={suppliers}
               users={users}
@@ -812,7 +815,6 @@ export function Workspace({
               }}
               purchaseRequests={purchaseRequests}
               rfqs={rfqs}
-              selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               suppliers={suppliers}
               users={users}
@@ -832,7 +834,6 @@ export function Workspace({
               }}
               purchaseOrders={purchaseOrders}
               rfqs={rfqs}
-              selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               users={users}
             />
@@ -843,7 +844,6 @@ export function Workspace({
               language={language}
               messages={messages}
               onCreateModeChange={setReceiptInvoiceCreateMode}
-              selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               users={users}
             />
@@ -852,13 +852,13 @@ export function Workspace({
               activeDemoUser={selectedDemoUser}
               language={language}
               messages={messages}
-              selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               users={users}
             />
           ) : (
             <ProcurementDashboardView
               companies={companies}
+              canChangeScope={canUseGroupDashboard}
               dashboard={procurementDashboardQuery.data?.data ?? null}
               errorMessage={procurementDashboardQuery.error instanceof Error ? procurementDashboardQuery.error.message : null}
               isError={procurementDashboardQuery.isError}
@@ -867,7 +867,7 @@ export function Workspace({
               messages={messages}
               onCompanyChange={setSelectedCompanyId}
               onScopeChange={setDashboardScopeValue}
-              scopeValue={dashboardScopeValue}
+              scopeValue={effectiveDashboardScopeValue}
             />
           )}
         </Content>

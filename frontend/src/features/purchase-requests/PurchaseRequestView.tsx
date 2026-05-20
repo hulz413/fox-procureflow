@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { APPLICANT_ROLE_ID, demoUserHasExactRole, demoUserHasRoleCapability } from '../../demoRoleCapabilities'
-import type { Language, CompanyContext, UserSummary, CategorySummary, SupplierSummary, BudgetAccountSummary, PurchaseRequestDrawerMode, PurchaseRequestListItem, CreatePurchaseRequestDraftPayload, PurchaseRequestFormState, PurchaseRequestFormLine, AiAssistantResponse, AiDraftPreviewResult } from '../../domain/types'
+import type { Language, UserSummary, CategorySummary, SupplierSummary, BudgetAccountSummary, PurchaseRequestDrawerMode, PurchaseRequestListItem, CreatePurchaseRequestDraftPayload, PurchaseRequestFormState, PurchaseRequestFormLine, AiAssistantResponse, AiDraftPreviewResult } from '../../domain/types'
 import { fetchPurchaseRequestDetail, createPurchaseRequestDraft, submitPurchaseRequest, deletePurchaseRequestDraft, fetchApprovalByRequest, previewAiPurchaseRequestDraft, reviewAiPurchaseRequestRisk } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
@@ -26,7 +26,6 @@ export function PurchaseRequestView({
   onCreateClose,
   onRefresh,
   purchaseRequests,
-  selectedCompany,
   selectedCompanyId,
   suppliers,
   users,
@@ -42,7 +41,6 @@ export function PurchaseRequestView({
   onCreateClose: () => void
   onRefresh: () => void
   purchaseRequests: PurchaseRequestListItem[]
-  selectedCompany: CompanyContext
   selectedCompanyId: string
   suppliers: SupplierSummary[]
   users: UserSummary[]
@@ -573,7 +571,6 @@ export function PurchaseRequestView({
           <PanelTitle
             icon={<FileAddOutlined />}
             title={messages.purchaseRequest.list}
-            aside={selectedCompany.companyName}
           />
           {isError && <div className="data-alert">{messages.purchaseRequest.unavailable}</div>}
           <div className="table-wrap">
@@ -923,10 +920,6 @@ export function PurchaseRequestView({
 		                      : messages.approval.terminal
 		                    : messages.purchaseRequest.noApproval}
 		                </dd>
-		              </div>
-		              <div>
-		                <dt>{messages.purchaseRequest.matchedRule}</dt>
-		                <dd>{selectedDetail.approval?.matchedRuleId ?? messages.purchaseRequest.noApproval}</dd>
 		              </div>
 		            </dl>
                 <section className="ai-card">

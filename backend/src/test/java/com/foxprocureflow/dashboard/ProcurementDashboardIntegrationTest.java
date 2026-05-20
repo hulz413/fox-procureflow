@@ -71,12 +71,14 @@ class ProcurementDashboardIntegrationTest {
             .andExpect(jsonPath("$.data.groupId").value("group-xinghe"))
             .andExpect(jsonPath("$.data.companyIds", hasItem("company-digital")))
             .andExpect(jsonPath("$.data.companyIds", hasItem("company-manufacturing")))
-            .andExpect(jsonPath("$.data.summary[?(@.key=='issuedPoAmount')].value", hasItem(377307.00)))
-            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(2)))
-            .andExpect(jsonPath("$.data.spendTrend.length()").value(10))
+            .andExpect(jsonPath("$.data.summary[?(@.key=='issuedPoAmount')].value", hasItem(544434.00)))
+            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(4)))
+            .andExpect(jsonPath("$.data.spendTrend.length()").value(11))
             .andExpect(jsonPath("$.data.spendTrend[0].period").value("2026-05-10"))
             .andExpect(jsonPath("$.data.spendTrend[1].amount").value(0.00))
             .andExpect(jsonPath("$.data.spendTrend[9].period").value("2026-05-19"))
+            .andExpect(jsonPath("$.data.spendTrend[10].period").value("2026-05-20"))
+            .andExpect(jsonPath("$.data.spendTrend[10].amount").value(167127.00))
             .andExpect(jsonPath("$.data.exceptionHighlights[*].companyId", hasItem("company-digital")))
             .andExpect(jsonPath("$.data.exceptionHighlights[*].companyId", hasItem("company-manufacturing")));
 
@@ -89,8 +91,8 @@ class ProcurementDashboardIntegrationTest {
             .andExpect(jsonPath("$.data.companyId").value("company-digital"))
             .andExpect(jsonPath("$.data.companyName").value("星河数字科技有限公司"))
             .andExpect(jsonPath("$.data.companyIds.length()").value(1))
-            .andExpect(jsonPath("$.data.summary[?(@.key=='issuedPoAmount')].value", hasItem(267471.00)))
-            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(1)))
+            .andExpect(jsonPath("$.data.summary[?(@.key=='issuedPoAmount')].value", hasItem(350978.00)))
+            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(2)))
             .andExpect(jsonPath("$.data.exceptionHighlights[*].companyId", not(hasItem("company-manufacturing"))));
     }
 
@@ -115,6 +117,13 @@ class ProcurementDashboardIntegrationTest {
         mockMvc.perform(get("/api/procurement-dashboard")
                 .param("scope", "GROUP")
                 .param("actorId", "user-digital-buyer"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message", containsString("Only administrators")));
+
+        mockMvc.perform(get("/api/procurement-dashboard")
+                .param("scope", "COMPANY")
+                .param("companyId", "company-digital")
+                .param("actorId", "user-digital-buyer"))
             .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/procurement-dashboard")
@@ -122,6 +131,13 @@ class ProcurementDashboardIntegrationTest {
                 .param("companyId", "company-digital")
                 .param("actorId", "user-digital-finance"))
             .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/procurement-dashboard")
+                .param("scope", "COMPANY")
+                .param("companyId", "company-manufacturing")
+                .param("actorId", "user-digital-finance"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message", containsString("own company")));
 
         mockMvc.perform(get("/api/procurement-dashboard")
                 .param("scope", "GROUP")
@@ -137,15 +153,17 @@ class ProcurementDashboardIntegrationTest {
             .param("companyId", "company-manufacturing")
             .param("actorId", "user-digital-admin"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.spendTrend.length()").value(3))
+            .andExpect(jsonPath("$.data.spendTrend.length()").value(4))
             .andExpect(jsonPath("$.data.spendTrend[0].period").value("2026-05-17"))
             .andExpect(jsonPath("$.data.spendTrend[0].amount").value(28024.00))
             .andExpect(jsonPath("$.data.spendTrend[1].period").value("2026-05-18"))
             .andExpect(jsonPath("$.data.spendTrend[1].amount").value(0.00))
             .andExpect(jsonPath("$.data.spendTrend[2].period").value("2026-05-19"))
             .andExpect(jsonPath("$.data.spendTrend[2].amount").value(81812.00))
-            .andExpect(jsonPath("$.data.documentFunnel[?(@.key=='issuedPurchaseOrders')].count", hasItem(2)))
-            .andExpect(jsonPath("$.data.documentFunnel[?(@.key=='matchedPurchaseOrders')].count", hasItem(0)))
+            .andExpect(jsonPath("$.data.spendTrend[3].period").value("2026-05-20"))
+            .andExpect(jsonPath("$.data.spendTrend[3].amount").value(83620.00))
+            .andExpect(jsonPath("$.data.documentFunnel[?(@.key=='issuedPurchaseOrders')].count", hasItem(6)))
+            .andExpect(jsonPath("$.data.documentFunnel[?(@.key=='matchedPurchaseOrders')].count", hasItem(1)))
             .andExpect(jsonPath("$.data.statusDistributions[?(@.documentType=='approval')].status", hasItem("APPROVED")))
             .andExpect(jsonPath("$.data.statusDistributions[?(@.documentType=='rfq')].status", hasItem("COMPARISON_READY")))
             .andExpect(jsonPath("$.data.statusDistributions[?(@.documentType=='purchaseOrder')].status", hasItem("ISSUED")))

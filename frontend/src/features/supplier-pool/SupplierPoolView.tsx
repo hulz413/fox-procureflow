@@ -7,7 +7,7 @@ import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
 import { routeParam } from '../../shared/utils/route'
 import { formatRiskLevel, riskToneOf, formatSupplierStatus, supplierStatusToneOf, formatSupplierSharedScope } from '../../shared/utils/procurement'
-import { ListPagination, PanelTitle } from '../../shared/ui/common'
+import { ListPagination, TruncatedText, PanelTitle } from '../../shared/ui/common'
 
 const RISK_LEVEL_ORDER = ['low', 'medium', 'high']
 
@@ -64,6 +64,8 @@ export function SupplierPoolView({
 
     return matchesKeyword && matchesCategory && matchesRisk && matchesStatus
   })
+  const activeSupplierCount = filteredSuppliers.filter((supplier) => supplier.status.toLowerCase() === 'active').length
+  const inactiveSupplierCount = filteredSuppliers.filter((supplier) => supplier.status.toLowerCase() === 'inactive').length
   const supplierPagination = useListPagination(
     filteredSuppliers,
     `${selectedCompanyId}:${normalizedKeyword}:${categoryId}:${riskLevel}:${supplierStatus}`,
@@ -122,7 +124,17 @@ export function SupplierPoolView({
           <div className="summary-block">
             <span>{messages.supplierPool.coveredCategories}</span>
             <strong>{categories.length}</strong>
-            <small>{context.supplierPoolScope}</small>
+            <small title={context.supplierPoolScope}>{context.supplierPoolScope}</small>
+          </div>
+          <div className="summary-block">
+            <span>{messages.supplierPool.activeSuppliers}</span>
+            <strong>{activeSupplierCount}</strong>
+            <small>{messages.supplierPool.visibleSuppliers}</small>
+          </div>
+          <div className="summary-block">
+            <span>{messages.supplierPool.inactiveSuppliers}</span>
+            <strong>{inactiveSupplierCount}</strong>
+            <small>{messages.supplierPool.visibleSuppliers}</small>
           </div>
         </div>
 
@@ -209,12 +221,12 @@ export function SupplierPoolView({
                         onClick={() => setSelectedSupplierId(supplier.supplierId)}
                         type="button"
                       >
-                        <span>{supplier.supplierName}</span>
+                        <span title={supplier.supplierName}>{supplier.supplierName}</span>
                       </button>
-                      <small>{supplier.supplierId}</small>
+                      <small title={supplier.supplierId}>{supplier.supplierId}</small>
                     </td>
-                    <td>{supplier.serviceScope}</td>
-                    <td>{supplier.location}</td>
+                    <td title={supplier.serviceScope}>{supplier.serviceScope}</td>
+                    <td title={supplier.location}>{supplier.location}</td>
                     <td>
                       <span className={`tag ${riskToneOf(supplier.riskLevel)}`}>
                         {formatRiskLevel(supplier.riskLevel, language)}
@@ -225,7 +237,9 @@ export function SupplierPoolView({
                         {formatSupplierStatus(supplier.status, messages)}
                       </span>
                     </td>
-                    <td>{supplier.categories.map((category) => category.categoryName).join(' / ')}</td>
+                    <td title={supplier.categories.map((category) => category.categoryName).join(' / ')}>
+                      {supplier.categories.map((category) => category.categoryName).join(' / ')}
+                    </td>
                   </tr>
                 ))
               )}
@@ -255,8 +269,8 @@ export function SupplierPoolView({
           <div className="request-detail">
             <div className="detail-heading">
               <div>
-                <strong>{selectedSupplier.supplierName}</strong>
-                <span>{selectedSupplier.supplierId}</span>
+                <TruncatedText className="text-strong" text={selectedSupplier.supplierName} />
+                <TruncatedText className="text-small" text={selectedSupplier.supplierId} />
               </div>
               <span className={`tag ${riskToneOf(selectedSupplier.riskLevel)}`}>
                 {formatRiskLevel(selectedSupplier.riskLevel, language)}
@@ -265,11 +279,15 @@ export function SupplierPoolView({
             <dl className="detail-grid">
               <div>
                 <dt>{messages.supplierPool.serviceScope}</dt>
-                <dd>{selectedSupplier.serviceScope}</dd>
+                <dd>
+                  <TruncatedText text={selectedSupplier.serviceScope} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.supplierPool.location}</dt>
-                <dd>{selectedSupplier.location}</dd>
+                <dd>
+                  <TruncatedText text={selectedSupplier.location} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.supplierPool.status}</dt>
@@ -281,7 +299,9 @@ export function SupplierPoolView({
               </div>
               <div>
                 <dt>{messages.supplierPool.sharedScope}</dt>
-                <dd>{formatSupplierSharedScope(selectedSupplier.sharedScope, messages)}</dd>
+                <dd>
+                  <TruncatedText text={formatSupplierSharedScope(selectedSupplier.sharedScope, messages)} />
+                </dd>
               </div>
             </dl>
             <section className="line-items-card supplier-category-card">

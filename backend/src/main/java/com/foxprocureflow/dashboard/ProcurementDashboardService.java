@@ -33,8 +33,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProcurementDashboardService {
 
     private static final String DEFAULT_CURRENCY = "CNY";
+    private static final String ADMIN_ROLE_ID = "role-admin";
     private static final List<String> DASHBOARD_VIEWER_ROLE_IDS = List.of(
-        "role-admin",
+        ADMIN_ROLE_ID,
         "role-procurement",
         "role-finance");
 
@@ -57,9 +58,9 @@ public class ProcurementDashboardService {
 
     @Transactional(readOnly = true)
     public ProcurementDashboardResponse dashboard(ProcurementDashboardScope scope, String companyId, String actorId) {
-        validateDashboardActor(actorId);
+        DashboardActor actor = validateDashboardActor(actorId);
         DemoOrganizationContext context = organizationService.getDemoContext();
-        ScopeSelection selection = resolveScope(context, scope, companyId);
+        ScopeSelection selection = resolveScope(context, scope, companyId, actor);
         LocalDateTime generatedAt = LocalDateTime.now();
         MapSqlParameterSource params = new MapSqlParameterSource("companyIds", selection.companyIds());
 
@@ -79,7 +80,7 @@ public class ProcurementDashboardService {
             exceptionHighlights(params));
     }
 
-    private void validateDashboardActor(String actorId) {
+    private DashboardActor validateDashboardActor(String actorId) {
         if (!StringUtils.hasText(actorId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "actorId is required for procurement dashboard access");
         }
@@ -94,14 +95,22 @@ public class ProcurementDashboardService {
         if (!hasDashboardRole) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Current user is not allowed to access procurement dashboard");
         }
+
+        boolean admin = userRoleRepository.existsByUserIdAndRoleIdIn(actorId, List.of(ADMIN_ROLE_ID));
+        return new DashboardActor(actor.getCompanyId(), admin);
     }
 
     private ScopeSelection resolveScope(
         DemoOrganizationContext context,
         ProcurementDashboardScope scope,
-        String companyId
+        String companyId,
+        DashboardActor actor
     ) {
         if (scope == ProcurementDashboardScope.GROUP) {
+            if (!actor.admin()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only administrators can access group dashboard scope");
+            }
+
             return new ScopeSelection(
                 ProcurementDashboardScope.GROUP,
                 null,
@@ -111,6 +120,10 @@ public class ProcurementDashboardService {
 
         if (!StringUtils.hasText(companyId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "companyId is required for COMPANY dashboard scope");
+        }
+
+        if (!actor.admin() && !actor.companyId().equals(companyId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Current user can only access own company dashboard");
         }
 
         DemoCompanyContext company = context.companies()
@@ -472,6 +485,9 @@ public class ProcurementDashboardService {
                 .sorted(Comparator.naturalOrder())
                 .toList();
         }
+    }
+
+    private record DashboardActor(String companyId, boolean admin) {
     }
 
     private record AmountSummary(BigDecimal amount, String currency) {

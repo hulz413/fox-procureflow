@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { PROCUREMENT_ROLE_ID, demoUserHasRoleCapability } from '../../demoRoleCapabilities'
-import type { Language, CompanyContext, UserSummary, CategorySummary, SupplierSummary, PurchaseRequestListItem, RfqListItem, UpsertRfqQuotePayload, RfqCreateFormState, RfqQuoteFormState, AiAssistantResponse } from '../../domain/types'
+import type { Language, UserSummary, CategorySummary, SupplierSummary, PurchaseRequestListItem, RfqListItem, UpsertRfqQuotePayload, RfqCreateFormState, RfqQuoteFormState, AiAssistantResponse } from '../../domain/types'
 import { fetchRfqDetail, createRfq, upsertRfqQuote, uploadAttachment, fetchRfqComparison, explainAiRfqQuotes } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
@@ -26,7 +26,6 @@ export function RfqView({
   onRefresh,
   purchaseRequests,
   rfqs,
-  selectedCompany,
   selectedCompanyId,
   suppliers,
   users,
@@ -42,7 +41,6 @@ export function RfqView({
   onRefresh: () => void
   purchaseRequests: PurchaseRequestListItem[]
   rfqs: RfqListItem[]
-  selectedCompany: CompanyContext
   selectedCompanyId: string
   suppliers: SupplierSummary[]
   users: UserSummary[]
@@ -226,7 +224,9 @@ export function RfqView({
     ? messages.rfq.saveQuotePendingReason
     : isQuoteUploading
       ? messages.rfq.uploadingAttachment
-      : undefined
+      : !isQuoteDirty
+        ? messages.rfq.noQuoteChanges
+        : undefined
   const createRfqDisabledReason = createMutation.isPending
     ? messages.rfq.createPendingReason
     : approvedRequests.length === 0
@@ -489,7 +489,7 @@ export function RfqView({
       {modalContextHolder}
       <section className="request-grid rfq-grid">
         <section className="panel request-list-panel">
-          <PanelTitle icon={<FileSearchOutlined />} title={messages.rfq.list} aside={selectedCompany.companyName} />
+          <PanelTitle icon={<FileSearchOutlined />} title={messages.rfq.list} />
           {isError && <div className="data-alert">{messages.rfq.unavailable}</div>}
           <div className="table-wrap">
             <table className="request-table">
@@ -616,7 +616,9 @@ export function RfqView({
               <dl className="detail-grid form-wide">
                 <div>
                   <dt>{messages.purchaseRequest.category}</dt>
-                  <dd>{categoryNameOf(selectedCreateRequest.categoryId, categories)}</dd>
+                  <dd>
+                    <TruncatedText text={categoryNameOf(selectedCreateRequest.categoryId, categories)} />
+                  </dd>
                 </div>
                 <div>
                   <dt>{messages.purchaseRequest.totalAmount}</dt>
@@ -654,11 +656,15 @@ export function RfqView({
             <dl className="detail-grid">
               <div>
                 <dt>{messages.rfq.procurementUser}</dt>
-                <dd>{userNameOf(detail.procurementUserId, users)}</dd>
+                <dd>
+                  <TruncatedText text={userNameOf(detail.procurementUserId, users)} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.purchaseRequest.category}</dt>
-                <dd>{categoryNameOf(detail.categoryId, categories)}</dd>
+                <dd>
+                  <TruncatedText text={categoryNameOf(detail.categoryId, categories)} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.purchaseRequest.totalAmount}</dt>
@@ -682,8 +688,10 @@ export function RfqView({
                       onClick={() => handleQuoteSupplierChange(supplier.supplierId)}
                       type="button"
                     >
-                      <strong>{supplier.supplierName}</strong>
-                      <span>{quote ? formatCurrency(quote.totalAmount, detail.currency, language) : messages.rfq.noQuote}</span>
+                      <strong title={supplier.supplierName}>{supplier.supplierName}</strong>
+                      <span title={quote ? formatCurrency(quote.totalAmount, detail.currency, language) : messages.rfq.noQuote}>
+                        {quote ? formatCurrency(quote.totalAmount, detail.currency, language) : messages.rfq.noQuote}
+                      </span>
                       <em className={`tag ${riskToneOf(supplier.riskLevel)}`}>
                         {formatRiskLevel(supplier.riskLevel, language)}
                       </em>

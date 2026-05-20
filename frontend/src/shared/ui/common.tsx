@@ -135,7 +135,7 @@ export function StatusPill({
   }
 
   return (
-    <span className="status-pill">
+    <span aria-label={`${label} ${state}`} className="status-pill" role="status">
       <AlertOutlined />
       {label} {state}
     </span>
@@ -413,7 +413,7 @@ export function PanelTitle({
         {icon}
         {title}
       </strong>
-      {actions ?? (aside && <span>{aside}</span>)}
+      {actions ?? (aside && <span title={aside}>{aside}</span>)}
     </div>
   )
 }

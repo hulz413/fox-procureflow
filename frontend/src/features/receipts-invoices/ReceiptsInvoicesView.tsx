@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { DEMO_OPERATOR_ROLE_ID, FINANCE_ROLE_ID, PROCUREMENT_ROLE_ID, WAREHOUSE_ROLE_ID, demoUserHasRoleCapability } from '../../demoRoleCapabilities'
-import type { Language, CompanyContext, UserSummary, ReceiptInvoiceCreateMode, FulfillmentPurchaseOrder, ReceiptCreateFormState, InvoiceCreateFormState, InvoiceEditableLineKey } from '../../domain/types'
+import type { Language, UserSummary, ReceiptInvoiceCreateMode, FulfillmentPurchaseOrder, ReceiptCreateFormState, InvoiceCreateFormState, InvoiceEditableLineKey } from '../../domain/types'
 import { uploadAttachment, fetchFulfillmentPurchaseOrders, fetchReceipts, fetchInvoices, createReceipt, createInvoice } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
@@ -21,7 +21,6 @@ export function ReceiptsInvoicesView({
   language,
   messages,
   onCreateModeChange,
-  selectedCompany,
   selectedCompanyId,
   users,
 }: {
@@ -30,7 +29,6 @@ export function ReceiptsInvoicesView({
   language: Language
   messages: LocalizedMessages
   onCreateModeChange: (mode: ReceiptInvoiceCreateMode | null) => void
-  selectedCompany: CompanyContext
   selectedCompanyId: string
   users: UserSummary[]
 }) {
@@ -396,7 +394,6 @@ export function ReceiptsInvoicesView({
           <PanelTitle
             actions={(
               <div className="panel-title-actions">
-                <span>{selectedCompany.companyName}</span>
                 <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
                   <button
                     className="primary-button"

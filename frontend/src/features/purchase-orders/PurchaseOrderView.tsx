@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { PROCUREMENT_ROLE_ID, demoUserHasRoleCapability } from '../../demoRoleCapabilities'
-import type { Language, CompanyContext, UserSummary, CategorySummary, RfqQuote, RfqListItem, PurchaseOrderListItem, PurchaseOrderActionPayload, CancelPurchaseOrderPayload, PurchaseOrderCreateFormState } from '../../domain/types'
+import type { Language, UserSummary, CategorySummary, RfqQuote, RfqListItem, PurchaseOrderListItem, PurchaseOrderActionPayload, CancelPurchaseOrderPayload, PurchaseOrderCreateFormState } from '../../domain/types'
 import { fetchRfqDetail, fetchRfqComparison, fetchPurchaseOrderDetail, createPurchaseOrder, publishPurchaseOrder, cancelPurchaseOrder } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
@@ -25,7 +25,6 @@ export function PurchaseOrderView({
   onRefresh,
   purchaseOrders,
   rfqs,
-  selectedCompany,
   selectedCompanyId,
   users,
 }: {
@@ -40,7 +39,6 @@ export function PurchaseOrderView({
   onRefresh: () => void
   purchaseOrders: PurchaseOrderListItem[]
   rfqs: RfqListItem[]
-  selectedCompany: CompanyContext
   selectedCompanyId: string
   users: UserSummary[]
 }) {
@@ -451,7 +449,7 @@ export function PurchaseOrderView({
       {modalContextHolder}
       <section className="request-grid rfq-grid">
         <section className="panel request-list-panel">
-          <PanelTitle icon={<ShoppingCartOutlined />} title={messages.purchaseOrder.list} aside={selectedCompany.companyName} />
+          <PanelTitle icon={<ShoppingCartOutlined />} title={messages.purchaseOrder.list} />
           {isError && <div className="data-alert">{messages.purchaseOrder.unavailable}</div>}
           <div className="table-wrap">
             <table className="request-table">
@@ -695,15 +693,21 @@ export function PurchaseOrderView({
             <dl className="detail-grid">
               <div>
                 <dt>{messages.purchaseOrder.supplier}</dt>
-                <dd>{detail.supplierName}</dd>
+                <dd>
+                  <TruncatedText text={detail.supplierName} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.purchaseOrder.buyer}</dt>
-                <dd>{userNameOf(detail.procurementUserId, users)}</dd>
+                <dd>
+                  <TruncatedText text={userNameOf(detail.procurementUserId, users)} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.purchaseRequest.category}</dt>
-                <dd>{categoryNameOf(detail.categoryId, categories)}</dd>
+                <dd>
+                  <TruncatedText text={categoryNameOf(detail.categoryId, categories)} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.rfq.totalAmount}</dt>
@@ -724,11 +728,15 @@ export function PurchaseOrderView({
               <dl className="detail-grid">
                 <div>
                   <dt>{messages.purchaseOrder.sourceRfq}</dt>
-                  <dd>{detail.rfqId}</dd>
+                  <dd>
+                    <TruncatedText text={detail.rfqId} />
+                  </dd>
                 </div>
                 <div>
                   <dt>{messages.purchaseOrder.selectedQuote}</dt>
-                  <dd>{detail.quoteId}</dd>
+                  <dd>
+                    <TruncatedText text={detail.quoteId} />
+                  </dd>
                 </div>
                 <div>
                   <dt>{messages.rfq.quoteAmount}</dt>
@@ -746,19 +754,27 @@ export function PurchaseOrderView({
               <dl className="detail-grid">
                 <div>
                   <dt>{messages.purchaseOrder.deliveryLocation}</dt>
-                  <dd>{detail.deliverySchedule.deliveryLocation}</dd>
+                  <dd>
+                    <TruncatedText text={detail.deliverySchedule.deliveryLocation} />
+                  </dd>
                 </div>
                 <div>
                   <dt>{messages.purchaseOrder.contactPerson}</dt>
-                  <dd>{detail.deliverySchedule.contactPerson}</dd>
+                  <dd>
+                    <TruncatedText text={detail.deliverySchedule.contactPerson} />
+                  </dd>
                 </div>
                 <div>
                   <dt>{messages.purchaseOrder.contactPhone}</dt>
-                  <dd>{detail.deliverySchedule.contactPhone}</dd>
+                  <dd>
+                    <TruncatedText text={detail.deliverySchedule.contactPhone} />
+                  </dd>
                 </div>
                 <div>
                   <dt>{messages.purchaseOrder.deliveryNote}</dt>
-                  <dd>{detail.deliverySchedule.deliveryNote ?? '-'}</dd>
+                  <dd>
+                    <TruncatedText text={detail.deliverySchedule.deliveryNote ?? '-'} />
+                  </dd>
                 </div>
               </dl>
             </section>
@@ -806,8 +822,8 @@ export function PurchaseOrderView({
                         {formatPurchaseOrderAction(record.action, messages)}
                       </span>
                       <div>
-                        <strong>{userNameOf(record.actorId, users)}</strong>
-                        <small>{formatDateTime(record.createdAt, language)}</small>
+                        <strong title={userNameOf(record.actorId, users)}>{userNameOf(record.actorId, users)}</strong>
+                        <small title={formatDateTime(record.createdAt, language)}>{formatDateTime(record.createdAt, language)}</small>
                         {record.comment && <p>{record.comment}</p>}
                       </div>
                     </article>

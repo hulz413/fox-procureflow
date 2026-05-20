@@ -8,6 +8,7 @@ import { formatCurrency, formatMatchSeverity, severityToneOf, formatDashboardExc
 import { TruncatedText, PanelTitle } from '../../shared/ui/common'
 
 export function ProcurementDashboardView({
+  canChangeScope,
   companies,
   dashboard,
   errorMessage,
@@ -19,6 +20,7 @@ export function ProcurementDashboardView({
   onScopeChange,
   scopeValue,
 }: {
+  canChangeScope: boolean
   companies: CompanyContext[]
   dashboard: ProcurementDashboard | null
   errorMessage: string | null
@@ -32,6 +34,18 @@ export function ProcurementDashboardView({
 }) {
   const navigate = useNavigate()
   const metrics = dashboardMetricsInOrder(dashboard?.summary ?? [])
+  const openMetricTarget = (metric: DashboardMetric) => {
+    const targetPath = dashboardMetricTargetPath(metric.key)
+    if (!targetPath) {
+      return
+    }
+
+    if (dashboard?.companyId) {
+      onCompanyChange(dashboard.companyId)
+    }
+
+    navigate(targetPath)
+  }
   const openExceptionDetail = (exception: ExceptionHighlight) => {
     onCompanyChange(exception.companyId)
     navigate(`/three-way-matching?companyId=${encodeURIComponent(exception.companyId)}&matchId=${encodeURIComponent(exception.matchId)}`)
@@ -39,42 +53,44 @@ export function ProcurementDashboardView({
 
   return (
     <div className="dashboard-page">
-      <section className="panel dashboard-scope-panel">
-        <PanelTitle
-          icon={<DashboardOutlined />}
-          title={messages.dashboard.scope}
-          aside={dashboard ? `${messages.dashboard.generatedAt}: ${formatDateTime(dashboard.generatedAt, language)}` : messages.dashboard.dataState}
-        />
-        <div className="dashboard-scope-switch">
-          <button
-            className={scopeValue === 'GROUP' ? 'company-option active' : 'company-option'}
-            onClick={() => onScopeChange('GROUP')}
-            type="button"
-          >
-            <BankOutlined />
-            <span>
-              <strong>{messages.dashboard.groupScope}</strong>
-              <small>{dashboard?.groupName ?? demoContext.groupName}</small>
-            </span>
-            <em>{messages.boundary.groupShared}</em>
-          </button>
-          {companies.map((company) => (
+      {canChangeScope && (
+        <section className="panel dashboard-scope-panel">
+          <PanelTitle
+            icon={<DashboardOutlined />}
+            title={messages.dashboard.scope}
+            aside={dashboard ? `${messages.dashboard.generatedAt}: ${formatDateTime(dashboard.generatedAt, language)}` : messages.dashboard.dataState}
+          />
+          <div className="dashboard-scope-switch">
             <button
-              className={scopeValue === company.companyId ? 'company-option active' : 'company-option'}
-              key={company.companyId}
-              onClick={() => onScopeChange(company.companyId)}
+              className={scopeValue === 'GROUP' ? 'company-option active' : 'company-option'}
+              onClick={() => onScopeChange('GROUP')}
               type="button"
             >
               <BankOutlined />
               <span>
-                <strong>{company.companyName}</strong>
-                <small>{company.businessScope}</small>
+                <strong title={messages.dashboard.groupScope}>{messages.dashboard.groupScope}</strong>
+                <small title={dashboard?.groupName ?? demoContext.groupName}>{dashboard?.groupName ?? demoContext.groupName}</small>
               </span>
-              <em>{messages.boundary.companyIsolated}</em>
+              <em>{messages.boundary.groupShared}</em>
             </button>
-          ))}
-        </div>
-      </section>
+            {companies.map((company) => (
+              <button
+                className={scopeValue === company.companyId ? 'company-option active' : 'company-option'}
+                key={company.companyId}
+                onClick={() => onScopeChange(company.companyId)}
+                type="button"
+              >
+              <BankOutlined />
+              <span>
+                  <strong title={company.companyName}>{company.companyName}</strong>
+                  <small title={company.businessScope}>{company.businessScope}</small>
+                </span>
+                <em>{messages.boundary.companyIsolated}</em>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {isError && <div className="data-alert">{errorMessage ?? messages.dashboard.unavailable}</div>}
 
@@ -85,24 +101,47 @@ export function ProcurementDashboardView({
       ) : dashboard ? (
         <>
           <section className="kpi-grid" aria-label={messages.aria.procurementMetrics}>
-            {metrics.map((metric) => (
-              <article className="panel kpi" key={metric.key}>
-                <div>
-                  <span>{dashboardMetricLabel(metric, messages)}</span>
-                  {dashboardMetricIcon(metric.key)}
-                </div>
-                <strong>{formatDashboardMetric(metric, language)}</strong>
-                <small className={dashboardMetricTone(metric.key, metric.value)}>
-                  {dashboardMetricNote(metric, messages, language)}
-                </small>
-              </article>
-            ))}
+            {metrics.map((metric) => {
+              const targetPath = dashboardMetricTargetPath(metric.key)
+              const metricContent = (
+                <>
+                  <div>
+                    <span>{dashboardMetricLabel(metric, messages)}</span>
+                    {dashboardMetricIcon(metric.key)}
+                  </div>
+                  <strong>{formatDashboardMetric(metric, language)}</strong>
+                  <small className={dashboardMetricTone(metric.key, metric.value)}>
+                    {dashboardMetricNote(metric, messages, language)}
+                  </small>
+                </>
+              )
+
+              return targetPath ? (
+                <button
+                  aria-label={dashboardMetricAriaLabel(metric, messages, language)}
+                  className="panel kpi dashboard-kpi-link"
+                  key={metric.key}
+                  onClick={() => openMetricTarget(metric)}
+                  type="button"
+                >
+                  {metricContent}
+                </button>
+              ) : (
+                <article className="panel kpi" key={metric.key}>
+                  {metricContent}
+                </article>
+              )
+            })}
           </section>
 
           <section className="dashboard-grid">
             <div className="left-column">
               <section className="panel chart-panel">
-                <PanelTitle icon={<DashboardOutlined />} title={messages.dashboard.spendTrend} aside={dashboard.scope === 'GROUP' ? messages.dashboard.groupScope : dashboard.companyName ?? ''} />
+                <PanelTitle
+                  icon={<DashboardOutlined />}
+                  title={messages.dashboard.spendTrend}
+                  aside={canChangeScope ? (dashboard.scope === 'GROUP' ? messages.dashboard.groupScope : dashboard.companyName ?? '') : undefined}
+                />
                 {dashboard.spendTrend.length === 0 ? (
                   <div className="empty-state compact">{messages.dashboard.noTrend}</div>
                 ) : (
@@ -177,7 +216,7 @@ export function ProcurementDashboardView({
                         </span>
                       </button>
                     ))}
-                    <button className="primary-button dashboard-link-button" onClick={() => navigate('/three-way-matching')} type="button">
+                    <button className="primary-button dashboard-link-button" onClick={() => navigate('/three-way-matching?tab=exceptions')} type="button">
                       <SwapOutlined />
                       <span>{messages.dashboard.viewMatching}</span>
                     </button>
@@ -233,6 +272,45 @@ function dashboardMetricIcon(key: string) {
   }
 
   return <ShoppingCartOutlined />
+}
+
+function dashboardMetricTargetPath(key: string) {
+  const targets: Record<string, string> = {
+    activeRfqs: '/rfqs',
+    issuedPoAmount: '/purchase-orders',
+    issuedPurchaseOrders: '/purchase-orders',
+    matchingExceptions: '/three-way-matching?tab=exceptions',
+    pendingApprovals: '/approvals',
+    receiptInvoiceFollowUp: '/receipts-invoices',
+  }
+
+  return targets[key]
+}
+
+function dashboardMetricTargetName(key: string, messages: LocalizedMessages) {
+  if (key === 'pendingApprovals') {
+    return messages.header.approvalsTitle
+  }
+  if (key === 'activeRfqs') {
+    return messages.header.rfqTitle
+  }
+  if (key === 'receiptInvoiceFollowUp') {
+    return messages.header.receiptInvoiceTitle
+  }
+  if (key === 'matchingExceptions') {
+    return messages.header.matchingTitle
+  }
+
+  return messages.header.purchaseOrdersTitle
+}
+
+function dashboardMetricAriaLabel(metric: DashboardMetric, messages: LocalizedMessages, language: Language) {
+  const metricLabel = dashboardMetricLabel(metric, messages)
+  const targetName = dashboardMetricTargetName(metric.key, messages)
+
+  return language === 'zh'
+    ? `${metricLabel}，打开${targetName}`
+    : `Open ${targetName} from ${metricLabel}`
 }
 
 

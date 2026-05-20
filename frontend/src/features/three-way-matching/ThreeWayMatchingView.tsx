@@ -4,7 +4,7 @@ import { Drawer, Modal } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { FINANCE_ROLE_ID, demoUserHasRoleCapability } from '../../demoRoleCapabilities'
-import type { Language, CompanyContext, UserSummary, ThreeWayMatchActionType, ThreeWayMatchTab, HandleMatchActionPayload, AiAssistantResponse } from '../../domain/types'
+import type { Language, UserSummary, ThreeWayMatchActionType, ThreeWayMatchTab, HandleMatchActionPayload, AiAssistantResponse } from '../../domain/types'
 import { fetchThreeWayMatches, fetchThreeWayMatchExceptions, fetchThreeWayMatchDetail, recalculateThreeWayMatch, handleThreeWayMatchAction, explainAiMatchingException } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
@@ -16,14 +16,12 @@ export function ThreeWayMatchingView({
   activeDemoUser,
   language,
   messages,
-  selectedCompany,
   selectedCompanyId,
   users,
 }: {
   activeDemoUser?: UserSummary
   language: Language
   messages: LocalizedMessages
-  selectedCompany: CompanyContext
   selectedCompanyId: string
   users: UserSummary[]
 }) {
@@ -31,8 +29,10 @@ export function ThreeWayMatchingView({
   const location = useLocation()
   const [modal, modalContextHolder] = Modal.useModal()
   const handledRouteMatchKey = useRef('')
+  const handledRouteTabKey = useRef('')
   const routeMatchId = routeParam(location.search, 'matchId')
-  const [activeTab, setActiveTab] = useState<ThreeWayMatchTab>('all')
+  const routeTab = matchingTabParam(location.search)
+  const [activeTab, setActiveTab] = useState<ThreeWayMatchTab>(() => routeTab || 'all')
   const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [actionNote, setActionNote] = useState('')
@@ -86,6 +86,20 @@ export function ThreeWayMatchingView({
     pending: matchingRows.filter((row) => row.status === 'PENDING_INPUT').length,
     resolved: matchingRows.filter((row) => row.status === 'RESOLVED').length,
   }
+
+  useEffect(() => {
+    if (!routeTab) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routeTab}`
+    if (handledRouteTabKey.current === routeKey) {
+      return
+    }
+
+    handledRouteTabKey.current = routeKey
+    setActiveTab(routeTab)
+  }, [location.key, routeTab])
 
   useEffect(() => {
     if (selectedMatchId && !matchingRows.some((row) => row.matchId === selectedMatchId)) {
@@ -296,7 +310,7 @@ export function ThreeWayMatchingView({
             <CheckCircleOutlined />
           </div>
           <strong>{totals.matched}</strong>
-          <small>{selectedCompany.companyName}</small>
+          <small>{messages.matching.dataState}</small>
         </article>
         <article className="panel kpi">
           <div>
@@ -326,7 +340,7 @@ export function ThreeWayMatchingView({
 
       <section className="request-grid rfq-grid">
         <section className="panel request-list-panel">
-          <PanelTitle icon={<SwapOutlined />} title={messages.matching.list} aside={selectedCompany.companyName} />
+          <PanelTitle icon={<SwapOutlined />} title={messages.matching.list} />
           {isError && <div className="data-alert">{messages.matching.unavailable}</div>}
           {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
           <div className="matching-tabs">
@@ -423,15 +437,17 @@ export function ThreeWayMatchingView({
           <section className="request-detail matching-detail">
             <div className="detail-heading">
               <div>
-                <strong>{detail.sourcePo.poId}</strong>
-                <span>{detail.sourcePo.title}</span>
+                <TruncatedText className="text-strong" text={detail.sourcePo.poId} />
+                <TruncatedText className="text-small" text={detail.sourcePo.title} />
               </div>
               <span className={`tag ${matchStatusToneOf(detail.status)}`}>{formatMatchStatus(detail.status, messages)}</span>
             </div>
             <dl className="detail-grid">
               <div>
                 <dt>{messages.purchaseOrder.supplier}</dt>
-                <dd>{detail.sourcePo.supplierName}</dd>
+                <dd>
+                  <TruncatedText text={detail.sourcePo.supplierName} />
+                </dd>
               </div>
               <div>
                 <dt>{messages.matching.poAmount}</dt>
@@ -548,8 +564,10 @@ export function ThreeWayMatchingView({
                 ) : (
                   detail.actions.map((action) => (
                     <article className="timeline-item" key={action.actionId}>
-                      <strong>{formatMatchAction(action.actionType, messages)}</strong>
-                      <span>{userNameOf(action.actorId, users)} · {formatDateTime(action.createdAt, language)}</span>
+                      <strong title={formatMatchAction(action.actionType, messages)}>{formatMatchAction(action.actionType, messages)}</strong>
+                      <span title={`${userNameOf(action.actorId, users)} · ${formatDateTime(action.createdAt, language)}`}>
+                        {userNameOf(action.actorId, users)} · {formatDateTime(action.createdAt, language)}
+                      </span>
                       <p>{action.note}</p>
                     </article>
                   ))
@@ -607,4 +625,14 @@ export function ThreeWayMatchingView({
       </Drawer>
     </>
   )
+}
+
+function matchingTabParam(search: string): ThreeWayMatchTab | '' {
+  const tab = routeParam(search, 'tab')
+
+  if (tab === 'all' || tab === 'exceptions' || tab === 'resolved') {
+    return tab
+  }
+
+  return ''
 }

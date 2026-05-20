@@ -1,38 +1,40 @@
 import { AlertOutlined, ApiOutlined, AuditOutlined, CheckCircleOutlined, LoadingOutlined, ProfileOutlined, SwapOutlined } from '@ant-design/icons'
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Drawer, Modal, Select } from 'antd'
+import { Drawer, Modal } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ADMIN_ROLE_ID, APPROVER_ROLE_ID, FINANCE_ROLE_ID, demoUserHasExactRole } from '../../demoRoleCapabilities'
 import { ALL_APPROVERS_VALUE } from '../../domain/types'
-import type { Language, CompanyContext, UserSummary, CategorySummary, SupplierSummary, AiAssistantResponse } from '../../domain/types'
+import type { Language, UserSummary, CategorySummary, SupplierSummary, BudgetAccountSummary, DepartmentSummary, AiAssistantResponse } from '../../domain/types'
 import { fetchApprovalTasks, fetchApprovalDetail, approveApproval, rejectApproval, withdrawApproval, reviewAiPurchaseRequestRisk } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
 import { routeParam } from '../../shared/utils/route'
-import { formatCurrency, getViewportCenter, formatApprovalStatus, approvalStatusToneOf, contextText, contextAmount, categoryNameOf, userNameOf, contextSupplierText, formatDateTime } from '../../shared/utils/procurement'
+import { formatCurrency, getViewportCenter, formatApprovalStatus, approvalStatusToneOf, contextText, contextAmount, categoryNameOf, budgetNameOf, userNameOf, contextSupplierText, formatDate, formatDateTime } from '../../shared/utils/procurement'
 import { ListPagination, TruncatedText, DisabledActionTooltip, AiResultPanel, PanelTitle } from '../../shared/ui/common'
 import { ApprovalProgress } from '../../shared/ui/procurementWidgets'
 
 export function ApprovalCenterView({
   activeDemoUser,
+  budgetAccounts,
   categories,
+  departments,
   isError,
   isLoading,
   language,
   messages,
-  selectedCompany,
   selectedCompanyId,
   suppliers,
   users,
 }: {
   activeDemoUser?: UserSummary
+  budgetAccounts: BudgetAccountSummary[]
   categories: CategorySummary[]
+  departments: DepartmentSummary[]
   isError: boolean
   isLoading: boolean
   language: Language
   messages: LocalizedMessages
-  selectedCompany: CompanyContext
   selectedCompanyId: string
   suppliers: SupplierSummary[]
   users: UserSummary[]
@@ -126,27 +128,24 @@ export function ApprovalCenterView({
   })
   const detail = detailQuery.data?.data
   const activeNode = detail?.nodes.find((node) => node.status === 'ACTIVE')
+  const summaryDepartmentId = detail ? contextText(detail.contextSnapshot, 'departmentId') : ''
+  const summaryBudgetAccountId = detail ? contextText(detail.contextSnapshot, 'budgetAccountId') : ''
+  const summaryExpectedDeliveryDate = detail ? contextText(detail.contextSnapshot, 'expectedDeliveryDate') : ''
+  const summaryDepartmentName =
+    departments.find((department) => department.departmentId === summaryDepartmentId)?.departmentName ??
+    users.find((user) => user.departmentId === summaryDepartmentId)?.departmentName ??
+    summaryDepartmentId
+  const summaryBudgetAccountName = budgetNameOf(summaryBudgetAccountId, budgetAccounts)
+  const summarySupplierText = detail ? contextSupplierText(detail.contextSnapshot, suppliers, messages) : ''
+  const summaryDeliveryDateText = summaryExpectedDeliveryDate
+    ? formatDate(summaryExpectedDeliveryDate, language)
+    : '-'
   const approvalActorId = selectedApproverId === ALL_APPROVERS_VALUE ? activeNode?.approverId ?? '' : selectedApproverId
   const canApprove =
     detail?.status === 'IN_PROGRESS' &&
     Boolean(activeNode) &&
     (isAdmin || activeNode?.approverId === selectedApproverId)
   const canWithdraw = detail?.status === 'IN_PROGRESS'
-  const activeApprover = approvers.find((user) => user.userId === activeApproverId)
-  const approverOptions = [
-    ...(isAdmin
-      ? [{
-          label: messages.approval.allApprovers,
-          searchText: messages.approval.allApprovers,
-          value: ALL_APPROVERS_VALUE,
-        }]
-      : []),
-    ...approvers.map((user) => ({
-      label: `${user.displayName} · ${user.positionTitle}`,
-      searchText: `${user.displayName} ${user.positionTitle} ${user.email} ${user.userId}`,
-      value: user.userId,
-    })),
-  ]
 
   const actionMutation = useMutation({
     mutationFn: ({
@@ -247,15 +246,6 @@ export function ApprovalCenterView({
     })
   }
 
-  const handleApproverChange = (approverId: string) => {
-    setSelectedApproverId(approverId)
-    setSelectedApprovalId(undefined)
-    setDetailDrawerOpen(false)
-    setComment('')
-    setFeedback(null)
-    setAiRiskResponse(null)
-  }
-
   const closeApprovalDrawer = () => {
     setDetailDrawerOpen(false)
     setComment('')
@@ -311,35 +301,7 @@ export function ApprovalCenterView({
     {modalContextHolder}
     <section className="approval-grid">
       <section className="panel approval-task-panel">
-        <PanelTitle icon={<AuditOutlined />} title={messages.approval.taskList} aside={selectedCompany.companyName} />
-        <div className="approval-toolbar">
-          <label>
-            <span>{messages.approval.approver}</span>
-            {isAdmin ? (
-              <Select
-                aria-label={messages.approval.approver}
-                className="approval-approver-select"
-                disabled={approvers.length === 0}
-                filterOption={(input, option) =>
-                  String(option?.searchText ?? option?.label ?? '')
-                    .toLowerCase()
-                    .includes(input.toLowerCase())
-                }
-                notFoundContent={messages.approval.noApprover}
-                onChange={handleApproverChange}
-                optionFilterProp="label"
-                options={approverOptions}
-                placeholder={messages.approval.searchApprover}
-                showSearch
-                value={selectedApproverId || undefined}
-              />
-            ) : (
-              <div className="approval-approver-readonly">
-                {activeApprover ? `${activeApprover.displayName} · ${activeApprover.positionTitle}` : messages.approval.noApprover}
-              </div>
-            )}
-          </label>
-        </div>
+        <PanelTitle icon={<AuditOutlined />} title={messages.approval.taskList} />
         {(isError || tasksError) && <div className="data-alert">{messages.approval.unavailable}</div>}
         <div className="table-wrap">
           <table className="request-table approval-task-table">
@@ -428,11 +390,15 @@ export function ApprovalCenterView({
           <dl className="detail-grid">
             <div>
               <dt>{messages.approval.requester}</dt>
-              <dd>{userNameOf(detail.requesterId, users)}</dd>
+              <dd>
+                <TruncatedText text={userNameOf(detail.requesterId, users)} />
+              </dd>
             </div>
             <div>
               <dt>{messages.purchaseRequest.category}</dt>
-              <dd>{categoryNameOf(contextText(detail.contextSnapshot, 'categoryId'), categories)}</dd>
+              <dd>
+                <TruncatedText text={categoryNameOf(contextText(detail.contextSnapshot, 'categoryId'), categories)} />
+              </dd>
             </div>
             <div>
               <dt>{messages.purchaseRequest.totalAmount}</dt>
@@ -446,11 +412,9 @@ export function ApprovalCenterView({
             </div>
             <div>
               <dt>{messages.approval.currentApprover}</dt>
-              <dd>{activeNode ? userNameOf(activeNode.approverId, users) : messages.approval.terminal}</dd>
-            </div>
-            <div>
-              <dt>{messages.approval.matchedRule}</dt>
-              <dd>{detail.matchedRuleId}</dd>
+              <dd>
+                <TruncatedText text={activeNode ? userNameOf(activeNode.approverId, users) : messages.approval.terminal} />
+              </dd>
             </div>
             <div>
               <dt>{messages.approval.startedAt}</dt>
@@ -460,12 +424,32 @@ export function ApprovalCenterView({
 
           <section className="approval-context">
             <PanelTitle icon={<ProfileOutlined />} title={messages.approval.requestSummary} />
-            <div className="context-grid">
-              <span>{contextText(detail.contextSnapshot, 'departmentId')}</span>
-              <span>{contextText(detail.contextSnapshot, 'budgetAccountId')}</span>
-              <span>{contextSupplierText(detail.contextSnapshot, suppliers, messages)}</span>
-              <span>{contextText(detail.contextSnapshot, 'expectedDeliveryDate')}</span>
-            </div>
+            <dl className="context-grid">
+              <div>
+                <dt>{messages.purchaseRequest.department}</dt>
+                <dd>
+                  <TruncatedText text={summaryDepartmentName} />
+                </dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseRequest.budgetAccount}</dt>
+                <dd>
+                  <TruncatedText text={summaryBudgetAccountName} />
+                </dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseRequest.supplier}</dt>
+                <dd>
+                  <TruncatedText text={summarySupplierText} />
+                </dd>
+              </div>
+              <div>
+                <dt>{messages.purchaseRequest.expectedDeliveryDate}</dt>
+                <dd>
+                  <TruncatedText text={summaryDeliveryDateText} />
+                </dd>
+              </div>
+            </dl>
           </section>
 
           <section className="ai-card">
