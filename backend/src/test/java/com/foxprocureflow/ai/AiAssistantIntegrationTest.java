@@ -252,6 +252,18 @@ class AiAssistantIntegrationTest {
     }
 
     @Test
+    void explainsPartialRfqWhenInsightMentionsInvitedSupplierWithoutQuote() throws Exception {
+        mockMvc.perform(post("/api/ai-assistant/rfq-quote-explanation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "companyId", "company-digital",
+                    "actorId", "user-digital-buyer",
+                    "rfqId", "RFQ-20260519-0602"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.result.supplierInsights[0].supplierId").value("supplier-bluechip"));
+    }
+
+    @Test
     void rejectsRfqExplanationWhenComparableQuotesAreInsufficient() throws Exception {
         mockMvc.perform(post("/api/ai-assistant/rfq-quote-explanation")
                 .contentType(MediaType.APPLICATION_JSON)

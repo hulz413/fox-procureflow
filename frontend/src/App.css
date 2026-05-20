@@ -1650,8 +1650,9 @@ tbody tr:last-child td {
   min-height: 42px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 8px 12px 12px;
   border-top: 1px solid var(--pf-border);
   color: var(--pf-muted);
@@ -1662,10 +1663,14 @@ tbody tr:last-child td {
 .list-pagination-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
 .list-pagination-total {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
   white-space: nowrap;
 }
 
@@ -2150,11 +2155,29 @@ tbody tr:last-child td {
   background: #fff;
 }
 
+.request-drawer .ai-action-row {
+  min-height: 40px;
+  align-items: center;
+}
+
 .request-drawer .ai-card > .panel-title,
 .request-drawer .ai-action-row > .panel-title,
 .request-drawer .ai-result-panel > .panel-title {
   min-height: 38px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   background: transparent;
+}
+
+.request-drawer .ai-action-row > .panel-title {
+  flex: 1 1 auto;
+}
+
+.request-drawer .ai-action-row .line-add-button {
+  flex: 0 0 auto;
+  height: 40px;
+  min-height: 40px;
 }
 
 .approval-grid {

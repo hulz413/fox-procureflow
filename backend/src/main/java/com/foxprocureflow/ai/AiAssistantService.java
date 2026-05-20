@@ -33,6 +33,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -174,7 +175,10 @@ public class AiAssistantService {
         context.put("comparisonRows", comparison);
         context.put("company", requireCompany(request.companyId()));
         context.put("actorId", request.actorId());
-        Set<String> supplierIds = comparison.stream().map(RfqComparisonRowResponse::supplierId).collect(Collectors.toSet());
+        Set<String> supplierIds = detail.suppliers().stream()
+            .map(supplier -> supplier.supplierId())
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        comparison.stream().map(RfqComparisonRowResponse::supplierId).forEach(supplierIds::add);
 
         return invokeScenario(
             AiScenario.RFQ_QUOTE_EXPLANATION,
@@ -184,7 +188,8 @@ public class AiAssistantService {
             List.of(new AiContextReference("rfq", detail.rfqId(), detail.title())),
             context,
             rfqSystemPrompt(),
-            "请解释以下 RFQ 报价对比。必须保留 comparisonRows 中的 rank，不得建议自动创建 PO。\n" + toPrettyJson(context),
+            "请解释以下 RFQ 报价对比。supplierInsights 只能引用 rfq.suppliers 中的 supplierId；必须保留 comparisonRows 中的 rank，不得建议自动创建 PO。\n"
+                + toPrettyJson(context),
             result -> outputValidator.validateRfqExplanation(result, supplierIds));
     }
 
