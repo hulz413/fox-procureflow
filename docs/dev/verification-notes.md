@@ -121,7 +121,7 @@
 
 - 浏览器人工 spot check 通过：
   - `http://localhost:5173/`：采购看板展示星河控股集团、星河数字科技有限公司、星河智能制造有限公司 scope，后端状态为 `UP`，集团汇总展示采购金额、待审批、RFQ、PO、收货/发票和三单匹配异常。
-  - `http://localhost:5173/suppliers`：供应商池展示集团共享边界、当前公司语境和 5 条真实后端供应商数据。
+  - `http://localhost:5173/suppliers`：供应商池展示集团共享边界、当前公司语境和 15 条真实后端供应商数据。
 
 - MVP runbook 入口覆盖记录：
   - 采购看板：集团汇总、`company-digital`、`company-manufacturing`。

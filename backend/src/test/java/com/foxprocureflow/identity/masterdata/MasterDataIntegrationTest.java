@@ -80,7 +80,17 @@ class MasterDataIntegrationTest {
                 "supplier-bluechip",
                 "supplier-hengrun",
                 "supplier-chengcai",
-                "supplier-anjie");
+                "supplier-anjie",
+                "supplier-qiming-cloud",
+                "supplier-nanyi-auto",
+                "supplier-jincheng-logistics",
+                "supplier-huace-office",
+                "supplier-hailian-materials",
+                "supplier-zhiwei-software",
+                "supplier-borui-spares",
+                "supplier-shuzhan-it",
+                "supplier-lianyunda-logistics",
+                "supplier-xingqiao-electronics");
         assertThat(categoryRepository.findAllByOrderBySortOrderAsc())
             .extracting("categoryId")
             .contains(
@@ -123,9 +133,12 @@ class MasterDataIntegrationTest {
 
         mockMvc.perform(get("/api/master-data/suppliers").param("categoryId", "category-it-hardware"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.length()").value(3))
+            .andExpect(jsonPath("$.data.length()").value(6))
             .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-bluechip")))
-            .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-chengcai")));
+            .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-chengcai")))
+            .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-qiming-cloud")))
+            .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-shuzhan-it")))
+            .andExpect(jsonPath("$.data[*].supplierId", hasItem("supplier-xingqiao-electronics")));
 
         mockMvc.perform(get("/api/master-data/categories"))
             .andExpect(status().isOk())

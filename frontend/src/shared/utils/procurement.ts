@@ -42,6 +42,10 @@ export function formatSupplierStatus(status: string, messages: LocalizedMessages
   return status
 }
 
+export function supplierStatusToneOf(status: string) {
+  return status === 'inactive' ? 'danger' : 'success'
+}
+
 export function formatSupplierSharedScope(sharedScope: string, messages: LocalizedMessages) {
   return sharedScope === 'group-shared' ? messages.supplierPool.groupSharedValue : sharedScope
 }

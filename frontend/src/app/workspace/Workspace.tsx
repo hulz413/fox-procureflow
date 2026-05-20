@@ -734,24 +734,16 @@ export function Workspace({
         </Header>
 
         <Content className="workspace">
-          <section className="status-strip" aria-label={messages.aria.serviceStatus}>
-            <span>{context.groupName}</span>
-            <span>{context.supplierPoolScope}</span>
-            <span>{selectedCompany.businessScope}</span>
-            <StatusPill status={healthStatus} isError={isError} label={messages.status.backend} />
-          </section>
+          <StatusPill status={healthStatus} isError={isError} label={messages.status.backend} />
 
           {isSupplierPoolRoute ? (
             <SupplierPoolView
               categories={categories}
-              companies={companies}
               context={context}
               isError={supplierPoolError}
               isLoading={supplierPoolLoading}
               language={language}
               messages={messages}
-              onCompanyChange={setSelectedCompanyId}
-              selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
               suppliers={suppliers}
             />

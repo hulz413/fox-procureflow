@@ -2,36 +2,31 @@ import { DeleteOutlined, ProfileOutlined, TeamOutlined } from '@ant-design/icons
 import { Drawer } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import type { Language, DemoContext, CompanyContext, CategorySummary, SupplierSummary } from '../../domain/types'
+import type { Language, DemoContext, CategorySummary, SupplierSummary } from '../../domain/types'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
 import { routeParam } from '../../shared/utils/route'
-import { formatRiskLevel, riskToneOf, formatSupplierStatus, formatSupplierSharedScope } from '../../shared/utils/procurement'
+import { formatRiskLevel, riskToneOf, formatSupplierStatus, supplierStatusToneOf, formatSupplierSharedScope } from '../../shared/utils/procurement'
 import { ListPagination, PanelTitle } from '../../shared/ui/common'
-import { CompanyContextSelector } from '../../shared/ui/procurementWidgets'
+
+const RISK_LEVEL_ORDER = ['low', 'medium', 'high']
 
 export function SupplierPoolView({
   categories,
-  companies,
   context,
   isError,
   isLoading,
   language,
   messages,
-  onCompanyChange,
-  selectedCompany,
   selectedCompanyId,
   suppliers,
 }: {
   categories: CategorySummary[]
-  companies: CompanyContext[]
   context: DemoContext
   isError: boolean
   isLoading: boolean
   language: Language
   messages: LocalizedMessages
-  onCompanyChange: (companyId: string) => void
-  selectedCompany: CompanyContext
   selectedCompanyId: string
   suppliers: SupplierSummary[]
 }) {
@@ -44,7 +39,9 @@ export function SupplierPoolView({
   const [supplierStatus, setSupplierStatus] = useState('')
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null)
   const normalizedKeyword = keyword.trim().toLowerCase()
-  const riskLevels = Array.from(new Set(suppliers.map((supplier) => supplier.riskLevel))).sort()
+  const riskLevels = Array.from(new Set(suppliers.map((supplier) => supplier.riskLevel))).sort(
+    (left, right) => riskSortValue(left) - riskSortValue(right) || left.localeCompare(right),
+  )
   const supplierStatuses = Array.from(new Set(suppliers.map((supplier) => supplier.status))).sort()
   const filteredSuppliers = suppliers.filter((supplier) => {
     const searchableText = [
@@ -115,20 +112,8 @@ export function SupplierPoolView({
   return (
     <section className="supplier-pool-page">
       <section className="panel supplier-pool-overview">
-        <PanelTitle icon={<TeamOutlined />} title={messages.supplierPool.sharedPool} aside={messages.supplierPool.dataState} />
+        <PanelTitle icon={<TeamOutlined />} title={messages.supplierPool.sharedPool} />
         <div className="foundation-summary supplier-pool-summary">
-          <div className="summary-block">
-            <span>{messages.boundary.groupShared}</span>
-            <strong>{context.groupName}</strong>
-            <small>{messages.supplierPool.groupBoundary}</small>
-          </div>
-          <CompanyContextSelector
-            companies={companies}
-            label={messages.supplierPool.selectedCompany}
-            onCompanyChange={onCompanyChange}
-            selectedCompany={selectedCompany}
-            selectedCompanyId={selectedCompanyId}
-          />
           <div className="summary-block">
             <span>{messages.supplierPool.visibleSuppliers}</span>
             <strong>{filteredSuppliers.length}</strong>
@@ -148,7 +133,6 @@ export function SupplierPoolView({
         <PanelTitle
           icon={<ProfileOutlined />}
           title={messages.supplierPool.list}
-          aside={`${messages.supplierPool.resultCount}: ${filteredSuppliers.length}/${suppliers.length}`}
         />
         <div className="supplier-filter-bar" aria-label={messages.supplierPool.filter}>
           <label className="supplier-filter-keyword">
@@ -237,7 +221,9 @@ export function SupplierPoolView({
                       </span>
                     </td>
                     <td>
-                      <span className="tag neutral">{formatSupplierStatus(supplier.status, messages)}</span>
+                      <span className={`tag ${supplierStatusToneOf(supplier.status)}`}>
+                        {formatSupplierStatus(supplier.status, messages)}
+                      </span>
                     </td>
                     <td>{supplier.categories.map((category) => category.categoryName).join(' / ')}</td>
                   </tr>
@@ -287,7 +273,11 @@ export function SupplierPoolView({
               </div>
               <div>
                 <dt>{messages.supplierPool.status}</dt>
-                <dd>{formatSupplierStatus(selectedSupplier.status, messages)}</dd>
+                <dd>
+                  <span className={`tag ${supplierStatusToneOf(selectedSupplier.status)}`}>
+                    {formatSupplierStatus(selectedSupplier.status, messages)}
+                  </span>
+                </dd>
               </div>
               <div>
                 <dt>{messages.supplierPool.sharedScope}</dt>
@@ -322,4 +312,10 @@ export function SupplierPoolView({
       </Drawer>
     </section>
   )
+}
+
+function riskSortValue(riskLevel: string) {
+  const index = RISK_LEVEL_ORDER.indexOf(riskLevel)
+
+  return index === -1 ? RISK_LEVEL_ORDER.length : index
 }
