@@ -12,12 +12,14 @@ import {
   FileAddOutlined,
   FileSearchOutlined,
   InboxOutlined,
+  LeftOutlined,
   LogoutOutlined,
   LoadingOutlined,
   NodeIndexOutlined,
   PlusOutlined,
   ProfileOutlined,
   ReloadOutlined,
+  RightOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
   ShoppingCartOutlined,
@@ -32,14 +34,15 @@ import type { MenuProps, ThemeConfig } from 'antd'
 import enUS from 'antd/locale/en_US'
 import zhCN from 'antd/locale/zh_CN'
 import ReactECharts from 'echarts-for-react'
-import { useEffect, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { FormEvent, KeyboardEvent, ReactNode } from 'react'
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 
 const { Header, Sider, Content } = Layout
 
 const queryClient = new QueryClient()
+const DEFAULT_LIST_PAGE_SIZE = 10
 
 type Language = 'zh' | 'en'
 
@@ -677,6 +680,49 @@ type ProcurementDashboard = {
   statusDistributions: StatusDistributionBucket[]
   supplierDistribution: SupplierDistributionItem[]
   exceptionHighlights: ExceptionHighlight[]
+}
+
+type GlobalSearchResultType =
+  | 'PURCHASE_REQUEST'
+  | 'APPROVAL'
+  | 'RFQ'
+  | 'PURCHASE_ORDER'
+  | 'RECEIPT'
+  | 'INVOICE'
+  | 'THREE_WAY_MATCH'
+  | 'SUPPLIER'
+  | 'MASTER_DATA'
+
+type GlobalSearchResult = {
+  type: GlobalSearchResultType
+  id: string
+  title: string
+  subtitle: string | null
+  status: string | null
+  companyId: string | null
+  companyName: string | null
+  supplierName: string | null
+  amount: number | null
+  currency: string | null
+  ownershipScope: 'COMPANY' | 'GROUP_SHARED' | string
+  matchedFields: string[]
+  targetPath: string
+  targetParams: Record<string, string>
+  occurredAt: string | null
+}
+
+type GlobalSearchGroup = {
+  type: GlobalSearchResultType
+  label: string
+  results: GlobalSearchResult[]
+}
+
+type GlobalSearchResponse = {
+  query: string
+  companyId: string
+  companyName: string
+  generatedAt: string
+  groups: GlobalSearchGroup[]
 }
 
 type ReceiptInvoiceAttachment = {
@@ -1349,6 +1395,11 @@ async function fetchProcurementDashboard(scope: ProcurementDashboardScope, compa
   return fetchApi<ProcurementDashboard>(`/api/procurement-dashboard?${query.toString()}`)
 }
 
+async function fetchGlobalSearch(companyId: string, query: string) {
+  const params = new URLSearchParams({ companyId, query })
+  return fetchApi<GlobalSearchResponse>(`/api/global-search?${params.toString()}`)
+}
+
 export const localizedContent = {
   zh: {
     brandSubtitle: '集团采购协同',
@@ -1449,6 +1500,39 @@ export const localizedContent = {
     },
     status: {
       backend: '后端',
+    },
+    pagination: {
+      label: '列表分页',
+      previous: '上一页',
+      next: '下一页',
+      summary: '第 {current}/{total} 页 · 每页 {pageSize} 条',
+    },
+    globalSearch: {
+      title: '全局搜索',
+      shortcut: '⌘/Ctrl K',
+      placeholder: '搜索 PR、RFQ、PO、供应商、发票号或人员',
+      scope: '当前公司交易数据，集团共享供应商池',
+      minQuery: '输入至少 2 个字符开始搜索',
+      loading: '搜索中',
+      empty: '未找到匹配结果',
+      error: '搜索暂不可用',
+      open: '打开搜索',
+      close: '关闭搜索',
+      companyOwned: '公司隔离',
+      groupShared: '集团共享',
+      matchedFields: '命中字段',
+      openResult: '打开结果',
+      types: {
+        PURCHASE_REQUEST: '采购申请',
+        APPROVAL: '审批',
+        RFQ: '询报价',
+        PURCHASE_ORDER: '采购订单',
+        RECEIPT: '收货',
+        INVOICE: '发票',
+        THREE_WAY_MATCH: '三单匹配',
+        SUPPLIER: '供应商池',
+        MASTER_DATA: '主数据',
+      },
     },
     userMenu: {
       openMenu: '打开用户菜单',
@@ -2108,6 +2192,39 @@ export const localizedContent = {
     status: {
       backend: 'Backend',
     },
+    pagination: {
+      label: 'List pagination',
+      previous: 'Previous page',
+      next: 'Next page',
+      summary: 'Page {current}/{total} · {pageSize} per page',
+    },
+    globalSearch: {
+      title: 'Global Search',
+      shortcut: '⌘/Ctrl K',
+      placeholder: 'Search PR, RFQ, PO, supplier, invoice, or person',
+      scope: 'Current company transactions; group-shared supplier pool',
+      minQuery: 'Type at least 2 characters to search',
+      loading: 'Searching',
+      empty: 'No matching results',
+      error: 'Search is unavailable',
+      open: 'Open search',
+      close: 'Close search',
+      companyOwned: 'Company scoped',
+      groupShared: 'Group shared',
+      matchedFields: 'Matched fields',
+      openResult: 'Open result',
+      types: {
+        PURCHASE_REQUEST: 'Purchase Request',
+        APPROVAL: 'Approval',
+        RFQ: 'RFQ',
+        PURCHASE_ORDER: 'Purchase Order',
+        RECEIPT: 'Receipt',
+        INVOICE: 'Invoice',
+        THREE_WAY_MATCH: 'Three-Way Match',
+        SUPPLIER: 'Supplier Pool',
+        MASTER_DATA: 'Master Data',
+      },
+    },
     userMenu: {
       openMenu: 'Open user menu',
       name: 'Wang Ran',
@@ -2721,6 +2838,37 @@ function getInitialLanguage(): Language {
   return new URLSearchParams(window.location.search).get('lang') === 'en' ? 'en' : 'zh'
 }
 
+function routeParam(search: string, key: string) {
+  return new URLSearchParams(search).get(key) ?? ''
+}
+
+function useListPagination<T>(
+  items: T[],
+  resetKey: string,
+  pageSize = DEFAULT_LIST_PAGE_SIZE,
+) {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+
+  useEffect(() => {
+    setPage(1)
+  }, [resetKey])
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages))
+  }, [totalPages])
+
+  return {
+    currentPage,
+    pageItems: items.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    pageSize,
+    setPage,
+    totalItems: items.length,
+    totalPages,
+  }
+}
+
 function Workspace({
   language,
   onLanguageChange,
@@ -2755,6 +2903,7 @@ function Workspace({
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
   const [dashboardScopeValue, setDashboardScopeValue] = useState<ProcurementDashboardScopeValue>('GROUP')
   const [isNotificationOpen, setNotificationOpen] = useState(false)
+  const [isGlobalSearchOpen, setGlobalSearchOpen] = useState(false)
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([])
   const [modal, modalContextHolder] = Modal.useModal()
   const resetDemoDataMutation = useMutation({
@@ -3100,6 +3249,18 @@ function Workspace({
     }
   }, [isReceiptInvoiceRoute, location.search, navigate])
 
+  useEffect(() => {
+    const handleGlobalSearchShortcut = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setGlobalSearchOpen(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalSearchShortcut)
+    return () => window.removeEventListener('keydown', handleGlobalSearchShortcut)
+  }, [])
+
   const primaryActionIcon = isReceiptInvoiceRoute
     ? <InboxOutlined />
     : isPurchaseOrderRoute
@@ -3125,9 +3286,27 @@ function Workspace({
     navigate(notification.path)
   }
 
+  const openGlobalSearchResult = (result: GlobalSearchResult) => {
+    const params = new URLSearchParams(result.targetParams)
+    setCreateDrawerOpen(false)
+    setRfqCreateDrawerOpen(false)
+    setPoCreateDrawerOpen(false)
+    setReceiptInvoiceCreateMode(null)
+    setGlobalSearchOpen(false)
+    navigate(params.size > 0 ? `${result.targetPath}?${params.toString()}` : result.targetPath)
+  }
+
   return (
     <>
       {modalContextHolder}
+      <GlobalSearchDialog
+        companyId={selectedCompanyId}
+        language={language}
+        messages={messages}
+        onClose={() => setGlobalSearchOpen(false)}
+        onOpenResult={openGlobalSearchResult}
+        open={isGlobalSearchOpen}
+      />
       <Layout className="app-shell">
       <Sider className="sidebar" width={244}>
         <div className="brand">
@@ -3198,7 +3377,12 @@ function Workspace({
           </div>
           <div className={isFoundationRoute || isSupplierPoolRoute ? 'top-actions compact' : 'top-actions'}>
             <Tooltip title={messages.aria.search} trigger={['hover', 'focus']}>
-              <button type="button" className="icon-button" aria-label={messages.aria.search}>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={messages.globalSearch.open}
+                onClick={() => setGlobalSearchOpen(true)}
+              >
                 <SearchOutlined />
               </button>
             </Tooltip>
@@ -3607,8 +3791,11 @@ function PurchaseRequestView({
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [modal, modalContextHolder] = Modal.useModal()
   const wasCreateOpen = useRef(false)
+  const handledRouteRequestKey = useRef('')
+  const routeRequestId = routeParam(location.search, 'requestId')
   const [selectedRequestId, setSelectedRequestId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [isCreateDirty, setCreateDirty] = useState(false)
@@ -3620,6 +3807,7 @@ function PurchaseRequestView({
   const [form, setForm] = useState<PurchaseRequestFormState>(() =>
     buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers),
   )
+  const purchaseRequestPagination = useListPagination(purchaseRequests, selectedCompanyId)
 
   useEffect(() => {
     if (purchaseRequests.length === 0) {
@@ -3948,6 +4136,33 @@ function PurchaseRequestView({
     setDetailDrawerOpen(true)
   }
 
+  useEffect(() => {
+    if (!routeRequestId) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routeRequestId}`
+    if (handledRouteRequestKey.current === routeKey) {
+      return
+    }
+
+    if (routeRequestId === selectedRequestId && isDetailDrawerOpen) {
+      handledRouteRequestKey.current = routeKey
+      return
+    }
+
+    if (!purchaseRequests.some((request) => request.requestId === routeRequestId)) {
+      return
+    }
+
+    handledRouteRequestKey.current = routeKey
+    setFeedback(null)
+    setAiRiskResponse(null)
+    setLastDrawerMode('detail')
+    setSelectedRequestId(routeRequestId)
+    setDetailDrawerOpen(true)
+  }, [isDetailDrawerOpen, location.key, purchaseRequests, routeRequestId, selectedRequestId])
+
   const closeCreateDrawer = () => {
     setLastDrawerMode('create')
     setCreateDirty(false)
@@ -4011,7 +4226,7 @@ function PurchaseRequestView({
                     <td colSpan={6}>{isLoading ? messages.purchaseRequest.loading : messages.purchaseRequest.empty}</td>
                   </tr>
                 ) : (
-	                  purchaseRequests.map((request) => (
+	                  purchaseRequestPagination.pageItems.map((request) => (
 	                    <tr key={request.requestId}>
 	                      <td>
                           <button
@@ -4048,6 +4263,14 @@ function PurchaseRequestView({
               </tbody>
             </table>
           </div>
+          <ListPagination
+            currentPage={purchaseRequestPagination.currentPage}
+            messages={messages}
+            onPageChange={purchaseRequestPagination.setPage}
+            pageSize={purchaseRequestPagination.pageSize}
+            totalItems={purchaseRequestPagination.totalItems}
+            totalPages={purchaseRequestPagination.totalPages}
+          />
         </section>
 
       </section>
@@ -4442,7 +4665,10 @@ function ApprovalCenterView({
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [modal, modalContextHolder] = Modal.useModal()
+  const handledRouteApprovalKey = useRef('')
+  const routeApprovalId = routeParam(location.search, 'approvalId')
   const approvers = users.filter(
     (user) =>
       user.active &&
@@ -4473,6 +4699,7 @@ function ApprovalCenterView({
     retry: 1,
   })
   const tasks = tasksQuery.isPlaceholderData ? [] : (tasksQuery.data?.data ?? [])
+  const taskPagination = useListPagination(tasks, `${selectedCompanyId}:${selectedApproverId}`)
 
   const detailQuery = useQuery({
     queryKey: ['approval-detail', selectedApprovalId, selectedCompanyId],
@@ -4605,6 +4832,29 @@ function ApprovalCenterView({
     setAiRiskResponse(null)
   }
 
+  useEffect(() => {
+    if (!routeApprovalId) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routeApprovalId}`
+    if (handledRouteApprovalKey.current === routeKey) {
+      return
+    }
+
+    if (routeApprovalId === selectedApprovalId && isDetailDrawerOpen) {
+      handledRouteApprovalKey.current = routeKey
+      return
+    }
+
+    handledRouteApprovalKey.current = routeKey
+    setSelectedApprovalId(routeApprovalId)
+    setDetailDrawerOpen(true)
+    setComment('')
+    setFeedback(null)
+    setAiRiskResponse(null)
+  }, [isDetailDrawerOpen, location.key, routeApprovalId, selectedApprovalId])
+
   const handleApprovalDrawerClose = () => {
     if (comment.length > 0) {
       modal.confirm({
@@ -4672,7 +4922,7 @@ function ApprovalCenterView({
                   </td>
                 </tr>
               ) : (
-                tasks.map((task) => (
+                taskPagination.pageItems.map((task) => (
                   <tr key={task.nodeId}>
                     <td>
                       <button
@@ -4701,6 +4951,14 @@ function ApprovalCenterView({
             </tbody>
           </table>
         </div>
+        <ListPagination
+          currentPage={taskPagination.currentPage}
+          messages={messages}
+          onPageChange={taskPagination.setPage}
+          pageSize={taskPagination.pageSize}
+          totalItems={taskPagination.totalItems}
+          totalPages={taskPagination.totalPages}
+        />
       </section>
     </section>
 
@@ -4883,8 +5141,11 @@ function RfqView({
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [modal, modalContextHolder] = Modal.useModal()
   const wasCreateOpen = useRef(false)
+  const handledRouteRfqKey = useRef('')
+  const routeRfqId = routeParam(location.search, 'rfqId')
   const [selectedRfqId, setSelectedRfqId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [isCreateDirty, setCreateDirty] = useState(false)
@@ -4903,6 +5164,7 @@ function RfqView({
   )
   const [quoteForm, setQuoteForm] = useState<RfqQuoteFormState>(() => buildRfqQuoteFormDefaults())
   const [isQuoteUploading, setQuoteUploading] = useState(false)
+  const rfqPagination = useListPagination(rfqs, selectedCompanyId)
 
   useEffect(() => {
     if (rfqs.length === 0) {
@@ -5200,7 +5462,7 @@ function RfqView({
     setAiRfqResponse(null)
   }
 
-  const confirmDiscardQuote = (onOk: () => void) => {
+  const confirmDiscardQuote = useCallback((onOk: () => void) => {
     modal.confirm({
       mousePosition: getViewportCenter(),
       centered: true,
@@ -5213,7 +5475,7 @@ function RfqView({
       rootClassName: 'procure-confirm-modal',
       title: messages.rfq.discardDetailTitle,
     })
-  }
+  }, [messages, modal])
 
   const handleDrawerClose = () => {
     if (drawerMode === 'create' && isCreateDirty) {
@@ -5264,6 +5526,52 @@ function RfqView({
     openDetail()
   }
 
+  useEffect(() => {
+    if (!routeRfqId) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routeRfqId}`
+    if (handledRouteRfqKey.current === routeKey) {
+      return
+    }
+
+    if (routeRfqId === selectedRfqId && isDetailDrawerOpen) {
+      handledRouteRfqKey.current = routeKey
+      return
+    }
+
+    if (!rfqs.some((rfq) => rfq.rfqId === routeRfqId)) {
+      return
+    }
+
+    handledRouteRfqKey.current = routeKey
+    const openDetail = () => {
+      if (routeRfqId !== selectedRfqId) {
+        setQuoteDirty(false)
+        setAiRfqResponse(null)
+      }
+      setSelectedRfqId(routeRfqId)
+      setDetailDrawerOpen(true)
+      setFeedback(null)
+    }
+
+    if (isDetailDrawerOpen && isQuoteDirty && routeRfqId !== selectedRfqId) {
+      confirmDiscardQuote(openDetail)
+      return
+    }
+
+    openDetail()
+  }, [
+    confirmDiscardQuote,
+    isDetailDrawerOpen,
+    isQuoteDirty,
+    location.key,
+    rfqs,
+    routeRfqId,
+    selectedRfqId,
+  ])
+
   return (
     <>
       {modalContextHolder}
@@ -5289,7 +5597,7 @@ function RfqView({
                     <td colSpan={6}>{isLoading ? messages.rfq.loading : messages.rfq.empty}</td>
                   </tr>
                 ) : (
-                  rfqs.map((rfq) => (
+                  rfqPagination.pageItems.map((rfq) => (
                     <tr key={rfq.rfqId}>
                       <td>
                         <button
@@ -5319,6 +5627,14 @@ function RfqView({
               </tbody>
             </table>
           </div>
+          <ListPagination
+            currentPage={rfqPagination.currentPage}
+            messages={messages}
+            onPageChange={rfqPagination.setPage}
+            pageSize={rfqPagination.pageSize}
+            totalItems={rfqPagination.totalItems}
+            totalPages={rfqPagination.totalPages}
+          />
         </section>
       </section>
 
@@ -5690,8 +6006,11 @@ function PurchaseOrderView({
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [modal, modalContextHolder] = Modal.useModal()
   const wasCreateOpen = useRef(false)
+  const handledRoutePoKey = useRef('')
+  const routePoId = routeParam(location.search, 'poId')
   const [selectedPoId, setSelectedPoId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [isCreateDirty, setCreateDirty] = useState(false)
@@ -5705,6 +6024,7 @@ function PurchaseOrderView({
   const [createForm, setCreateForm] = useState<PurchaseOrderCreateFormState>(() =>
     buildPurchaseOrderCreateFormDefaults(selectedCompanyId, eligibleRfqs, buyers),
   )
+  const purchaseOrderPagination = useListPagination(purchaseOrders, selectedCompanyId)
 
   useEffect(() => {
     if (purchaseOrders.length === 0) {
@@ -5775,14 +6095,27 @@ function PurchaseOrderView({
     placeholderData: keepPreviousData,
     retry: 1,
   })
-  const createRfqComparisonRows = createRfqComparisonQuery.data?.data ?? []
-  const createQuoteBySupplier = new Map(createRfqDetail?.quotes.map((quote) => [quote.supplierId, quote]) ?? [])
-  const createSupplierById = new Map(createRfqDetail?.suppliers.map((supplier) => [supplier.supplierId, supplier]) ?? [])
-  const quoteOptions = createRfqComparisonRows.length > 0
-    ? createRfqComparisonRows
-        .map((row) => createQuoteBySupplier.get(row.supplierId))
-        .filter((quote): quote is RfqQuote => Boolean(quote))
-    : createRfqDetail?.quotes ?? []
+  const createRfqComparisonRows = useMemo(
+    () => createRfqComparisonQuery.data?.data ?? [],
+    [createRfqComparisonQuery.data?.data],
+  )
+  const createQuoteBySupplier = useMemo(
+    () => new Map(createRfqDetail?.quotes.map((quote) => [quote.supplierId, quote]) ?? []),
+    [createRfqDetail?.quotes],
+  )
+  const createSupplierById = useMemo(
+    () => new Map(createRfqDetail?.suppliers.map((supplier) => [supplier.supplierId, supplier]) ?? []),
+    [createRfqDetail?.suppliers],
+  )
+  const quoteOptions = useMemo(
+    () =>
+      createRfqComparisonRows.length > 0
+        ? createRfqComparisonRows
+            .map((row) => createQuoteBySupplier.get(row.supplierId))
+            .filter((quote): quote is RfqQuote => Boolean(quote))
+        : createRfqDetail?.quotes ?? [],
+    [createQuoteBySupplier, createRfqComparisonRows, createRfqDetail?.quotes],
+  )
 
   useEffect(() => {
     if (!createRfqDetail) {
@@ -5960,7 +6293,7 @@ function PurchaseOrderView({
     setCancelReason('')
   }
 
-  const confirmDiscardDetailInput = (onOk: () => void) => {
+  const confirmDiscardDetailInput = useCallback((onOk: () => void) => {
     modal.confirm({
       mousePosition: getViewportCenter(),
       centered: true,
@@ -5973,7 +6306,7 @@ function PurchaseOrderView({
       rootClassName: 'procure-confirm-modal',
       title: messages.purchaseOrder.discardDetailTitle,
     })
-  }
+  }, [messages, modal])
 
   const handleDrawerClose = () => {
     if (drawerMode === 'create' && isCreateDirty) {
@@ -6023,6 +6356,51 @@ function PurchaseOrderView({
     openDetail()
   }
 
+  useEffect(() => {
+    if (!routePoId) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routePoId}`
+    if (handledRoutePoKey.current === routeKey) {
+      return
+    }
+
+    if (routePoId === selectedPoId && isDetailDrawerOpen) {
+      handledRoutePoKey.current = routeKey
+      return
+    }
+
+    if (!purchaseOrders.some((purchaseOrder) => purchaseOrder.poId === routePoId)) {
+      return
+    }
+
+    handledRoutePoKey.current = routeKey
+    const openDetail = () => {
+      if (routePoId !== selectedPoId) {
+        setCancelReason('')
+      }
+      setSelectedPoId(routePoId)
+      setDetailDrawerOpen(true)
+      setFeedback(null)
+    }
+
+    if (isDetailDrawerOpen && cancelReason.trim() && routePoId !== selectedPoId) {
+      confirmDiscardDetailInput(openDetail)
+      return
+    }
+
+    openDetail()
+  }, [
+    cancelReason,
+    confirmDiscardDetailInput,
+    isDetailDrawerOpen,
+    location.key,
+    purchaseOrders,
+    routePoId,
+    selectedPoId,
+  ])
+
   return (
     <>
       {modalContextHolder}
@@ -6048,7 +6426,7 @@ function PurchaseOrderView({
                     <td colSpan={6}>{isLoading ? messages.purchaseOrder.loading : messages.purchaseOrder.empty}</td>
                   </tr>
                 ) : (
-                  purchaseOrders.map((purchaseOrder) => (
+                  purchaseOrderPagination.pageItems.map((purchaseOrder) => (
                     <tr key={purchaseOrder.poId}>
                       <td>
                         <button
@@ -6078,6 +6456,14 @@ function PurchaseOrderView({
               </tbody>
             </table>
           </div>
+          <ListPagination
+            currentPage={purchaseOrderPagination.currentPage}
+            messages={messages}
+            onPageChange={purchaseOrderPagination.setPage}
+            pageSize={purchaseOrderPagination.pageSize}
+            totalItems={purchaseOrderPagination.totalItems}
+            totalPages={purchaseOrderPagination.totalPages}
+          />
         </section>
       </section>
 
@@ -6442,7 +6828,10 @@ function ThreeWayMatchingView({
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [modal, modalContextHolder] = Modal.useModal()
+  const handledRouteMatchKey = useRef('')
+  const routeMatchId = routeParam(location.search, 'matchId')
   const [activeTab, setActiveTab] = useState<ThreeWayMatchTab>('all')
   const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -6471,15 +6860,19 @@ function ThreeWayMatchingView({
     enabled: Boolean(selectedMatchId) && selectedCompanyId.length > 0,
     retry: 1,
   })
-  const matchingRows = matchesQuery.data?.data ?? []
-  const exceptionRows = exceptionsQuery.data?.data ?? []
-  const resolvedRows = matchingRows.filter((row) => row.status === 'RESOLVED')
+  const matchingRows = useMemo(() => matchesQuery.data?.data ?? [], [matchesQuery.data?.data])
+  const exceptionRows = useMemo(() => exceptionsQuery.data?.data ?? [], [exceptionsQuery.data?.data])
+  const resolvedRows = useMemo(
+    () => matchingRows.filter((row) => row.status === 'RESOLVED'),
+    [matchingRows],
+  )
   const tabRows =
     activeTab === 'exceptions'
       ? exceptionRows
       : activeTab === 'resolved'
         ? resolvedRows
         : matchingRows
+  const matchingPagination = useListPagination(tabRows, `${selectedCompanyId}:${activeTab}`)
   const detail = detailQuery.data?.data
   const isError = matchesQuery.isError || exceptionsQuery.isError || detailQuery.isError
   const isLoading = matchesQuery.isLoading || exceptionsQuery.isLoading
@@ -6547,7 +6940,7 @@ function ThreeWayMatchingView({
     },
   })
 
-  const discardActionInput = (next: () => void) => {
+  const discardActionInput = useCallback((next: () => void) => {
     if (!isActionDirty) {
       next()
       return
@@ -6569,7 +6962,7 @@ function ThreeWayMatchingView({
       rootClassName: 'procure-confirm-modal',
       title: messages.matching.discardTitle,
     })
-  }
+  }, [isActionDirty, messages, modal])
 
   const openMatchDetail = (matchId: string) => {
     discardActionInput(() => {
@@ -6581,6 +6974,43 @@ function ThreeWayMatchingView({
       setFeedback(null)
     })
   }
+
+  useEffect(() => {
+    if (!routeMatchId) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routeMatchId}`
+    if (handledRouteMatchKey.current === routeKey) {
+      return
+    }
+
+    if (routeMatchId === selectedMatchId && isDetailDrawerOpen) {
+      handledRouteMatchKey.current = routeKey
+      return
+    }
+
+    if (!matchingRows.some((row) => row.matchId === routeMatchId)) {
+      return
+    }
+
+    handledRouteMatchKey.current = routeKey
+    discardActionInput(() => {
+      if (routeMatchId !== selectedMatchId) {
+        setAiMatchingResponse(null)
+      }
+      setSelectedMatchId(routeMatchId)
+      setDetailDrawerOpen(true)
+      setFeedback(null)
+    })
+  }, [
+    discardActionInput,
+    isDetailDrawerOpen,
+    location.key,
+    matchingRows,
+    routeMatchId,
+    selectedMatchId,
+  ])
 
   const handleDrawerClose = () => {
     discardActionInput(() => {
@@ -6730,7 +7160,7 @@ function ThreeWayMatchingView({
                     <td colSpan={7}>{isLoading ? messages.matching.loading : messages.matching.empty}</td>
                   </tr>
                 ) : (
-                  tabRows.map((row) => (
+                  matchingPagination.pageItems.map((row) => (
                     <tr key={row.matchId}>
                       <td>
                         <button
@@ -6763,6 +7193,14 @@ function ThreeWayMatchingView({
               </tbody>
             </table>
           </div>
+          <ListPagination
+            currentPage={matchingPagination.currentPage}
+            messages={messages}
+            onPageChange={matchingPagination.setPage}
+            pageSize={matchingPagination.pageSize}
+            totalItems={matchingPagination.totalItems}
+            totalPages={matchingPagination.totalPages}
+          />
         </section>
       </section>
 
@@ -6985,8 +7423,11 @@ function ReceiptsInvoicesView({
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [modal, modalContextHolder] = Modal.useModal()
   const wasCreateOpen = useRef(false)
+  const handledRouteFulfillmentKey = useRef('')
+  const routePoId = routeParam(location.search, 'poId')
   const [selectedPoId, setSelectedPoId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [isCreateDirty, setCreateDirty] = useState(false)
@@ -7009,9 +7450,10 @@ function ReceiptsInvoicesView({
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
-  const fulfillmentRows = fulfillmentQuery.data?.data ?? []
-  const receipts = receiptsQuery.data?.data ?? []
-  const invoices = invoicesQuery.data?.data ?? []
+  const fulfillmentRows = useMemo(() => fulfillmentQuery.data?.data ?? [], [fulfillmentQuery.data?.data])
+  const fulfillmentPagination = useListPagination(fulfillmentRows, selectedCompanyId)
+  const receipts = useMemo(() => receiptsQuery.data?.data ?? [], [receiptsQuery.data?.data])
+  const invoices = useMemo(() => invoicesQuery.data?.data ?? [], [invoicesQuery.data?.data])
   const selectedPo = fulfillmentRows.find((row) => row.poId === selectedPoId)
   const relatedReceipts = selectedPo ? receipts.filter((receipt) => receipt.poId === selectedPo.poId) : []
   const relatedInvoices = selectedPo ? invoices.filter((invoice) => invoice.poId === selectedPo.poId) : []
@@ -7140,6 +7582,31 @@ function ReceiptsInvoicesView({
     setDetailDrawerOpen(true)
     setFeedback(null)
   }
+
+  useEffect(() => {
+    if (!routePoId) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routePoId}`
+    if (handledRouteFulfillmentKey.current === routeKey) {
+      return
+    }
+
+    if (routePoId === selectedPoId && isDetailDrawerOpen) {
+      handledRouteFulfillmentKey.current = routeKey
+      return
+    }
+
+    if (!fulfillmentRows.some((row) => row.poId === routePoId)) {
+      return
+    }
+
+    handledRouteFulfillmentKey.current = routeKey
+    setSelectedPoId(routePoId)
+    setDetailDrawerOpen(true)
+    setFeedback(null)
+  }, [fulfillmentRows, isDetailDrawerOpen, location.key, routePoId, selectedPoId])
 
   const openCreateMode = (mode: ReceiptInvoiceCreateMode, po?: FulfillmentPurchaseOrder) => {
     const row = po ?? fulfillmentRows[0]
@@ -7350,7 +7817,7 @@ function ReceiptsInvoicesView({
                     <td colSpan={7}>{isLoading ? messages.receiptInvoice.loading : messages.receiptInvoice.empty}</td>
                   </tr>
                 ) : (
-                  fulfillmentRows.map((row) => (
+                  fulfillmentPagination.pageItems.map((row) => (
                     <tr key={row.poId}>
                       <td>
                         <button
@@ -7384,6 +7851,14 @@ function ReceiptsInvoicesView({
               </tbody>
             </table>
           </div>
+          <ListPagination
+            currentPage={fulfillmentPagination.currentPage}
+            messages={messages}
+            onPageChange={fulfillmentPagination.setPage}
+            pageSize={fulfillmentPagination.pageSize}
+            totalItems={fulfillmentPagination.totalItems}
+            totalPages={fulfillmentPagination.totalPages}
+          />
         </section>
       </section>
 
@@ -8210,6 +8685,9 @@ function SupplierPoolView({
   selectedCompanyId: string
   suppliers: SupplierSummary[]
 }) {
+  const location = useLocation()
+  const handledRouteSupplierKey = useRef('')
+  const routeSupplierId = routeParam(location.search, 'supplierId')
   const [keyword, setKeyword] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [riskLevel, setRiskLevel] = useState('')
@@ -8239,6 +8717,10 @@ function SupplierPoolView({
 
     return matchesKeyword && matchesCategory && matchesRisk && matchesStatus
   })
+  const supplierPagination = useListPagination(
+    filteredSuppliers,
+    `${selectedCompanyId}:${normalizedKeyword}:${categoryId}:${riskLevel}:${supplierStatus}`,
+  )
   const hasFilters =
     normalizedKeyword.length > 0 ||
     categoryId.length > 0 ||
@@ -8261,6 +8743,24 @@ function SupplierPoolView({
     setRiskLevel('')
     setSupplierStatus('')
   }
+
+  useEffect(() => {
+    if (!routeSupplierId) {
+      return
+    }
+
+    const routeKey = `${location.key}:${routeSupplierId}`
+    if (handledRouteSupplierKey.current === routeKey) {
+      return
+    }
+
+    if (!suppliers.some((supplier) => supplier.supplierId === routeSupplierId)) {
+      return
+    }
+
+    handledRouteSupplierKey.current = routeKey
+    setSelectedSupplierId(routeSupplierId)
+  }, [location.key, routeSupplierId, suppliers])
 
   return (
     <section className="supplier-pool-page">
@@ -8393,7 +8893,7 @@ function SupplierPoolView({
                   <td colSpan={6}>{emptyText}</td>
                 </tr>
               ) : (
-                filteredSuppliers.map((supplier) => (
+                supplierPagination.pageItems.map((supplier) => (
                   <tr key={supplier.supplierId}>
                     <td>
                       <button
@@ -8422,6 +8922,14 @@ function SupplierPoolView({
             </tbody>
           </table>
         </div>
+        <ListPagination
+          currentPage={supplierPagination.currentPage}
+          messages={messages}
+          onPageChange={supplierPagination.setPage}
+          pageSize={supplierPagination.pageSize}
+          totalItems={supplierPagination.totalItems}
+          totalPages={supplierPagination.totalPages}
+        />
       </section>
 
       <Drawer
@@ -8717,6 +9225,306 @@ function FoundationDataView({
         </div>
       </section>
     </section>
+  )
+}
+
+export function GlobalSearchDialog({
+  companyId,
+  language,
+  messages,
+  onClose,
+  onOpenResult,
+  open,
+}: {
+  companyId: string
+  language: Language
+  messages: LocalizedMessages
+  onClose: () => void
+  onOpenResult: (result: GlobalSearchResult) => void
+  open: boolean
+}) {
+  const [query, setQuery] = useState('')
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const normalizedQuery = query.trim()
+  const canSearch = open && companyId.length > 0 && normalizedQuery.length >= 2
+  const searchQuery = useQuery({
+    queryKey: ['global-search', companyId, normalizedQuery],
+    queryFn: () => fetchGlobalSearch(companyId, normalizedQuery),
+    enabled: canSearch,
+    retry: 1,
+  })
+  const groups = canSearch ? (searchQuery.data?.data.groups ?? []) : []
+  const flattenedResults = groups.flatMap((group) => group.results)
+  const groupsWithOffsets = groups.reduce<Array<{ group: GlobalSearchGroup; start: number }>>((current, group) => {
+    const start = current.reduce((sum, item) => sum + item.group.results.length, 0)
+    return [...current, { group, start }]
+  }, [])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    window.setTimeout(() => inputRef.current?.focus(), 0)
+  }, [open])
+
+  useEffect(() => {
+    setSelectedIndex(0)
+  }, [normalizedQuery, open])
+
+  useEffect(() => {
+    if (selectedIndex >= flattenedResults.length) {
+      setSelectedIndex(Math.max(flattenedResults.length - 1, 0))
+    }
+  }, [flattenedResults.length, selectedIndex])
+
+  const openSelectedResult = () => {
+    const result = flattenedResults[selectedIndex]
+    if (result) {
+      onOpenResult(result)
+    }
+  }
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onClose()
+      return
+    }
+
+    if (flattenedResults.length === 0) {
+      return
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setSelectedIndex((current) => (current + 1) % flattenedResults.length)
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setSelectedIndex((current) => (current - 1 + flattenedResults.length) % flattenedResults.length)
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      openSelectedResult()
+    }
+  }
+
+  return (
+    <Modal
+      className="global-search-modal"
+      destroyOnClose={false}
+      footer={null}
+      onCancel={onClose}
+      open={open}
+      title={null}
+      width={680}
+    >
+      <div className="global-search" onKeyDown={handleKeyDown}>
+        <div className="global-search-box">
+          <SearchOutlined />
+          <input
+            aria-label={messages.globalSearch.title}
+            className="global-search-input"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={messages.globalSearch.placeholder}
+            ref={inputRef}
+            type="search"
+            value={query}
+          />
+          <kbd>{messages.globalSearch.shortcut}</kbd>
+        </div>
+        <div className="global-search-scope">
+          <span>{messages.globalSearch.scope}</span>
+        </div>
+
+        <div className="global-search-results">
+          {normalizedQuery.length < 2 ? (
+            <div className="empty-state compact">{messages.globalSearch.minQuery}</div>
+          ) : searchQuery.isLoading ? (
+            <div className="empty-state compact">
+              <LoadingOutlined />
+              {messages.globalSearch.loading}
+            </div>
+          ) : searchQuery.isError ? (
+            <div className="data-alert">{messages.globalSearch.error}</div>
+          ) : groups.length === 0 ? (
+            <div className="empty-state compact">{messages.globalSearch.empty}</div>
+          ) : (
+            groupsWithOffsets.map(({ group, start }) => (
+              <section className="global-search-group" key={group.type}>
+                <div className="global-search-group-title">
+                  {globalSearchResultTypeIcon(group.type)}
+                  <span>{messages.globalSearch.types[group.type]}</span>
+                  <strong>{group.results.length}</strong>
+                </div>
+                {group.results.map((result, index) => {
+                  const globalIndex = start + index
+                  const isSelected = globalIndex === selectedIndex
+
+                  return (
+                    <button
+                      aria-label={`${messages.globalSearch.openResult}: ${result.title}`}
+                      className={isSelected ? 'global-search-result active' : 'global-search-result'}
+                      key={`${result.type}-${result.id}`}
+                      onClick={() => onOpenResult(result)}
+                      type="button"
+                    >
+                      <span className="global-search-result-icon">
+                        {globalSearchResultTypeIcon(result.type)}
+                      </span>
+                      <span className="global-search-result-main">
+                        <strong>{result.title}</strong>
+                        <small>{globalSearchResultMeta(result, messages, language).join(' · ')}</small>
+                        {result.matchedFields.length > 0 && (
+                          <em>
+                            {messages.globalSearch.matchedFields}: {result.matchedFields.slice(0, 2).join(' / ')}
+                          </em>
+                        )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </section>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function globalSearchResultTypeIcon(type: GlobalSearchResultType) {
+  if (type === 'PURCHASE_REQUEST') {
+    return <FileAddOutlined />
+  }
+  if (type === 'APPROVAL') {
+    return <AuditOutlined />
+  }
+  if (type === 'RFQ') {
+    return <FileSearchOutlined />
+  }
+  if (type === 'PURCHASE_ORDER') {
+    return <ShoppingCartOutlined />
+  }
+  if (type === 'RECEIPT' || type === 'INVOICE') {
+    return <InboxOutlined />
+  }
+  if (type === 'THREE_WAY_MATCH') {
+    return <SwapOutlined />
+  }
+  if (type === 'SUPPLIER') {
+    return <TeamOutlined />
+  }
+  return <DatabaseOutlined />
+}
+
+function formatSearchStatus(status: string, messages: LocalizedMessages) {
+  const labels: Record<string, string> = {
+    ACTIVE: messages.foundation.active,
+    APPROVED: messages.approval.approved,
+    CANCELLED: messages.purchaseOrder.cancelled,
+    COMPARISON_READY: messages.rfq.comparisonReady,
+    DRAFT: messages.purchaseRequest.draft,
+    EXCEPTION: messages.matching.exception,
+    FULLY_INVOICED: messages.receiptInvoice.fullyInvoiced,
+    FULLY_RECEIVED: messages.receiptInvoice.fullyReceived,
+    IN_PROGRESS: messages.approval.inProgress,
+    ISSUED: messages.purchaseOrder.issued,
+    MATCHED: messages.matching.matched,
+    NOT_INVOICED: messages.receiptInvoice.notInvoiced,
+    NOT_RECEIVED: messages.receiptInvoice.notReceived,
+    PARTIALLY_INVOICED: messages.receiptInvoice.partiallyInvoiced,
+    PARTIALLY_RECEIVED: messages.receiptInvoice.partiallyReceived,
+    PENDING: messages.approval.pending,
+    PENDING_INPUT: messages.matching.pendingInput,
+    QUOTING: messages.rfq.quoting,
+    RECORDED: messages.receiptInvoice.recorded,
+    REJECTED: messages.approval.rejected,
+    RESOLVED: messages.matching.resolved,
+    SUBMITTED: messages.purchaseRequest.submitted,
+    WITHDRAWN: messages.approval.withdrawn,
+    active: messages.supplierPool.active,
+    inactive: messages.supplierPool.inactive,
+  }
+
+  return labels[status] ?? status
+}
+
+function globalSearchResultMeta(
+  result: GlobalSearchResult,
+  messages: LocalizedMessages,
+  language: Language,
+) {
+  const meta = [
+    result.id,
+    result.status ? formatSearchStatus(result.status, messages) : '',
+    result.ownershipScope === 'GROUP_SHARED'
+      ? messages.globalSearch.groupShared
+      : messages.globalSearch.companyOwned,
+    result.companyName,
+    result.supplierName,
+    result.amount !== null && result.currency
+      ? formatCurrency(result.amount, result.currency, language)
+      : '',
+  ]
+
+  return meta.filter((item): item is string => Boolean(item))
+}
+
+function ListPagination({
+  currentPage,
+  messages,
+  onPageChange,
+  pageSize,
+  totalItems,
+  totalPages,
+}: {
+  currentPage: number
+  messages: LocalizedMessages
+  onPageChange: (page: number) => void
+  pageSize: number
+  totalItems: number
+  totalPages: number
+}) {
+  if (totalItems <= pageSize) {
+    return null
+  }
+
+  const summary = messages.pagination.summary
+    .replace('{current}', String(currentPage))
+    .replace('{total}', String(totalPages))
+    .replace('{pageSize}', String(pageSize))
+
+  return (
+    <nav aria-label={messages.pagination.label} className="list-pagination">
+      <button
+        aria-label={messages.pagination.previous}
+        className="icon-button list-page-button"
+        disabled={currentPage <= 1}
+        onClick={() => onPageChange(currentPage - 1)}
+        title={messages.pagination.previous}
+        type="button"
+      >
+        <LeftOutlined />
+      </button>
+      <span>{summary}</span>
+      <button
+        aria-label={messages.pagination.next}
+        className="icon-button list-page-button"
+        disabled={currentPage >= totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+        title={messages.pagination.next}
+        type="button"
+      >
+        <RightOutlined />
+      </button>
+    </nav>
   )
 }
 

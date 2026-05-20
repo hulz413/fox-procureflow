@@ -43,6 +43,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/receipts-invoices/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/attachments/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/attachments/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/global-search/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/procurement-dashboard/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/three-way-matching/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/three-way-matching/**").permitAll()

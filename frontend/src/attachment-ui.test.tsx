@@ -1,9 +1,12 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   AttachmentInlineAction,
   AttachmentList,
+  GlobalSearchDialog,
   NotificationPanel,
   ReceiptInvoiceAttachmentFields,
   localizedContent,
@@ -42,7 +45,24 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
 })
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  })
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {ui}
+    </QueryClientProvider>,
+  )
+}
 
 describe('attachment UI', () => {
   it('shows RFQ pending upload rows with disabled download tooltip reasons', () => {
@@ -172,5 +192,102 @@ describe('attachment UI', () => {
 
     expect(onDismiss).toHaveBeenCalledWith(notification.id)
     expect(onSelect).toHaveBeenCalledWith(notification)
+  })
+
+  it('searches global results and opens the keyboard-selected target', async () => {
+    const onOpenResult = vi.fn()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            companyId: 'company-digital',
+            companyName: '星河数字科技有限公司',
+            generatedAt: '2026-05-19T12:00:00',
+            groups: [
+              {
+                label: '采购订单',
+                results: [
+                  {
+                    amount: 178540,
+                    companyId: 'company-digital',
+                    companyName: '星河数字科技有限公司',
+                    currency: 'CNY',
+                    id: 'PO-20260518-0301',
+                    matchedFields: ['PO-20260518-0301'],
+                    occurredAt: '2026-05-19T11:20:00',
+                    ownershipScope: 'COMPANY',
+                    status: 'DRAFT',
+                    subtitle: 'RFQ-20260518-0301 · 上海云舟信息技术有限公司',
+                    supplierName: '上海云舟信息技术有限公司',
+                    targetParams: { poId: 'PO-20260518-0301' },
+                    targetPath: '/purchase-orders',
+                    title: '移动工作站采购订单',
+                    type: 'PURCHASE_ORDER',
+                  },
+                  {
+                    amount: 24295,
+                    companyId: 'company-digital',
+                    companyName: '星河数字科技有限公司',
+                    currency: 'CNY',
+                    id: 'PO-20260518-0302',
+                    matchedFields: ['PO-20260518-0302'],
+                    occurredAt: '2026-05-19T11:25:00',
+                    ownershipScope: 'COMPANY',
+                    status: 'ISSUED',
+                    subtitle: 'RFQ-20260518-0302 · 杭州诚采办公用品有限公司',
+                    supplierName: '杭州诚采办公用品有限公司',
+                    targetParams: { poId: 'PO-20260518-0302' },
+                    targetPath: '/purchase-orders',
+                    title: '办公耗材采购订单',
+                    type: 'PURCHASE_ORDER',
+                  },
+                ],
+                type: 'PURCHASE_ORDER',
+              },
+            ],
+            query: 'PO',
+          },
+          success: true,
+          timestamp: '2026-05-19T12:00:00',
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      ),
+    )
+
+    renderWithQueryClient(
+      <GlobalSearchDialog
+        companyId="company-digital"
+        language="zh"
+        messages={messages}
+        onClose={vi.fn()}
+        onOpenResult={onOpenResult}
+        open
+      />,
+    )
+
+    const input = screen.getByLabelText(messages.globalSearch.title)
+    fireEvent.change(input, { target: { value: 'PO' } })
+
+    expect(await screen.findByText('移动工作站采购订单')).toBeInTheDocument()
+    expect(screen.getByText('办公耗材采购订单')).toBeInTheDocument()
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/api/global-search?companyId=company-digital&query=PO')
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /办公耗材采购订单/ })).toHaveClass('active')
+    })
+
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onOpenResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'PO-20260518-0302',
+        targetPath: '/purchase-orders',
+        targetParams: { poId: 'PO-20260518-0302' },
+      }),
+    )
   })
 })
