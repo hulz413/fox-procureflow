@@ -2445,6 +2445,26 @@ tbody tr:last-child td {
   margin-top: 0;
 }
 
+.matching-detail-section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.request-drawer .matching-detail .matching-detail-section > .panel-title {
+  border: 0;
+  border-bottom: 1px solid var(--pf-border);
+  border-radius: 0;
+}
+
+.matching-detail-section > .compact-detail-table,
+.matching-detail-section > .matching-actions-list {
+  border: 0;
+  border-radius: 0;
+}
+
 .compact-detail-table {
   border-right: 1px solid var(--pf-border);
   border-bottom: 1px solid var(--pf-border);

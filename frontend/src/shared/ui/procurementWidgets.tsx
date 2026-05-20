@@ -548,17 +548,19 @@ export function AttachmentInlineAction({
 }
 
 export function ApprovalPath({
+  aside,
   messages,
   nodes,
   users,
 }: {
+  aside?: string
   messages: LocalizedMessages
   nodes: ApprovalNode[]
   users: UserSummary[]
 }) {
   return (
     <section className="approval-section">
-      <PanelTitle icon={<NodeIndexOutlined />} title={messages.approval.path} />
+      <PanelTitle icon={<NodeIndexOutlined />} title={messages.approval.path} aside={aside} />
       <div className="approval-path">
         {nodes.map((node) => (
           <div className={`approval-step ${approvalNodeToneOf(node.status)}`} key={node.nodeId}>

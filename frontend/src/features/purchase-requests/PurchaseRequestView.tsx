@@ -1,4 +1,4 @@
-import { ApiOutlined, AuditOutlined, CheckCircleOutlined, DeleteOutlined, FileAddOutlined, LoadingOutlined, PlusOutlined } from '@ant-design/icons'
+import { ApiOutlined, CheckCircleOutlined, DeleteOutlined, FileAddOutlined, LoadingOutlined, PlusOutlined } from '@ant-design/icons'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Drawer, Modal, Select, Tooltip } from 'antd'
 import { useEffect, useRef, useState } from 'react'
@@ -983,31 +983,29 @@ export function PurchaseRequestView({
 	              </table>
 	            </div>
 	            {selectedDetail.approval && (
-	              <section className="approval-section">
-	                <PanelTitle
-	                  icon={<AuditOutlined />}
-	                  title={messages.purchaseRequest.approvalPath}
-	                  aside={formatApprovalStatus(selectedDetail.approval.status, messages)}
-	                />
-	                {approvalDetail ? (
-	                  <>
-	                    <ApprovalPath messages={messages} nodes={approvalDetail.nodes} users={users} />
-	                    <ApprovalTimeline
-	                      language={language}
-	                      messages={messages}
-	                      records={approvalDetail.timeline}
-	                      users={users}
-	                    />
-	                  </>
-	                ) : (
+	              approvalDetail ? (
+	                <>
+	                  <ApprovalPath
+	                    aside={formatApprovalStatus(selectedDetail.approval.status, messages)}
+	                    messages={messages}
+	                    nodes={approvalDetail.nodes}
+	                    users={users}
+	                  />
 	                  <ApprovalTimeline
 	                    language={language}
 	                    messages={messages}
-	                    records={selectedDetail.approval.timeline}
+	                    records={approvalDetail.timeline}
 	                    users={users}
 	                  />
-	                )}
-	              </section>
+	                </>
+	              ) : (
+	                <ApprovalTimeline
+	                  language={language}
+	                  messages={messages}
+	                  records={selectedDetail.approval.timeline}
+	                  users={users}
+	                />
+	              )
 	            )}
 	          </div>
 	        ) : (

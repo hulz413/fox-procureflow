@@ -796,7 +796,7 @@ export function PurchaseOrderView({
 
             <section className="approval-section">
               <PanelTitle icon={<NodeIndexOutlined />} title={messages.purchaseOrder.statusRecords} />
-              <div className="timeline">
+              <div className="timeline-list">
                 {detail.statusRecords.length === 0 ? (
                   <div className="empty-state">{messages.purchaseOrder.noRecords}</div>
                 ) : (

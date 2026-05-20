@@ -482,74 +482,80 @@ export function ThreeWayMatchingView({
               />
             </section>
 
-            <PanelTitle icon={<NodeIndexOutlined />} title={messages.receiptInvoice.lineFulfillment} aside={messages.matching.dataState} />
-            <div className="table-wrap compact-detail-table">
-              <table className="request-table">
-                <thead>
-                  <tr>
-                    <th>{messages.receiptInvoice.lineFulfillment}</th>
-                    <th>{messages.matching.ordered}</th>
-                    <th>{messages.matching.received}</th>
-                    <th>{messages.matching.invoiced}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.lines.map((line) => (
-                    <tr key={line.poLineId}>
-                      <td><TruncatedText text={`${line.lineNo}. ${line.itemName}`} /></td>
-                      <td>{`${line.orderedQuantity} ${line.unit}`}</td>
-                      <td>{`${line.receivedQuantity} ${line.unit}`}</td>
-                      <td>{`${line.invoicedQuantity} ${line.unit}`}</td>
+            <section className="matching-detail-section">
+              <PanelTitle icon={<NodeIndexOutlined />} title={messages.receiptInvoice.lineFulfillment} aside={messages.matching.dataState} />
+              <div className="table-wrap compact-detail-table">
+                <table className="request-table">
+                  <thead>
+                    <tr>
+                      <th>{messages.receiptInvoice.lineFulfillment}</th>
+                      <th>{messages.matching.ordered}</th>
+                      <th>{messages.matching.received}</th>
+                      <th>{messages.matching.invoiced}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <PanelTitle icon={<AlertOutlined />} title={messages.matching.differences} />
-            <div className="table-wrap compact-detail-table">
-              <table className="request-table">
-                <thead>
-                  <tr>
-                    <th>{messages.matching.differences}</th>
-                    <th>{messages.matching.severity}</th>
-                    <th>{messages.matching.received}</th>
-                    <th>{messages.matching.invoiced}</th>
-                    <th>{messages.matching.invoiceVariance}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.differences.length === 0 ? (
-                    <tr><td colSpan={5}>{messages.matching.noDifferences}</td></tr>
-                  ) : (
-                    detail.differences.map((difference) => (
-                      <tr key={difference.differenceId}>
-                        <td><TruncatedText text={`${formatDifferenceType(difference.differenceType, messages)} · ${difference.description}`} /></td>
-                        <td><span className={`tag ${severityToneOf(difference.severity)}`}>{formatMatchSeverity(difference.severity, messages)}</span></td>
-                        <td>{difference.receivedQuantity ?? '-'}</td>
-                        <td>{difference.invoicedQuantity ?? '-'}</td>
-                        <td>{difference.differenceAmount === null ? '-' : formatCurrency(difference.differenceAmount, difference.currency, language)}</td>
+                  </thead>
+                  <tbody>
+                    {detail.lines.map((line) => (
+                      <tr key={line.poLineId}>
+                        <td><TruncatedText text={`${line.lineNo}. ${line.itemName}`} /></td>
+                        <td>{`${line.orderedQuantity} ${line.unit}`}</td>
+                        <td>{`${line.receivedQuantity} ${line.unit}`}</td>
+                        <td>{`${line.invoicedQuantity} ${line.unit}`}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-            <PanelTitle icon={<AuditOutlined />} title={messages.matching.handlingRecords} />
-            <div className="timeline-list matching-actions-list">
-              {detail.actions.length === 0 ? (
-                <div className="empty-state">{messages.matching.noActions}</div>
-              ) : (
-                detail.actions.map((action) => (
-                  <article className="timeline-item" key={action.actionId}>
-                    <strong>{formatMatchAction(action.actionType, messages)}</strong>
-                    <span>{userNameOf(action.actorId, users)} · {formatDateTime(action.createdAt, language)}</span>
-                    <p>{action.note}</p>
-                  </article>
-                ))
-              )}
-            </div>
+            <section className="matching-detail-section">
+              <PanelTitle icon={<AlertOutlined />} title={messages.matching.differences} />
+              <div className="table-wrap compact-detail-table">
+                <table className="request-table">
+                  <thead>
+                    <tr>
+                      <th>{messages.matching.differences}</th>
+                      <th>{messages.matching.severity}</th>
+                      <th>{messages.matching.received}</th>
+                      <th>{messages.matching.invoiced}</th>
+                      <th>{messages.matching.invoiceVariance}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.differences.length === 0 ? (
+                      <tr><td colSpan={5}>{messages.matching.noDifferences}</td></tr>
+                    ) : (
+                      detail.differences.map((difference) => (
+                        <tr key={difference.differenceId}>
+                          <td><TruncatedText text={`${formatDifferenceType(difference.differenceType, messages)} · ${difference.description}`} /></td>
+                          <td><span className={`tag ${severityToneOf(difference.severity)}`}>{formatMatchSeverity(difference.severity, messages)}</span></td>
+                          <td>{difference.receivedQuantity ?? '-'}</td>
+                          <td>{difference.invoicedQuantity ?? '-'}</td>
+                          <td>{difference.differenceAmount === null ? '-' : formatCurrency(difference.differenceAmount, difference.currency, language)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="matching-detail-section">
+              <PanelTitle icon={<AuditOutlined />} title={messages.matching.handlingRecords} />
+              <div className="timeline-list matching-actions-list">
+                {detail.actions.length === 0 ? (
+                  <div className="empty-state">{messages.matching.noActions}</div>
+                ) : (
+                  detail.actions.map((action) => (
+                    <article className="timeline-item" key={action.actionId}>
+                      <strong>{formatMatchAction(action.actionType, messages)}</strong>
+                      <span>{userNameOf(action.actorId, users)} · {formatDateTime(action.createdAt, language)}</span>
+                      <p>{action.note}</p>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
 
             <label className="form-wide matching-note">
               <span>{messages.matching.actionNote}</span>
