@@ -106,8 +106,7 @@ export function RfqView({
     setCreateForm((current) => {
       const currentRequest = approvedRequests.find((request) => request.requestId === current.requestId)
       const request = currentRequest ?? approvedRequests[0]
-      const procurementUser =
-        buyers.find((buyer) => buyer.userId === current.procurementUserId) ?? activeBuyer ?? buyers[0]
+      const procurementUser = activeBuyer ?? buyers.find((buyer) => buyer.companyId === selectedCompanyId) ?? buyers[0]
       const validSupplierIds = suppliersForCategory(request?.categoryId ?? '', suppliers).map((supplier) => supplier.supplierId)
       const supplierIds = current.supplierIds.filter((supplierId) => validSupplierIds.includes(supplierId))
       const next = {
@@ -127,7 +126,7 @@ export function RfqView({
       }
       return next
     })
-  }, [activeBuyer, approvedRequests, buyers, suppliers])
+  }, [activeBuyer, approvedRequests, buyers, selectedCompanyId, suppliers])
 
   const detailQuery = useQuery({
     queryKey: ['rfq-detail', selectedRfqId, selectedCompanyId],
@@ -584,17 +583,9 @@ export function RfqView({
             </label>
             <label>
               <span>{messages.rfq.procurementUser}</span>
-              <select
-                required
-                value={createForm.procurementUserId}
-                onChange={(event) => updateCreateForm('procurementUserId', event.target.value)}
-              >
-                {buyers.map((buyer) => (
-                  <option key={buyer.userId} value={buyer.userId}>
-                    {buyer.displayName}
-                  </option>
-                ))}
-              </select>
+              <div className="readonly-form-value">
+                <TruncatedText text={userNameOf(createForm.procurementUserId, users)} />
+              </div>
             </label>
             <label>
               <span>{messages.purchaseRequest.title}</span>

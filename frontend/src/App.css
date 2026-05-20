@@ -1889,6 +1889,20 @@ tbody tr:last-child td {
   background: #fff;
 }
 
+.readonly-form-value {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--pf-border);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--pf-text);
+  background: var(--pf-panel-soft);
+  font-weight: 700;
+}
+
 .request-form .ant-select {
   width: 100%;
 }

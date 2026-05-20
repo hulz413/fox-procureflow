@@ -58,7 +58,6 @@ export function ProcurementDashboardView({
           <PanelTitle
             icon={<DashboardOutlined />}
             title={messages.dashboard.scope}
-            aside={dashboard ? `${messages.dashboard.generatedAt}: ${formatDateTime(dashboard.generatedAt, language)}` : messages.dashboard.dataState}
           />
           <div className="dashboard-scope-switch">
             <button
