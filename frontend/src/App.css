@@ -2077,6 +2077,27 @@ tbody tr:last-child td {
   padding: 12px;
 }
 
+.button-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-action-row .primary-button,
+.button-action-row .secondary-button {
+  width: auto;
+  min-width: 112px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.button-action-row .disabled-tooltip-wrap {
+  display: inline-flex;
+}
+
 .matching-tabs,
 .matching-action-bar {
   display: flex;

@@ -7761,7 +7761,7 @@ function ReceiptsInvoicesView({
           <PanelTitle icon={<InboxOutlined />} title={messages.receiptInvoice.list} aside={selectedCompany.companyName} />
           {isError && <div className="data-alert">{messages.receiptInvoice.unavailable}</div>}
           {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
-          <div className="action-row">
+          <div className="action-row button-action-row">
             <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
               <button
                 className="primary-button"
@@ -8367,7 +8367,7 @@ function FulfillmentDetail({
           <dd>{po.attachmentCount}</dd>
         </div>
       </dl>
-      <div className="action-row">
+      <div className="action-row button-action-row">
         <DisabledActionTooltip title={receiptDisabledReason}>
           <button className="primary-button" disabled={Boolean(receiptDisabledReason)} onClick={onCreateReceipt} type="button">
             <InboxOutlined />
