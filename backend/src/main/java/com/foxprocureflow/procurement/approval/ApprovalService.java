@@ -421,6 +421,10 @@ public class ApprovalService {
         snapshot.put("categoryId", request.getCategoryId());
         snapshot.put("budgetAccountId", request.getBudgetAccountId());
         snapshot.put("supplierId", request.getSupplierId());
+        Object supplierIds = fromJson(request.getFieldSnapshotJson()).get("supplierIds");
+        if (supplierIds instanceof Collection<?>) {
+            snapshot.put("supplierIds", supplierIds);
+        }
         snapshot.put("title", request.getTitle());
         snapshot.put("totalAmount", request.getTotalAmount());
         snapshot.put("currency", request.getCurrency());

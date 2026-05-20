@@ -1,159 +1,159 @@
-# purchase-orders Spec
+# purchase-orders 规格
 
 ## Purpose
 
-Define the MVP purchase order capability so procurement users can create company-scoped POs from comparable RFQ quotes, snapshot upstream supplier/quote/request data, publish or cancel POs with an audit trail, and provide a stable upstream document for later receiving, invoice, and three-way matching slices.
+定义 MVP 采购订单能力，使采购用户可以从可对比 RFQ quote 创建公司级 PO，快照上游供应商、quote 和申请数据，带审计轨迹发布或取消 PO，并为后续收货、发票和三单匹配切片提供稳定上游单据。
 
 ## Requirements
 
-### Requirement: Purchase orders are created from comparable RFQ quotes
-The system SHALL allow a procurement user to create exactly one company-scoped purchase order from an effective supplier quote on an RFQ whose status is `COMPARISON_READY`.
+### Requirement: 采购订单从可对比 RFQ quote 创建
+系统 SHALL 允许采购用户从状态为 `COMPARISON_READY` 的 RFQ 上的有效供应商 quote 创建正好一个公司级采购订单。
 
-#### Scenario: Create PO from top-ranked digital IT hardware RFQ quote
-- **WHEN** a procurement user from `company-digital` creates a purchase order from an effective quote on a `company-digital` RFQ with status `COMPARISON_READY`
-- **THEN** the system MUST persist a purchase order with status `DRAFT`
-- **AND** the purchase order MUST reference the source `rfqId`, `quoteId`, `requestId`, `approvalId`, `companyId`, procurement user, supplier, category, budget account, currency, quote amount, tax rate, tax amount, total amount, expected delivery date, and line item snapshot
-- **AND** the response MUST return a stable `poId`
+#### Scenario: 从排名最高的数字公司 IT 硬件 RFQ quote 创建 PO
+- **WHEN** `company-digital` 的采购用户从 `company-digital` 且状态为 `COMPARISON_READY` 的 RFQ 上的有效 quote 创建采购订单
+- **THEN** 系统 MUST 持久化状态为 `DRAFT` 的采购订单
+- **AND** 采购订单 MUST 引用来源 `rfqId`、`quoteId`、`requestId`、`approvalId`、`companyId`、采购用户、供应商、品类、预算科目、币种、quote 金额、税率、税额、总金额、期望交付日期和明细快照
+- **AND** 响应 MUST 返回稳定的 `poId`
 
-#### Scenario: Reject PO creation before RFQ comparison is ready
-- **WHEN** a procurement user tries to create a purchase order from an RFQ whose status is `ISSUED` or `QUOTING`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT persist a purchase order, purchase order line, delivery schedule, status record, receipt, invoice, or matching record
+#### Scenario: RFQ 对比就绪前拒绝创建 PO
+- **WHEN** 采购用户尝试从状态为 `ISSUED` 或 `QUOTING` 的 RFQ 创建采购订单
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 持久化采购订单、采购订单明细、交付计划、状态记录、收货、发票或匹配记录
 
-#### Scenario: Reject PO creation for cross-company RFQ
-- **WHEN** a procurement user from `company-digital` tries to create a purchase order from an RFQ owned by `company-manufacturing`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT fall back to the active demo company
+#### Scenario: 拒绝为跨公司 RFQ 创建 PO
+- **WHEN** `company-digital` 的采购用户尝试从属于 `company-manufacturing` 的 RFQ 创建采购订单
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 回退到活跃演示公司
 
-#### Scenario: Reject duplicate PO for same RFQ
-- **WHEN** a purchase order already exists for an RFQ
-- **THEN** a second create request for the same `rfqId` MUST be rejected with a conflict-style 4xx error
-- **AND** the existing purchase order MUST remain unchanged
+#### Scenario: 拒绝同一 RFQ 重复创建 PO
+- **WHEN** 某个 RFQ 已经存在采购订单
+- **THEN** 同一 `rfqId` 的第二次创建请求 MUST 以冲突语义的 4xx 错误被拒绝
+- **AND** 现有采购订单 MUST 保持不变
 
-#### Scenario: Reject quote outside RFQ scope
-- **WHEN** a procurement user submits a purchase order create request with a `quoteId` that does not belong to the selected `rfqId`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT persist a partial purchase order
+#### Scenario: 拒绝 RFQ 范围外 quote
+- **WHEN** 采购用户提交的采购订单创建请求包含不属于所选 `rfqId` 的 `quoteId`
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 持久化部分采购订单
 
-### Requirement: Purchase orders snapshot supplier, quote, request, and delivery data
-The system SHALL store purchase order header, line, supplier, amount, tax, and delivery schedule data as stable snapshots for downstream receipt, invoice, and three-way matching workflows.
+### Requirement: 采购订单快照供应商、quote、申请和交付数据
+系统 SHALL 将采购订单头、明细、供应商、金额、税和交付计划数据存储为稳定快照，供下游收货、发票和三单匹配流程使用。
 
-#### Scenario: Snapshot selected supplier and quote amounts
-- **WHEN** a purchase order is created from a selected RFQ quote
-- **THEN** the purchase order MUST snapshot supplier identifier, supplier name, service scope, risk level, quote amount, tax rate, tax amount, total amount, currency, delivery date, and quote updated timestamp
-- **AND** later RFQ quote updates MUST NOT mutate the persisted purchase order snapshot
+#### Scenario: 快照所选供应商和 quote 金额
+- **WHEN** 采购订单从所选 RFQ quote 创建
+- **THEN** 采购订单 MUST 快照供应商标识、供应商名称、服务范围、风险等级、quote 金额、税率、税额、总金额、币种、交付日期和 quote 更新时间戳
+- **AND** 后续 RFQ quote 更新 MUST NOT 变更已持久化的采购订单快照
 
-#### Scenario: Snapshot source request line items
-- **WHEN** a purchase order is created from an RFQ that originated from a purchase request with line items
-- **THEN** the purchase order MUST persist one purchase order line for each source request line
-- **AND** each purchase order line MUST include line number, item name, specification, quantity, unit, category, and amount snapshot fields usable by future receiving workflows
+#### Scenario: 快照来源申请明细
+- **WHEN** 采购订单从来源于带明细采购申请的 RFQ 创建
+- **THEN** 采购订单 MUST 为每条来源申请明细持久化一条采购订单明细
+- **AND** 每条采购订单明细 MUST 包含行号、物料名称、规格、数量、单位、品类和金额快照字段，供未来收货流程使用
 
-#### Scenario: Record delivery schedule
-- **WHEN** a procurement user creates a purchase order with planned delivery date, delivery location, contact person, contact phone, and delivery note
-- **THEN** the system MUST persist a delivery schedule associated with the `poId`
-- **AND** the purchase order detail response MUST include the delivery schedule data
+#### Scenario: 记录交付计划
+- **WHEN** 采购用户创建采购订单并提供计划交付日期、交付地点、联系人、联系电话和交付备注
+- **THEN** 系统 MUST 持久化与 `poId` 关联的交付计划
+- **AND** 采购订单详情响应 MUST 包含交付计划数据
 
-#### Scenario: Preserve company ownership boundary
-- **WHEN** a purchase order is created for `company-digital`
-- **THEN** the purchase order, lines, delivery schedule, and status records MUST all persist `company-digital` ownership either directly or through the purchase order header
-- **AND** company-scoped queries for `company-manufacturing` MUST NOT return that purchase order
+#### Scenario: 保留公司归属边界
+- **WHEN** 为 `company-digital` 创建采购订单
+- **THEN** 采购订单、明细、交付计划和状态记录 MUST 直接或通过采购订单头持久化 `company-digital` 归属
+- **AND** `company-manufacturing` 的公司级查询 MUST NOT 返回该采购订单
 
-### Requirement: Purchase order status flow supports draft, publish, and cancellation
-The system SHALL maintain a small MVP purchase order status flow with auditable status records.
+### Requirement: 采购订单状态流支持草稿、发布和取消
+系统 SHALL 维护一个小型 MVP 采购订单状态流，并带可审计状态记录。
 
-#### Scenario: Publish draft PO
-- **WHEN** a procurement user publishes a `DRAFT` purchase order owned by the same company
-- **THEN** the purchase order status MUST change to `ISSUED`
-- **AND** the system MUST append a status record containing the publish action, actor, optional comment, and timestamp
+#### Scenario: 发布草稿 PO
+- **WHEN** 采购用户发布同公司归属的 `DRAFT` 采购订单
+- **THEN** 采购订单状态 MUST 变为 `ISSUED`
+- **AND** 系统 MUST 追加一条包含发布动作、操作者、可选备注和时间戳的状态记录
 
-#### Scenario: Reject publish for non-draft PO
-- **WHEN** a caller tries to publish a purchase order whose status is `ISSUED` or `CANCELLED`
-- **THEN** the system MUST reject the operation with a conflict-style 4xx error
-- **AND** the purchase order status and status records MUST remain unchanged
+#### Scenario: 拒绝发布非草稿 PO
+- **WHEN** 调用方尝试发布状态为 `ISSUED` 或 `CANCELLED` 的采购订单
+- **THEN** 系统 MUST 以冲突语义的 4xx 错误拒绝操作
+- **AND** 采购订单状态和状态记录 MUST 保持不变
 
-#### Scenario: Cancel draft or issued PO
-- **WHEN** an authorized actor cancels a purchase order whose status is `DRAFT` or `ISSUED` with a cancellation reason
-- **THEN** the purchase order status MUST change to `CANCELLED`
-- **AND** the system MUST append a status record containing the cancel action, actor, reason, and timestamp
+#### Scenario: 取消草稿或已发布 PO
+- **WHEN** 授权操作者带取消原因取消状态为 `DRAFT` 或 `ISSUED` 的采购订单
+- **THEN** 采购订单状态 MUST 变为 `CANCELLED`
+- **AND** 系统 MUST 追加一条包含取消动作、操作者、原因和时间戳的状态记录
 
-#### Scenario: Reject repeated cancellation
-- **WHEN** a caller tries to cancel a purchase order whose status is already `CANCELLED`
-- **THEN** the system MUST reject the operation with a conflict-style 4xx error
-- **AND** the system MUST NOT create a duplicate cancellation record
+#### Scenario: 拒绝重复取消
+- **WHEN** 调用方尝试取消状态已经是 `CANCELLED` 的采购订单
+- **THEN** 系统 MUST 以冲突语义的 4xx 错误拒绝操作
+- **AND** 系统 MUST NOT 创建重复取消记录
 
-### Requirement: Purchase order APIs expose company-scoped list, detail, creation, and status actions
-The system SHALL expose purchase order REST APIs that return company-scoped PO data and support the current demo security model.
+### Requirement: 采购订单 API 暴露公司级列表、详情、创建和状态操作
+系统 SHALL 暴露采购订单 REST API，返回公司级 PO 数据，并支持当前演示安全模型。
 
-#### Scenario: List purchase orders for one company
-- **WHEN** a caller requests `GET /api/purchase-orders?companyId=company-digital`
-- **THEN** the system MUST return only purchase orders owned by `company-digital`
-- **AND** the response MUST NOT include purchase orders owned by `company-manufacturing`
+#### Scenario: 列出一个公司的采购订单
+- **WHEN** 调用方请求 `GET /api/purchase-orders?companyId=company-digital`
+- **THEN** 系统 MUST 仅返回属于 `company-digital` 的采购订单
+- **AND** 响应 MUST NOT 包含属于 `company-manufacturing` 的采购订单
 
-#### Scenario: Query purchase order detail
-- **WHEN** a caller requests `GET /api/purchase-orders/{poId}` for an existing purchase order
-- **THEN** the system MUST return the purchase order header, source RFQ summary, source request summary, selected supplier, quote snapshot, line items, delivery schedule, status records, current status, and timestamps
+#### Scenario: 查询采购订单详情
+- **WHEN** 调用方请求现有采购订单的 `GET /api/purchase-orders/{poId}`
+- **THEN** 系统 MUST 返回采购订单头、来源 RFQ 摘要、来源申请摘要、所选供应商、quote 快照、明细、交付计划、状态记录、当前状态和时间戳
 
-#### Scenario: Create purchase order through API
-- **WHEN** a caller submits `POST /api/purchase-orders` with valid `companyId`, `rfqId`, `quoteId`, procurement user, and delivery schedule data
-- **THEN** the system MUST create a `DRAFT` purchase order and return its detail response
+#### Scenario: 通过 API 创建采购订单
+- **WHEN** 调用方提交 `POST /api/purchase-orders`，包含有效 `companyId`、`rfqId`、`quoteId`、采购用户和交付计划数据
+- **THEN** 系统 MUST 创建 `DRAFT` 采购订单并返回其详情响应
 
-#### Scenario: Publish purchase order through API
-- **WHEN** a caller submits `POST /api/purchase-orders/{poId}/publish` with a valid actor from the purchase order company
-- **THEN** the system MUST publish the purchase order and return the updated detail response
+#### Scenario: 通过 API 发布采购订单
+- **WHEN** 调用方提交 `POST /api/purchase-orders/{poId}/publish`，并带有来自采购订单所属公司的有效操作者
+- **THEN** 系统 MUST 发布采购订单并返回更新后的详情响应
 
-#### Scenario: Cancel purchase order through API
-- **WHEN** a caller submits `POST /api/purchase-orders/{poId}/cancel` with a valid actor from the purchase order company and a reason
-- **THEN** the system MUST cancel the purchase order and return the updated detail response
+#### Scenario: 通过 API 取消采购订单
+- **WHEN** 调用方提交 `POST /api/purchase-orders/{poId}/cancel`，并带有来自采购订单所属公司的有效操作者和原因
+- **THEN** 系统 MUST 取消采购订单并返回更新后的详情响应
 
-#### Scenario: Unknown company list request is rejected
-- **WHEN** a caller requests the purchase order list with an unknown `companyId`
-- **THEN** the system MUST return a client-visible error instead of falling back to a default company
+#### Scenario: 未知公司列表请求被拒绝
+- **WHEN** 调用方使用未知 `companyId` 请求采购订单列表
+- **THEN** 系统 MUST 返回客户端可见错误，而不是回退到默认公司
 
-#### Scenario: Swagger documents purchase order endpoints
-- **WHEN** a developer opens Swagger UI or requests `/v3/api-docs`
-- **THEN** the API documentation MUST include purchase order list, detail, create, publish, and cancel endpoints with request and response shapes
+#### Scenario: Swagger 记录采购订单端点
+- **WHEN** 开发者打开 Swagger UI 或请求 `/v3/api-docs`
+- **THEN** API 文档 MUST 包含采购订单列表、详情、创建、发布和取消端点及其请求/响应结构
 
-#### Scenario: Demo frontend can call purchase order APIs
-- **WHEN** the frontend calls purchase order GET and POST endpoints in the current skeleton environment
-- **THEN** Spring Security MUST allow the calls without JWT
-- **AND** the service layer MUST still validate explicit company, actor, procurement user, RFQ, quote, supplier, and purchase order ownership or scope
+#### Scenario: 演示前端可以调用采购订单 API
+- **WHEN** 前端在当前 skeleton 环境中调用采购订单 GET 和 POST 端点
+- **THEN** Spring Security MUST 允许不带 JWT 调用
+- **AND** service layer MUST 仍然校验明确的公司、操作者、采购用户、RFQ、quote、供应商和采购订单归属或范围
 
-### Requirement: Frontend provides a purchase order workspace
-The frontend SHALL provide a real purchase order page in the procurement workspace for creating POs from comparable RFQ quotes, viewing PO details, and operating MVP status actions.
+### Requirement: 前端提供采购订单工作台
+前端 SHALL 在采购工作台中提供真实采购订单页面，用于从可对比 RFQ quote 创建 PO、查看 PO 详情和执行 MVP 状态操作。
 
-#### Scenario: Open purchase order page
-- **WHEN** a user selects “采购订单” in the workspace navigation
-- **THEN** the system MUST open a `/purchase-orders` page
-- **AND** the page MUST load purchase order and eligible RFQ quote data from backend APIs rather than static mock data
+#### Scenario: 打开采购订单页面
+- **WHEN** 用户在工作台导航中选择“采购订单”
+- **THEN** 系统 MUST 打开 `/purchase-orders` 页面
+- **AND** 页面 MUST 从后端 API 加载采购订单和符合条件的 RFQ quote 数据，而不是静态 mock 数据
 
-#### Scenario: Create PO from eligible RFQ quote in the frontend
-- **WHEN** a procurement user selects an eligible `COMPARISON_READY` RFQ quote, fills delivery schedule fields, and submits the PO form
-- **THEN** the frontend MUST call the purchase order create API
-- **AND** the new purchase order MUST appear in the purchase order list with its backend `poId`, source `rfqId`, supplier, total amount, and `DRAFT` status
+#### Scenario: 从前端基于合格 RFQ quote 创建 PO
+- **WHEN** 采购用户选择合格的 `COMPARISON_READY` RFQ quote，填写交付计划字段并提交 PO 表单
+- **THEN** 前端 MUST 调用采购订单创建 API
+- **AND** 新采购订单 MUST 出现在采购订单列表中，并展示其后端 `poId`、来源 `rfqId`、供应商、总金额和 `DRAFT` 状态
 
-#### Scenario: Review purchase order detail
-- **WHEN** a user selects a purchase order from the list
-- **THEN** the frontend MUST show source RFQ information, selected supplier, quote amount, tax amount, total amount, line item snapshot, delivery schedule, status records, and current status
+#### Scenario: 查看采购订单详情
+- **WHEN** 用户从列表选择采购订单
+- **THEN** 前端 MUST 展示来源 RFQ 信息、所选供应商、quote 金额、税额、总金额、明细快照、交付计划、状态记录和当前状态
 
-#### Scenario: Publish PO from the frontend
-- **WHEN** a procurement user publishes a `DRAFT` purchase order from the detail view
-- **THEN** the frontend MUST call the purchase order publish API
-- **AND** the purchase order list and detail view MUST refresh to show `ISSUED` status and the publish record
+#### Scenario: 从前端发布 PO
+- **WHEN** 采购用户从详情视图发布 `DRAFT` 采购订单
+- **THEN** 前端 MUST 调用采购订单发布 API
+- **AND** 采购订单列表和详情视图 MUST 刷新，以展示 `ISSUED` 状态和发布记录
 
-#### Scenario: Cancel PO from the frontend
-- **WHEN** a valid actor cancels a `DRAFT` or `ISSUED` purchase order with a reason from the detail view
-- **THEN** the frontend MUST call the purchase order cancel API
-- **AND** the purchase order list and detail view MUST refresh to show `CANCELLED` status and the cancellation record
+#### Scenario: 从前端取消 PO
+- **WHEN** 有效操作者从详情视图带原因取消 `DRAFT` 或 `ISSUED` 采购订单
+- **THEN** 前端 MUST 调用采购订单取消 API
+- **AND** 采购订单列表和详情视图 MUST 刷新，以展示 `CANCELLED` 状态和取消记录
 
-### Requirement: Purchase orders do not implement downstream receiving, invoice, matching, or AI workflows
-The system SHALL keep this change focused on purchase order creation and status management, and SHALL NOT create downstream execution records or AI-generated decisions.
+### Requirement: 采购订单不实现下游收货、发票、匹配或 AI 流程
+系统 SHALL 将本 change 聚焦在采购订单创建和状态管理，并且 SHALL NOT 创建下游执行记录或 AI 生成决策。
 
-#### Scenario: PO publication does not create downstream records
-- **WHEN** a purchase order reaches `ISSUED`
-- **THEN** the system MUST NOT create receipts, invoices, three-way matching results, supplier portal tasks, RabbitMQ events, payment records, or AI recommendations
-- **AND** the purchase order MUST remain the input for later receiving and invoice slices
+#### Scenario: PO 发布不创建下游记录
+- **WHEN** 采购订单到达 `ISSUED`
+- **THEN** 系统 MUST NOT 创建收货、发票、三单匹配结果、供应商门户任务、RabbitMQ events、付款记录或 AI 建议
+- **AND** 采购订单 MUST 保持为后续收货和发票切片的输入
 
-#### Scenario: PO workflow does not require deferred infrastructure
-- **WHEN** a developer runs the purchase order workflow in the MVP local environment
-- **THEN** the workflow MUST use MySQL and synchronous service calls
-- **AND** it MUST NOT require Redis, RabbitMQ, MongoDB, MinIO, Prometheus, Grafana, Jaeger, Zipkin, Keycloak, or DeepSeek
+#### Scenario: PO 流程不需要延期基础设施
+- **WHEN** 开发者在 MVP 本地环境中运行采购订单流程
+- **THEN** 流程 MUST 使用 MySQL 和同步 service 调用
+- **AND** 它 MUST NOT 需要 Redis、RabbitMQ、MongoDB、MinIO、Prometheus、Grafana、Jaeger、Zipkin、Keycloak 或 DeepSeek

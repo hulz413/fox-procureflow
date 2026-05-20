@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -82,6 +81,7 @@ public class PurchaseRequestService {
     @Transactional
     public PurchaseRequestDetailResponse createDraft(CreateDraftRequest request) {
         validateMasterData(request);
+        List<String> supplierIds = normalizedSupplierIds(request);
 
         String requestId = nextRequestId();
         List<PurchaseRequestLineJpaEntity> lines = buildLines(requestId, request.categoryId(), request.lineItems());
@@ -92,7 +92,7 @@ public class PurchaseRequestService {
             throw badRequest("totalAmount must equal the sum of line estimated amounts");
         }
 
-        String fieldSnapshotJson = toJson(fieldSnapshot(request, calculatedTotal));
+        String fieldSnapshotJson = toJson(fieldSnapshot(request, calculatedTotal, supplierIds));
         PurchaseRequestJpaEntity saved = purchaseRequestRepository.saveAndFlush(new PurchaseRequestJpaEntity(
             requestId,
             request.companyId(),
@@ -100,7 +100,7 @@ public class PurchaseRequestService {
             request.departmentId(),
             request.categoryId(),
             request.budgetAccountId(),
-            blankToNull(request.supplierId()),
+            supplierIds.isEmpty() ? null : supplierIds.get(0),
             request.title().trim(),
             blankToNull(request.description()),
             calculatedTotal,
@@ -191,8 +191,7 @@ public class PurchaseRequestService {
             throw badRequest("budget account is not valid for categoryId: " + request.categoryId());
         }
 
-        Optional<String> supplierId = Optional.ofNullable(blankToNull(request.supplierId()));
-        supplierId.ifPresent(value -> validateSupplier(value, request.categoryId()));
+        normalizedSupplierIds(request).forEach(value -> validateSupplier(value, request.categoryId()));
     }
 
     private void validateSupplier(String supplierId, String categoryId) {
@@ -245,7 +244,22 @@ public class PurchaseRequestService {
         return prefix + "%04d".formatted(nextSequence);
     }
 
-    private Map<String, Object> fieldSnapshot(CreateDraftRequest request, BigDecimal calculatedTotal) {
+    private List<String> normalizedSupplierIds(CreateDraftRequest request) {
+        java.util.LinkedHashSet<String> supplierIds = new java.util.LinkedHashSet<>();
+        String supplierId = blankToNull(request.supplierId());
+        if (supplierId != null) {
+            supplierIds.add(supplierId);
+        }
+        if (request.supplierIds() != null) {
+            request.supplierIds().stream()
+                .map(PurchaseRequestService::blankToNull)
+                .filter(value -> value != null)
+                .forEach(supplierIds::add);
+        }
+        return supplierIds.stream().toList();
+    }
+
+    private Map<String, Object> fieldSnapshot(CreateDraftRequest request, BigDecimal calculatedTotal, List<String> supplierIds) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("formVersion", "purchase-request-intake-v1");
         snapshot.put("companyId", request.companyId());
@@ -253,7 +267,8 @@ public class PurchaseRequestService {
         snapshot.put("departmentId", request.departmentId());
         snapshot.put("categoryId", request.categoryId());
         snapshot.put("budgetAccountId", request.budgetAccountId());
-        snapshot.put("supplierId", blankToNull(request.supplierId()));
+        snapshot.put("supplierId", supplierIds.isEmpty() ? null : supplierIds.get(0));
+        snapshot.put("supplierIds", supplierIds);
         snapshot.put("title", request.title());
         snapshot.put("expectedDeliveryDate", request.expectedDeliveryDate().toString());
         snapshot.put("totalAmount", calculatedTotal);
@@ -275,6 +290,7 @@ public class PurchaseRequestService {
             request.getCategoryId(),
             request.getBudgetAccountId(),
             request.getSupplierId(),
+            supplierIdsFromSnapshot(request.getSupplierId(), fromJson(request.getFieldSnapshotJson())),
             request.getTitle(),
             request.getStatus(),
             request.getTotalAmount(),
@@ -291,6 +307,7 @@ public class PurchaseRequestService {
         List<PurchaseRequestLineJpaEntity> lines,
         ApprovalSummaryResponse approval
     ) {
+        Map<String, Object> fieldSnapshot = fromJson(request.getFieldSnapshotJson());
         return new PurchaseRequestDetailResponse(
             request.getRequestId(),
             request.getCompanyId(),
@@ -299,6 +316,7 @@ public class PurchaseRequestService {
             request.getCategoryId(),
             request.getBudgetAccountId(),
             request.getSupplierId(),
+            supplierIdsFromSnapshot(request.getSupplierId(), fieldSnapshot),
             request.getTitle(),
             request.getDescription(),
             request.getStatus(),
@@ -308,9 +326,27 @@ public class PurchaseRequestService {
             request.getSubmittedAt(),
             request.getCreatedAt(),
             request.getUpdatedAt(),
-            fromJson(request.getFieldSnapshotJson()),
+            fieldSnapshot,
             lines.stream().map(this::toLineResponse).toList(),
             approval);
+    }
+
+    private List<String> supplierIdsFromSnapshot(String supplierId, Map<String, Object> fieldSnapshot) {
+        Object value = fieldSnapshot.get("supplierIds");
+        if (value instanceof Collection<?> supplierIds) {
+            List<String> normalized = supplierIds.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .map(PurchaseRequestService::blankToNull)
+                .filter(item -> item != null)
+                .distinct()
+                .toList();
+            if (!normalized.isEmpty()) {
+                return normalized;
+            }
+        }
+        String fallbackSupplierId = blankToNull(supplierId);
+        return fallbackSupplierId == null ? List.of() : List.of(fallbackSupplierId);
     }
 
     private PurchaseRequestLineResponse toLineResponse(PurchaseRequestLineJpaEntity line) {

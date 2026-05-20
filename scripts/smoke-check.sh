@@ -192,7 +192,7 @@ http_check "Frontend workspace" "${FRONTEND_URL}"
 
 http_check "Master data context" "${BACKEND_BASE_URL}/api/master-data/context" "星河控股集团"
 http_check "Shared supplier pool" "${BACKEND_BASE_URL}/api/master-data/suppliers" "supplier-yunzhou"
-http_check "Group dashboard" "${BACKEND_BASE_URL}/api/procurement-dashboard?scope=GROUP" "success"
+http_check "Group dashboard" "${BACKEND_BASE_URL}/api/procurement-dashboard?scope=GROUP&actorId=user-digital-admin" "success"
 http_check "Digital company purchase requests" "${BACKEND_BASE_URL}/api/purchase-requests?companyId=company-digital" "PR-"
 http_check "Digital company approval tasks" "${BACKEND_BASE_URL}/api/approvals/tasks?companyId=company-digital&approverId=user-digital-approver" "AP-"
 http_check "Digital company RFQs" "${BACKEND_BASE_URL}/api/rfqs?companyId=company-digital" "RFQ-"

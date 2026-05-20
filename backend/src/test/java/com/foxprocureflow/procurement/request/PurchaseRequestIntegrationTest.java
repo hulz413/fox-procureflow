@@ -133,6 +133,28 @@ class PurchaseRequestIntegrationTest {
     }
 
     @Test
+    void createsDraftWithMultiplePreferredSuppliersInSnapshot() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/purchase-requests/drafts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(digitalLaptopDraft(Map.of(
+                    "supplierIds", java.util.List.of("supplier-bluechip", "supplier-yunzhou")
+                )))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.supplierId").value("supplier-bluechip"))
+            .andExpect(jsonPath("$.data.supplierIds[*]", hasItem("supplier-bluechip")))
+            .andExpect(jsonPath("$.data.supplierIds[*]", hasItem("supplier-yunzhou")))
+            .andExpect(jsonPath("$.data.fieldSnapshot.supplierIds[*]", hasItem("supplier-bluechip")))
+            .andExpect(jsonPath("$.data.fieldSnapshot.supplierIds[*]", hasItem("supplier-yunzhou")))
+            .andReturn();
+
+        String requestId = JsonPath.read(created.getResponse().getContentAsString(), "$.data.requestId");
+        mockMvc.perform(get("/api/purchase-requests/{requestId}", requestId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.supplierIds[*]", hasItem("supplier-bluechip")))
+            .andExpect(jsonPath("$.data.supplierIds[*]", hasItem("supplier-yunzhou")));
+    }
+
+    @Test
     void rejectsInvalidMasterDataReferencesWithoutFallback() throws Exception {
         mockMvc.perform(post("/api/purchase-requests/drafts")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -149,6 +171,14 @@ class PurchaseRequestIntegrationTest {
                 )))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message", containsString("budget account is not valid for categoryId")));
+
+        mockMvc.perform(post("/api/purchase-requests/drafts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(digitalLaptopDraft(Map.of(
+                    "supplierIds", java.util.List.of("supplier-anjie")
+                )))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message", containsString("supplierId does not support categoryId")));
 
         mockMvc.perform(post("/api/purchase-requests/drafts")
                 .contentType(MediaType.APPLICATION_JSON)

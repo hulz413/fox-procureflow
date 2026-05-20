@@ -1,153 +1,153 @@
 ## ADDED Requirements
 
-### Requirement: Three-way matching results are calculated from issued purchase orders
-The system SHALL calculate company-scoped three-way matching results from issued purchase orders, cumulative receipt lines, and cumulative supplier invoice lines.
+### Requirement: 三单匹配结果从已发布采购订单计算
+系统 SHALL 基于已发布采购订单、累计收货明细和累计供应商发票明细计算公司级三单匹配结果。
 
-#### Scenario: Create pending matching result for issued PO without complete inputs
-- **WHEN** the matching service recalculates an `ISSUED` `company-digital` purchase order that has no receipt or invoice data
-- **THEN** the system MUST persist or update one current matching result for that `poId`
-- **AND** the matching result MUST have status `PENDING_INPUT`
-- **AND** the matching result MUST reference `company-digital`, the source `poId`, supplier, PO amount, and last calculated timestamp
+#### Scenario: 为输入不完整的已发布 PO 创建待输入匹配结果
+- **WHEN** 匹配服务重新计算一个没有收货或发票数据的 `ISSUED` `company-digital` 采购订单
+- **THEN** 系统 MUST 为该 `poId` 持久化或更新一个当前匹配结果
+- **AND** 匹配结果 MUST 状态为 `PENDING_INPUT`
+- **AND** 匹配结果 MUST 引用 `company-digital`、来源 `poId`、供应商、PO 金额和最后计算时间戳
 
-#### Scenario: Calculate matched result for fully received and invoiced PO
-- **WHEN** the matching service recalculates an `ISSUED` purchase order whose PO line quantities equal cumulative receipt quantities and cumulative invoice quantities, and whose invoice total amount equals the PO total amount
-- **THEN** the matching result MUST have status `MATCHED`
-- **AND** the matching result MUST have zero current difference items
-- **AND** the result MUST remain scoped to the source purchase order company
+#### Scenario: 为完全收货和开票的 PO 计算匹配成功结果
+- **WHEN** 匹配服务重新计算 `ISSUED` 采购订单，且其 PO 明细数量等于累计收货数量和累计开票数量，并且发票总金额等于 PO 总金额
+- **THEN** 匹配结果 MUST 状态为 `MATCHED`
+- **AND** 匹配结果 MUST 没有当前差异项
+- **AND** 结果 MUST 继续隔离在来源采购订单公司范围内
 
-#### Scenario: Ignore draft or cancelled PO during matching
-- **WHEN** a caller tries to recalculate matching for a `DRAFT` or `CANCELLED` purchase order
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT create or update a matching result, difference item, or handling record for that purchase order
+#### Scenario: 匹配时忽略草稿或已取消 PO
+- **WHEN** 调用方尝试为 `DRAFT` 或 `CANCELLED` 采购订单重算匹配
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 为该采购订单创建或更新匹配结果、差异项或处理记录
 
-#### Scenario: Recalculate matching idempotently
-- **WHEN** the matching service recalculates the same `company-digital` purchase order twice without source PO, receipt, or invoice changes
-- **THEN** the system MUST keep exactly one current matching result for that `poId`
-- **AND** the system MUST NOT duplicate current difference items
-- **AND** existing manual handling records MUST remain available in the matching detail
+#### Scenario: 幂等重算匹配
+- **WHEN** 匹配服务在来源 PO、收货或发票未变化的情况下两次重新计算同一个 `company-digital` 采购订单
+- **THEN** 系统 MUST 为该 `poId` 保持正好一个当前匹配结果
+- **AND** 系统 MUST NOT 复制当前差异项
+- **AND** 现有手工处理记录 MUST 仍在匹配详情中可用
 
-### Requirement: Matching differences identify quantity and amount exceptions
-The system SHALL persist current difference items when PO, receipt, and invoice data do not align.
+### Requirement: 匹配差异识别数量和金额异常
+系统 SHALL 在 PO、收货和发票数据不一致时持久化当前差异项。
 
-#### Scenario: Detect invoice amount higher than PO
-- **WHEN** a `company-digital` supplier invoice total is 2,300 higher than the source purchase order total after recalculation
-- **THEN** the matching result MUST have status `EXCEPTION`
-- **AND** the system MUST persist an `INVOICE_AMOUNT_MISMATCH` difference item with PO amount, invoice amount, difference amount, currency, and severity
-- **AND** the matching result MUST appear in the company exception queue
+#### Scenario: 检测发票金额高于 PO
+- **WHEN** `company-digital` 供应商发票总额在重算后比来源采购订单总额高 2,300
+- **THEN** 匹配结果 MUST 状态为 `EXCEPTION`
+- **AND** 系统 MUST 持久化 `INVOICE_AMOUNT_MISMATCH` 差异项，包含 PO 金额、发票金额、差异金额、币种和严重程度
+- **AND** 匹配结果 MUST 出现在公司异常队列中
 
-#### Scenario: Detect invoice quantity greater than received quantity
-- **WHEN** a purchase order line has cumulative invoice quantity greater than cumulative received quantity
-- **THEN** the matching result MUST have status `EXCEPTION`
-- **AND** the system MUST persist an `INVOICE_QUANTITY_OVER_RECEIPT` difference item referencing the source `poLineId`
-- **AND** the difference item MUST include ordered quantity, received quantity, invoiced quantity, unit, and line item snapshot
+#### Scenario: 检测发票数量大于收货数量
+- **WHEN** 采购订单明细的累计开票数量大于累计收货数量
+- **THEN** 匹配结果 MUST 状态为 `EXCEPTION`
+- **AND** 系统 MUST 持久化引用来源 `poLineId` 的 `INVOICE_QUANTITY_OVER_RECEIPT` 差异项
+- **AND** 差异项 MUST 包含订购数量、收货数量、开票数量、单位和明细快照
 
-#### Scenario: Detect invoice without receipt
-- **WHEN** an issued purchase order has supplier invoice lines but no corresponding receipt lines
-- **THEN** the matching result MUST have status `EXCEPTION`
-- **AND** the system MUST persist a `MISSING_RECEIPT` difference item
-- **AND** the exception queue MUST show the purchase order supplier and invoice summary for finance review
+#### Scenario: 检测有发票但无收货
+- **WHEN** 已发布采购订单有供应商发票明细但没有对应收货明细
+- **THEN** 匹配结果 MUST 状态为 `EXCEPTION`
+- **AND** 系统 MUST 持久化 `MISSING_RECEIPT` 差异项
+- **AND** 异常队列 MUST 展示采购订单供应商和发票摘要，供财务复核
 
-#### Scenario: Keep received but not invoiced PO as pending input
-- **WHEN** an issued purchase order has receipt lines but no supplier invoice lines
-- **THEN** the matching result MUST have status `PENDING_INPUT`
-- **AND** the system MUST NOT include that result in the default exception queue
-- **AND** the matching detail MUST expose the missing invoice state for follow-up
+#### Scenario: 已收货但未开票 PO 保持待输入
+- **WHEN** 已发布采购订单有收货明细但没有供应商发票明细
+- **THEN** 匹配结果 MUST 状态为 `PENDING_INPUT`
+- **AND** 系统 MUST NOT 将该结果包含在默认异常队列中
+- **AND** 匹配详情 MUST 暴露缺少发票状态以便跟进
 
-### Requirement: Matching APIs expose company-scoped lists, exceptions, details, recalculation, and actions
-The system SHALL expose three-way matching REST APIs that return company-scoped data, support the current demo security model, and validate ownership in the service layer.
+### Requirement: 匹配 API 暴露公司级列表、异常、详情、重算和操作
+系统 SHALL 暴露三单匹配 REST API，返回公司级数据，支持当前演示安全模型，并在 service layer 校验归属。
 
-#### Scenario: List matching results for one company
-- **WHEN** a caller requests `GET /api/three-way-matching?companyId=company-digital`
-- **THEN** the system MUST return only matching results owned by `company-digital`
-- **AND** the response MUST NOT include matching results owned by `company-manufacturing`
+#### Scenario: 列出一个公司的匹配结果
+- **WHEN** 调用方请求 `GET /api/three-way-matching?companyId=company-digital`
+- **THEN** 系统 MUST 仅返回属于 `company-digital` 的匹配结果
+- **AND** 响应 MUST NOT 包含属于 `company-manufacturing` 的匹配结果
 
-#### Scenario: List matching exceptions for one company
-- **WHEN** a caller requests `GET /api/three-way-matching/exceptions?companyId=company-digital`
-- **THEN** the system MUST return only `EXCEPTION` matching results owned by `company-digital`
-- **AND** each result MUST include PO summary, supplier, difference count, highest severity, invoice variance, and last calculated timestamp
+#### Scenario: 列出一个公司的匹配异常
+- **WHEN** 调用方请求 `GET /api/three-way-matching/exceptions?companyId=company-digital`
+- **THEN** 系统 MUST 仅返回属于 `company-digital` 的 `EXCEPTION` 匹配结果
+- **AND** 每个结果 MUST 包含 PO 摘要、供应商、差异数量、最高严重程度、发票差异和最后计算时间戳
 
-#### Scenario: Query matching detail
-- **WHEN** a caller requests `GET /api/three-way-matching/{matchId}?companyId=company-digital` for an existing company-owned result
-- **THEN** the system MUST return the matching result, source PO summary, receipt summary, invoice summary, current difference items, handling records, status, and timestamps
+#### Scenario: 查询匹配详情
+- **WHEN** 调用方对现有公司归属结果请求 `GET /api/three-way-matching/{matchId}?companyId=company-digital`
+- **THEN** 系统 MUST 返回匹配结果、来源 PO 摘要、收货摘要、发票摘要、当前差异项、处理记录、状态和时间戳
 
-#### Scenario: Recalculate matching through API
-- **WHEN** a caller submits `POST /api/three-way-matching/recalculate` with valid `companyId`, `poId`, and actor from the same company
-- **THEN** the system MUST recalculate the current matching result for that issued purchase order
-- **AND** the response MUST return the updated matching detail
+#### Scenario: 通过 API 重算匹配
+- **WHEN** 调用方提交 `POST /api/three-way-matching/recalculate`，包含有效 `companyId`、`poId` 和同公司操作者
+- **THEN** 系统 MUST 为该已发布采购订单重新计算当前匹配结果
+- **AND** 响应 MUST 返回更新后的匹配详情
 
-#### Scenario: Reject cross-company matching access
-- **WHEN** a caller from `company-digital` requests, recalculates, or handles a matching result owned by `company-manufacturing`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT fall back to the active demo company
+#### Scenario: 拒绝跨公司匹配访问
+- **WHEN** `company-digital` 的调用方请求、重算或处理属于 `company-manufacturing` 的匹配结果
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 回退到活跃演示公司
 
-#### Scenario: Swagger documents matching endpoints
-- **WHEN** a developer opens Swagger UI or requests `/v3/api-docs`
-- **THEN** the API documentation MUST include matching list, exception list, detail, recalculate, and action endpoints with request and response shapes
+#### Scenario: Swagger 记录匹配端点
+- **WHEN** 开发者打开 Swagger UI 或请求 `/v3/api-docs`
+- **THEN** API 文档 MUST 包含匹配列表、异常列表、详情、重算和操作端点及其请求/响应结构
 
-### Requirement: Matching exceptions can be handled with auditable actions
-The system SHALL allow finance or procurement actors from the owning company to append handling actions to matching exceptions without mutating source PO, receipt, or invoice records.
+### Requirement: 匹配异常可通过可审计操作处理
+系统 SHALL 允许归属公司内的财务或采购操作者向匹配异常追加处理动作，而不变更来源 PO、收货或发票记录。
 
-#### Scenario: Acknowledge a matching exception
-- **WHEN** a valid actor from the matching result company submits an `ACKNOWLEDGE` action with a handling note for an `EXCEPTION` result
-- **THEN** the system MUST append a handling record with actor, action type, note, and timestamp
-- **AND** the matching detail MUST show the handling record
+#### Scenario: 确认匹配异常
+- **WHEN** 来自匹配结果所属公司的有效操作者为 `EXCEPTION` 结果提交带处理备注的 `ACKNOWLEDGE` 动作
+- **THEN** 系统 MUST 追加包含操作者、动作类型、备注和时间戳的处理记录
+- **AND** 匹配详情 MUST 展示该处理记录
 
-#### Scenario: Resolve a matching exception
-- **WHEN** a valid actor from the matching result company submits a `RESOLVE` action with a required resolution note for an `EXCEPTION` result
-- **THEN** the matching result status MUST change to `RESOLVED`
-- **AND** the system MUST append a handling record with the resolution note
-- **AND** the system MUST NOT modify source purchase order, receipt, invoice, or attachment metadata records
+#### Scenario: 解决匹配异常
+- **WHEN** 来自匹配结果所属公司的有效操作者为 `EXCEPTION` 结果提交带必填解决备注的 `RESOLVE` 动作
+- **THEN** 匹配结果状态 MUST 变为 `RESOLVED`
+- **AND** 系统 MUST 追加包含解决备注的处理记录
+- **AND** 系统 MUST NOT 修改来源采购订单、收货、发票或附件元数据记录
 
-#### Scenario: Reopen resolved exception after new source data changes
-- **WHEN** a `RESOLVED` matching result is recalculated after new receipt or invoice data creates a current difference
-- **THEN** the matching result status MUST become `EXCEPTION`
-- **AND** prior handling records MUST remain visible in chronological order
+#### Scenario: 来源数据变化后重新打开已解决异常
+- **WHEN** `RESOLVED` 匹配结果在新收货或发票数据产生当前差异后被重算
+- **THEN** 匹配结果状态 MUST 变为 `EXCEPTION`
+- **AND** 先前处理记录 MUST 按时间顺序保持可见
 
-#### Scenario: Reject handling action without company-owned actor
-- **WHEN** a caller submits a matching handling action with an unknown actor or an actor from another company
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT append a handling record
+#### Scenario: 拒绝没有公司归属操作者的处理动作
+- **WHEN** 调用方提交匹配处理动作，但操作者未知或来自另一公司
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 追加处理记录
 
-### Requirement: Frontend provides a three-way matching workspace
-The frontend SHALL provide a real three-way matching page in the procurement workspace for reviewing matching status, triaging exceptions, viewing details, and recording handling actions.
+### Requirement: 前端提供三单匹配工作台
+前端 SHALL 在采购工作台中提供真实三单匹配页面，用于查看匹配状态、分诊异常、查看详情和记录处理动作。
 
-#### Scenario: Open three-way matching page
-- **WHEN** a user selects “三单匹配” in the workspace navigation
-- **THEN** the system MUST open a `/three-way-matching` page
-- **AND** the page MUST load matching results and exception data from backend APIs rather than static mock data
+#### Scenario: 打开三单匹配页面
+- **WHEN** 用户在工作台导航中选择“三单匹配”
+- **THEN** 系统 MUST 打开 `/three-way-matching` 页面
+- **AND** 页面 MUST 从后端 API 加载匹配结果和异常数据，而不是静态 mock 数据
 
-#### Scenario: Review matching overview and exception queue
-- **WHEN** the three-way matching page loads for `company-digital`
-- **THEN** the page MUST show company-scoped totals for matched, pending input, exception, and resolved results
-- **AND** the exception queue MUST show at least PO number, supplier, status, highest severity, difference count, invoice variance, and last calculated timestamp for each backend result
+#### Scenario: 查看匹配总览和异常队列
+- **WHEN** 三单匹配页面为 `company-digital` 加载
+- **THEN** 页面 MUST 展示公司级已匹配、待输入、异常和已解决结果总数
+- **AND** 异常队列 MUST 至少为每个后端结果展示 PO 编号、供应商、状态、最高严重程度、差异数量、发票差异和最后计算时间戳
 
-#### Scenario: Review matching detail
-- **WHEN** a user selects a matching result from the list
-- **THEN** the frontend MUST show PO summary, supplier, ordered quantities, received quantities, invoiced quantities, PO amount, invoice amount, difference items, and handling records from backend APIs
+#### Scenario: 查看匹配详情
+- **WHEN** 用户从列表选择匹配结果
+- **THEN** 前端 MUST 展示来自后端 API 的 PO 摘要、供应商、订购数量、收货数量、开票数量、PO 金额、发票金额、差异项和处理记录
 
-#### Scenario: Handle exception from the frontend
-- **WHEN** a user submits an allowed handling action with a valid note from the detail view
-- **THEN** the frontend MUST call the matching action API
-- **AND** the matching list and detail view MUST refresh to show the updated status and handling record
+#### Scenario: 从前端处理异常
+- **WHEN** 用户从详情视图提交允许的处理动作和有效备注
+- **THEN** 前端 MUST 调用匹配操作 API
+- **AND** 匹配列表和详情视图 MUST 刷新，以展示更新后的状态和处理记录
 
-#### Scenario: Guard unavailable handling actions in the frontend
-- **WHEN** a matching result is `MATCHED`, `PENDING_INPUT`, or already `RESOLVED`
-- **THEN** the frontend MUST disable invalid handling actions with a client-visible tooltip explaining the reason
-- **AND** it MUST still rely on backend validation for final enforcement
+#### Scenario: 前端防护不可用处理动作
+- **WHEN** 匹配结果为 `MATCHED`、`PENDING_INPUT` 或已经 `RESOLVED`
+- **THEN** 前端 MUST 禁用无效处理动作，并提供解释原因的客户端可见 tooltip
+- **AND** 它 MUST 仍然依赖后端校验进行最终强制约束
 
-#### Scenario: Confirm before discarding unsaved handling note
-- **WHEN** a user has typed an unsaved handling note and closes the detail drawer, switches selected row, or leaves the current handling object
-- **THEN** the frontend MUST show a confirmation before discarding the unsaved input
+#### Scenario: 丢弃未保存处理备注前确认
+- **WHEN** 用户已输入未保存处理备注并关闭详情抽屉、切换选中行或离开当前处理对象
+- **THEN** 前端 MUST 在丢弃未保存输入前显示确认
 
-### Requirement: Three-way matching does not implement deferred infrastructure, payment, upload, or AI workflows
-The system SHALL keep this change focused on deterministic three-way matching and SHALL NOT create payment, object storage, asynchronous messaging, or AI-generated decisions.
+### Requirement: 三单匹配不实现延期基础设施、付款、上传或 AI 流程
+系统 SHALL 将本 change 聚焦在确定性三单匹配，并且 SHALL NOT 创建付款、对象存储、异步消息或 AI 生成决策。
 
-#### Scenario: Matching workflow does not require deferred infrastructure
-- **WHEN** a developer runs the three-way matching workflow in the MVP local environment
-- **THEN** the workflow MUST use MySQL and synchronous service calls
-- **AND** it MUST NOT require Redis, RabbitMQ, MongoDB, MinIO, Prometheus, Grafana, Jaeger, Zipkin, Keycloak, or DeepSeek
+#### Scenario: 匹配流程不需要延期基础设施
+- **WHEN** 开发者在 MVP 本地环境中运行三单匹配流程
+- **THEN** 流程 MUST 使用 MySQL 和同步 service 调用
+- **AND** 它 MUST NOT 需要 Redis、RabbitMQ、MongoDB、MinIO、Prometheus、Grafana、Jaeger、Zipkin、Keycloak 或 DeepSeek
 
-#### Scenario: Matching exception handling does not create payment or AI decisions
-- **WHEN** a user resolves a matching exception
-- **THEN** the system MUST NOT create payment records, supplier portal tasks, RabbitMQ events, uploaded files, or AI recommendations
-- **AND** the matching handling record MUST remain an audit note rather than an automated financial settlement
+#### Scenario: 匹配异常处理不创建付款或 AI 决策
+- **WHEN** 用户解决匹配异常
+- **THEN** 系统 MUST NOT 创建付款记录、供应商门户任务、RabbitMQ events、已上传文件或 AI 建议
+- **AND** 匹配处理记录 MUST 保持为审计备注，而不是自动财务结算

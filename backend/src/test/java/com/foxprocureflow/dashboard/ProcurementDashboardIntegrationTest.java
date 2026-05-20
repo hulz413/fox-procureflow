@@ -64,7 +64,8 @@ class ProcurementDashboardIntegrationTest {
     @Test
     void exposesGroupAndCompanyDashboardScopesWithIsolatedMetrics() throws Exception {
         mockMvc.perform(get("/api/procurement-dashboard")
-                .param("scope", "GROUP"))
+                .param("scope", "GROUP")
+                .param("actorId", "user-digital-admin"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.scope").value("GROUP"))
             .andExpect(jsonPath("$.data.groupId").value("group-xinghe"))
@@ -81,7 +82,8 @@ class ProcurementDashboardIntegrationTest {
 
         mockMvc.perform(get("/api/procurement-dashboard")
                 .param("scope", "COMPANY")
-                .param("companyId", "company-digital"))
+                .param("companyId", "company-digital")
+                .param("actorId", "user-digital-admin"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.scope").value("COMPANY"))
             .andExpect(jsonPath("$.data.companyId").value("company-digital"))
@@ -95,22 +97,45 @@ class ProcurementDashboardIntegrationTest {
     @Test
     void rejectsMissingOrUnknownCompanyScopeWithoutFallback() throws Exception {
         mockMvc.perform(get("/api/procurement-dashboard")
-                .param("scope", "COMPANY"))
+                .param("scope", "COMPANY")
+                .param("actorId", "user-digital-admin"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message", containsString("companyId is required")));
 
         mockMvc.perform(get("/api/procurement-dashboard")
                 .param("scope", "COMPANY")
-                .param("companyId", "company-unknown"))
+                .param("companyId", "company-unknown")
+                .param("actorId", "user-digital-admin"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.message", containsString("Unknown companyId")));
+    }
+
+    @Test
+    void allowsOnlyDashboardViewerRoles() throws Exception {
+        mockMvc.perform(get("/api/procurement-dashboard")
+                .param("scope", "GROUP")
+                .param("actorId", "user-digital-buyer"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/procurement-dashboard")
+                .param("scope", "COMPANY")
+                .param("companyId", "company-digital")
+                .param("actorId", "user-digital-finance"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/procurement-dashboard")
+                .param("scope", "GROUP")
+                .param("actorId", "user-digital-applicant"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message", containsString("not allowed")));
     }
 
     @Test
     void returnsLifecycleTrendFunnelStatusSupplierAndExceptionDatasets() throws Exception {
         mockMvc.perform(get("/api/procurement-dashboard")
             .param("scope", "COMPANY")
-            .param("companyId", "company-manufacturing"))
+            .param("companyId", "company-manufacturing")
+            .param("actorId", "user-digital-admin"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.spendTrend.length()").value(3))
             .andExpect(jsonPath("$.data.spendTrend[0].period").value("2026-05-17"))
@@ -141,7 +166,8 @@ class ProcurementDashboardIntegrationTest {
         Map<String, Integer> before = tableCounts();
 
         mockMvc.perform(get("/api/procurement-dashboard")
-                .param("scope", "GROUP"))
+                .param("scope", "GROUP")
+                .param("actorId", "user-digital-admin"))
             .andExpect(status().isOk());
 
         assertThat(tableCounts()).isEqualTo(before);

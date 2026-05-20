@@ -10,6 +10,9 @@ import com.foxprocureflow.dashboard.ProcurementDashboardDtos.SupplierDistributio
 import com.foxprocureflow.identity.DemoCompanyContext;
 import com.foxprocureflow.identity.DemoOrganizationContext;
 import com.foxprocureflow.identity.DemoOrganizationService;
+import com.foxprocureflow.identity.persistence.DemoUserJpaEntity;
+import com.foxprocureflow.identity.persistence.DemoUserRepository;
+import com.foxprocureflow.identity.persistence.DemoUserRoleRepository;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -30,20 +33,31 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProcurementDashboardService {
 
     private static final String DEFAULT_CURRENCY = "CNY";
+    private static final List<String> DASHBOARD_VIEWER_ROLE_IDS = List.of(
+        "role-admin",
+        "role-procurement",
+        "role-finance");
 
     private final DemoOrganizationService organizationService;
+    private final DemoUserRepository userRepository;
+    private final DemoUserRoleRepository userRoleRepository;
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public ProcurementDashboardService(
         DemoOrganizationService organizationService,
+        DemoUserRepository userRepository,
+        DemoUserRoleRepository userRoleRepository,
         NamedParameterJdbcTemplate jdbcTemplate
     ) {
         this.organizationService = organizationService;
+        this.userRepository = userRepository;
+        this.userRoleRepository = userRoleRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
-    public ProcurementDashboardResponse dashboard(ProcurementDashboardScope scope, String companyId) {
+    public ProcurementDashboardResponse dashboard(ProcurementDashboardScope scope, String companyId, String actorId) {
+        validateDashboardActor(actorId);
         DemoOrganizationContext context = organizationService.getDemoContext();
         ScopeSelection selection = resolveScope(context, scope, companyId);
         LocalDateTime generatedAt = LocalDateTime.now();
@@ -63,6 +77,23 @@ public class ProcurementDashboardService {
             statusDistributions(params),
             supplierDistribution(params),
             exceptionHighlights(params));
+    }
+
+    private void validateDashboardActor(String actorId) {
+        if (!StringUtils.hasText(actorId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "actorId is required for procurement dashboard access");
+        }
+
+        DemoUserJpaEntity actor = userRepository.findByUserId(actorId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown actorId: " + actorId));
+        if (!actor.isActive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Inactive users cannot access procurement dashboard");
+        }
+
+        boolean hasDashboardRole = userRoleRepository.existsByUserIdAndRoleIdIn(actorId, DASHBOARD_VIEWER_ROLE_IDS);
+        if (!hasDashboardRole) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Current user is not allowed to access procurement dashboard");
+        }
     }
 
     private ScopeSelection resolveScope(

@@ -38,6 +38,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent, ReactNode } from 'react'
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
+import {
+  ADMIN_ROLE_ID,
+  APPLICANT_ROLE_ID,
+  APPROVER_ROLE_ID,
+  DEMO_OPERATOR_ROLE_ID,
+  FINANCE_ROLE_ID,
+  PROCUREMENT_ROLE_ID,
+  WAREHOUSE_ROLE_ID,
+  canDemoPersonaUsePrimaryAction,
+  demoUserCanViewDashboard,
+  demoUserHasExactRole,
+  demoUserHasRoleCapability,
+} from './demoRoleCapabilities'
 
 const { Header, Sider, Content } = Layout
 
@@ -73,14 +86,14 @@ const demoPersonaMenuOrder: DemoPersonaKey[] = ['admin', 'applicant', 'approver'
 
 const demoPersonas: DemoPersona[] = [
   {
-    allowedPaths: ['/', '/purchase-requests', '/suppliers'],
+    allowedPaths: ['/purchase-requests', '/suppliers'],
     defaultPath: '/purchase-requests',
     key: 'applicant',
     preferredUserIds: ['user-digital-applicant', 'user-mfg-applicant'],
     roleIds: ['role-applicant'],
   },
   {
-    allowedPaths: ['/', '/approvals', '/purchase-requests'],
+    allowedPaths: ['/approvals', '/purchase-requests'],
     defaultPath: '/approvals',
     key: 'approver',
     preferredUserIds: ['user-digital-approver', 'user-mfg-approver'],
@@ -94,7 +107,7 @@ const demoPersonas: DemoPersona[] = [
     roleIds: ['role-procurement'],
   },
   {
-    allowedPaths: ['/', '/receipts-invoices', '/purchase-orders'],
+    allowedPaths: ['/receipts-invoices', '/purchase-orders'],
     defaultPath: '/receipts-invoices',
     key: 'warehouse',
     preferredUserIds: ['user-mfg-warehouse'],
@@ -349,6 +362,7 @@ type PurchaseRequestListItem = {
   categoryId: string
   budgetAccountId: string
   supplierId: string | null
+  supplierIds?: string[]
   title: string
   status: PurchaseRequestStatus
   totalAmount: number
@@ -374,6 +388,7 @@ type CreatePurchaseRequestDraftPayload = {
   categoryId: string
   budgetAccountId: string
   supplierId?: string
+  supplierIds?: string[]
   title: string
   description?: string
   totalAmount: number
@@ -395,7 +410,7 @@ type PurchaseRequestFormState = {
   departmentId: string
   categoryId: string
   budgetAccountId: string
-  supplierId: string
+  supplierIds: string[]
   title: string
   description: string
   expectedDeliveryDate: string
@@ -1123,6 +1138,7 @@ type AiDraftPreviewResult = {
   categoryId?: string
   budgetAccountId?: string
   supplierId?: string
+  supplierIds?: string[]
   expectedDeliveryDate?: string
   currency?: string
   totalAmount?: number
@@ -1456,8 +1472,8 @@ async function explainAiMatchingException(payload: { companyId: string; actorId:
   return postApi<AiAssistantResponse>('/api/ai-assistant/three-way-matching-explanation', payload)
 }
 
-async function fetchProcurementDashboard(scope: ProcurementDashboardScope, companyId?: string) {
-  const query = new URLSearchParams({ scope })
+async function fetchProcurementDashboard(scope: ProcurementDashboardScope, actorId: string, companyId?: string) {
+  const query = new URLSearchParams({ scope, actorId })
   if (scope === 'COMPANY' && companyId) {
     query.set('companyId', companyId)
   }
@@ -1534,6 +1550,7 @@ export const localizedContent = {
     ai: {
       title: 'AI 采购助手',
       dataState: 'AI 建议',
+      draftDefaultIntent: '研发团队下月需要采购 20 台 14 英寸商务笔记本，预算约 18.6 万元，预计 6 月中旬交付，用于研发团队扩编。',
       draftIntent: '自然语言需求',
       draftPlaceholder: '例如：研发团队下月需要 20 台 14 英寸笔记本，预算约 18.6 万',
       generateDraft: '生成草稿',
@@ -2244,6 +2261,7 @@ export const localizedContent = {
     ai: {
       title: 'AI Procurement Assistant',
       dataState: 'AI advice',
+      draftDefaultIntent: 'The R&D team needs 20 14-inch business laptops next month, with a budget around CNY 186,000 and delivery expected by mid-June for team expansion.',
       draftIntent: 'Natural-language need',
       draftPlaceholder: 'Example: R&D needs 20 14-inch laptops next month, budget around 186,000',
       generateDraft: 'Generate Draft',
@@ -3089,12 +3107,6 @@ function Workspace({
   })
   const dashboardScope: ProcurementDashboardScope = dashboardScopeValue === 'GROUP' ? 'GROUP' : 'COMPANY'
   const dashboardCompanyId = dashboardScope === 'COMPANY' ? dashboardScopeValue : undefined
-  const procurementDashboardQuery = useQuery({
-    queryKey: ['procurement-dashboard', dashboardScope, dashboardCompanyId],
-    queryFn: () => fetchProcurementDashboard(dashboardScope, dashboardCompanyId),
-    enabled: isDashboardRoute,
-    retry: 1,
-  })
 
   const messages = localizedContent[language]
   const visibleNotifications = messages.notificationCenter.items.filter(
@@ -3142,6 +3154,14 @@ function Workspace({
     userForDemoPersona(selectedDemoPersona, allDemoUsers, selectedCompanyId) ??
     allDemoUsers.find((user) => user.companyId === selectedCompanyId) ??
     allDemoUsers[0]
+  const selectedDemoUserId = selectedDemoUser?.userId
+  const canViewDashboard = demoUserCanViewDashboard(selectedDemoUser)
+  const procurementDashboardQuery = useQuery({
+    queryKey: ['procurement-dashboard', dashboardScope, dashboardCompanyId, selectedDemoUserId],
+    queryFn: () => fetchProcurementDashboard(dashboardScope, selectedDemoUserId ?? '', dashboardCompanyId),
+    enabled: isDashboardRoute && Boolean(selectedDemoUserId) && canViewDashboard,
+    retry: 1,
+  })
   const selectedDemoRoleLabel = selectedDemoUser
     ? selectedDemoUser.roles.map((role) => role.roleName).join(' / ')
     : messages.userMenu.role
@@ -3466,6 +3486,35 @@ function Workspace({
     }
   }, [companies, isThreeWayMatchingRoute, location.search, selectedCompanyId])
 
+  const dismissSearchTooltip = useCallback(() => {
+    setSearchTooltipOpen(false)
+    searchButtonRef.current?.blur()
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  }, [])
+
+  const openGlobalSearch = useCallback(() => {
+    dismissSearchTooltip()
+    setGlobalSearchOpen(true)
+  }, [dismissSearchTooltip])
+
+  const closeGlobalSearch = useCallback(() => {
+    dismissSearchTooltip()
+    setGlobalSearchOpen(false)
+  }, [dismissSearchTooltip])
+
+  const openGlobalSearchResult = useCallback((result: GlobalSearchResult) => {
+    const params = new URLSearchParams(result.targetParams)
+    dismissSearchTooltip()
+    setCreateDrawerOpen(false)
+    setRfqCreateDrawerOpen(false)
+    setPoCreateDrawerOpen(false)
+    setReceiptInvoiceCreateMode(null)
+    setGlobalSearchOpen(false)
+    navigate(params.size > 0 ? `${result.targetPath}?${params.toString()}` : result.targetPath)
+  }, [dismissSearchTooltip, navigate])
+
   useEffect(() => {
     const handleGlobalSearchShortcut = (event: globalThis.KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -3476,13 +3525,16 @@ function Workspace({
 
     window.addEventListener('keydown', handleGlobalSearchShortcut)
     return () => window.removeEventListener('keydown', handleGlobalSearchShortcut)
-  }, [])
+  }, [openGlobalSearch])
 
   const canUsePrimaryAction =
-    (selectedDemoPersona.key === 'applicant' && (isDashboardRoute || isPurchaseRequestRoute)) ||
-    (selectedDemoPersona.key === 'procurement' && (isRfqRoute || isPurchaseOrderRoute)) ||
-    (selectedDemoPersona.key === 'warehouse' && isReceiptInvoiceRoute) ||
-    (selectedDemoPersona.key === 'finance' && isReceiptInvoiceRoute)
+    canDemoPersonaUsePrimaryAction(selectedDemoPersona.key, {
+      isDashboardRoute,
+      isPurchaseOrderRoute,
+      isPurchaseRequestRoute,
+      isReceiptInvoiceRoute,
+      isRfqRoute,
+    })
   const primaryActionIcon = isReceiptInvoiceRoute
     ? selectedDemoPersona.key === 'finance'
       ? <ProfileOutlined />
@@ -3510,35 +3562,6 @@ function Workspace({
   const openNotificationTarget = (notification: NotificationItem) => {
     setNotificationOpen(false)
     navigate(notification.path)
-  }
-
-  const dismissSearchTooltip = () => {
-    setSearchTooltipOpen(false)
-    searchButtonRef.current?.blur()
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur()
-    }
-  }
-
-  const openGlobalSearch = () => {
-    dismissSearchTooltip()
-    setGlobalSearchOpen(true)
-  }
-
-  const closeGlobalSearch = () => {
-    dismissSearchTooltip()
-    setGlobalSearchOpen(false)
-  }
-
-  const openGlobalSearchResult = (result: GlobalSearchResult) => {
-    const params = new URLSearchParams(result.targetParams)
-    dismissSearchTooltip()
-    setCreateDrawerOpen(false)
-    setRfqCreateDrawerOpen(false)
-    setPoCreateDrawerOpen(false)
-    setReceiptInvoiceCreateMode(null)
-    setGlobalSearchOpen(false)
-    navigate(params.size > 0 ? `${result.targetPath}?${params.toString()}` : result.targetPath)
   }
 
   return (
@@ -3753,6 +3776,7 @@ function Workspace({
               messages={messages}
               selectedCompany={selectedCompany}
               selectedCompanyId={selectedCompanyId}
+              suppliers={suppliers}
               users={users}
             />
           ) : isRfqRoute ? (
@@ -4068,9 +4092,10 @@ function PurchaseRequestView({
   const [isCreateDirty, setCreateDirty] = useState(false)
   const [lastDrawerMode, setLastDrawerMode] = useState<PurchaseRequestDrawerMode>('detail')
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
-  const [aiIntent, setAiIntent] = useState('')
+  const [aiIntent, setAiIntent] = useState<string>(messages.ai.draftDefaultIntent)
   const [aiDraftResponse, setAiDraftResponse] = useState<AiAssistantResponse | null>(null)
   const [aiRiskResponse, setAiRiskResponse] = useState<AiAssistantResponse | null>(null)
+  const createSubmitIntentRef = useRef<'draft' | 'submit'>('draft')
   const [form, setForm] = useState<PurchaseRequestFormState>(() =>
     buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers, activeDemoUser),
   )
@@ -4097,25 +4122,25 @@ function PurchaseRequestView({
       setLastDrawerMode('create')
       setCreateDirty(false)
       setFeedback(null)
-      setAiIntent('')
+      setAiIntent(messages.ai.draftDefaultIntent)
       setAiDraftResponse(null)
       setAiRiskResponse(null)
       setDetailDrawerOpen(false)
       setForm(buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers, activeDemoUser))
     }
-  }, [activeDemoUser, budgetAccounts, categories, isCreateOpen, selectedCompanyId, suppliers, users])
+  }, [activeDemoUser, budgetAccounts, categories, isCreateOpen, messages.ai.draftDefaultIntent, selectedCompanyId, suppliers, users])
 
   useEffect(() => {
     setForm((current) => {
       const currentRequester = users.find((user) => user.userId === current.requesterId)
       const demoRequester =
         activeDemoUser?.companyId === selectedCompanyId &&
-        activeDemoUser.roles.some((role) => role.roleId === 'role-applicant')
+        demoUserHasRoleCapability(activeDemoUser, [APPLICANT_ROLE_ID])
           ? activeDemoUser
           : undefined
-      const applicant = users.find((user) => user.roles.some((role) => role.roleId === 'role-applicant'))
+      const applicant = users.find((user) => demoUserHasExactRole(user, [APPLICANT_ROLE_ID]))
       const requester =
-        currentRequester?.roles.some((role) => role.roleId === 'role-applicant')
+        demoUserHasRoleCapability(currentRequester, [APPLICANT_ROLE_ID])
           ? currentRequester
           : demoRequester ?? applicant ?? users.find((user) => user.active) ?? users[0]
       const currentCategory = categories.find((category) => category.categoryId === current.categoryId)
@@ -4132,7 +4157,7 @@ function PurchaseRequestView({
         budgetAccounts.find((account) => account.active) ??
         budgetAccounts[0]
       const categoryId = budgetAccount?.categoryId ?? defaultCategory?.categoryId ?? ''
-      const supplier = preferredSupplierForCategory(categoryId, suppliers, current.supplierId)
+      const supplierIds = preferredSupplierIdsForCategory(categoryId, suppliers, current.supplierIds)
 
       return {
         ...current,
@@ -4141,7 +4166,7 @@ function PurchaseRequestView({
         companyId: selectedCompanyId,
         departmentId: requester?.departmentId ?? '',
         requesterId: requester?.userId ?? '',
-        supplierId: supplier?.supplierId ?? '',
+        supplierIds,
       }
     })
   }, [activeDemoUser, budgetAccounts, categories, selectedCompanyId, suppliers, users])
@@ -4178,6 +4203,29 @@ function PurchaseRequestView({
       onCreateClose()
       onRefresh()
       void queryClient.invalidateQueries({ queryKey: ['purchase-request', response.data.requestId] })
+    },
+  })
+
+  const createAndSubmitMutation = useMutation({
+    mutationFn: async (payload: CreatePurchaseRequestDraftPayload) => {
+      const created = await createPurchaseRequestDraft(payload)
+      return submitPurchaseRequest(created.data.requestId)
+    },
+    onError: (error) => {
+      setFeedback({
+        message: `${messages.purchaseRequest.submitFailed}: ${error instanceof Error ? error.message : ''}`,
+        tone: 'danger',
+      })
+    },
+    onSuccess: (response) => {
+      setCreateDirty(false)
+      setFeedback({ message: messages.purchaseRequest.submitSuccess, tone: 'success' })
+      setSelectedRequestId(response.data.requestId)
+      setDetailDrawerOpen(true)
+      onCreateClose()
+      onRefresh()
+      void queryClient.invalidateQueries({ queryKey: ['purchase-request', response.data.requestId] })
+      void queryClient.invalidateQueries({ queryKey: ['approval-by-request', response.data.requestId] })
     },
   })
 
@@ -4218,7 +4266,11 @@ function PurchaseRequestView({
         description: draft.businessPurpose || current.description,
         expectedDeliveryDate: draft.expectedDeliveryDate || current.expectedDeliveryDate,
         requesterId: draft.requesterId || current.requesterId,
-        supplierId: draft.supplierId ?? current.supplierId,
+        supplierIds: preferredSupplierIdsForCategory(
+          draft.categoryId || current.categoryId,
+          suppliers,
+          draft.supplierIds ?? (draft.supplierId ? [draft.supplierId] : current.supplierIds),
+        ),
         title: draft.title || current.title,
         lineItems:
           draft.lineItems && draft.lineItems.length > 0
@@ -4258,17 +4310,35 @@ function PurchaseRequestView({
   const renderedDrawerMode = drawerMode ?? lastDrawerMode
   const drawerTitle = renderedDrawerMode === 'create' ? messages.purchaseRequest.create : messages.purchaseRequest.detail
   const totalAmount = roundAmount(form.lineItems.reduce((sum, line) => sum + lineAmountOf(line), 0))
+  const isCreatePending = createMutation.isPending || createAndSubmitMutation.isPending
   const drawerExtra =
     renderedDrawerMode === 'create' ? (
-      <button
-        className="primary-button"
-        disabled={createMutation.isPending}
-        form="purchase-request-create-form"
-        type="submit"
-      >
-        <FileAddOutlined />
-        <span>{messages.purchaseRequest.saveDraft}</span>
-      </button>
+      <div className="drawer-action-group">
+        <button
+          className="secondary-button"
+          disabled={isCreatePending}
+          form="purchase-request-create-form"
+          onClick={() => {
+            createSubmitIntentRef.current = 'draft'
+          }}
+          type="submit"
+        >
+          <FileAddOutlined />
+          <span>{messages.purchaseRequest.saveDraft}</span>
+        </button>
+        <button
+          className="primary-button"
+          disabled={isCreatePending}
+          form="purchase-request-create-form"
+          onClick={() => {
+            createSubmitIntentRef.current = 'submit'
+          }}
+          type="submit"
+        >
+          <CheckCircleOutlined />
+          <span>{messages.purchaseRequest.submit}</span>
+        </button>
+      </div>
     ) : selectedDetail?.status === 'DRAFT' ? (
       <button
         className="primary-button"
@@ -4361,12 +4431,12 @@ function PurchaseRequestView({
     setCreateDirty(true)
     const budgetAccount =
       budgetAccounts.find((account) => account.categoryId === categoryId && account.active) ?? budgetAccounts[0]
-    const supplier = preferredSupplierForCategory(categoryId, suppliers)
+    const supplierIds = preferredSupplierIdsForCategory(categoryId, suppliers)
     setForm((current) => ({
       ...current,
       budgetAccountId: budgetAccount?.budgetAccountId ?? '',
       categoryId,
-      supplierId: supplier?.supplierId ?? '',
+      supplierIds,
     }))
   }
 
@@ -4377,7 +4447,7 @@ function PurchaseRequestView({
       return
     }
 
-    createMutation.mutate({
+    const payload = {
       budgetAccountId: form.budgetAccountId,
       categoryId: form.categoryId,
       companyId: form.companyId,
@@ -4386,7 +4456,8 @@ function PurchaseRequestView({
       description: form.description,
       expectedDeliveryDate: form.expectedDeliveryDate,
       requesterId: form.requesterId,
-      supplierId: form.supplierId || undefined,
+      supplierId: form.supplierIds[0] || undefined,
+      supplierIds: form.supplierIds.length > 0 ? form.supplierIds : undefined,
       title: form.title,
       totalAmount,
       lineItems: form.lineItems.map((line) => ({
@@ -4397,7 +4468,16 @@ function PurchaseRequestView({
         specification: line.specification,
         unit: line.unit,
       })),
-    })
+    }
+    const intent = createSubmitIntentRef.current
+    createSubmitIntentRef.current = 'draft'
+
+    if (intent === 'submit') {
+      createAndSubmitMutation.mutate(payload)
+      return
+    }
+
+    createMutation.mutate(payload)
   }
 
   const handleRequestDetailOpen = (requestId: string) => {
@@ -4438,7 +4518,7 @@ function PurchaseRequestView({
   const closeCreateDrawer = () => {
     setLastDrawerMode('create')
     setCreateDirty(false)
-    setAiIntent('')
+    setAiIntent(messages.ai.draftDefaultIntent)
     setAiDraftResponse(null)
     setDetailDrawerOpen(false)
     onCreateClose()
@@ -4571,18 +4651,19 @@ function PurchaseRequestView({
                 onChange={(event) => setAiIntent(event.target.value)}
               />
             </label>
-            <DisabledActionTooltip className="form-wide" title={aiDraftDisabledReason}>
-              <button
-                aria-busy={aiDraftMutation.isPending}
-                className="line-add-button"
-                disabled={Boolean(aiDraftDisabledReason)}
-                onClick={requestAiDraft}
-                type="button"
-              >
-                {aiDraftMutation.isPending ? <LoadingOutlined /> : <ApiOutlined />}
-                <span>{aiDraftMutation.isPending ? messages.ai.generating : messages.ai.generateDraft}</span>
-              </button>
-            </DisabledActionTooltip>
+            {!aiDraftMutation.isPending && (
+              <DisabledActionTooltip className="form-wide" title={aiDraftDisabledReason}>
+                <button
+                  className="line-add-button"
+                  disabled={Boolean(aiDraftDisabledReason)}
+                  onClick={requestAiDraft}
+                  type="button"
+                >
+                  <ApiOutlined />
+                  <span>{messages.ai.generateDraft}</span>
+                </button>
+              </DisabledActionTooltip>
+            )}
             <AiResultPanel
               isLoading={aiDraftMutation.isPending}
               language={language}
@@ -4627,14 +4708,17 @@ function PurchaseRequestView({
           </label>
           <label>
             <span>{messages.purchaseRequest.supplier}</span>
-            <select value={form.supplierId} onChange={(event) => updateForm('supplierId', event.target.value)}>
-              <option value="">{messages.purchaseRequest.noSupplier}</option>
-              {filteredSuppliers.map((supplier) => (
-                <option key={supplier.supplierId} value={supplier.supplierId}>
-                  {supplier.supplierName}
-                </option>
-              ))}
-            </select>
+            <Select
+              allowClear
+              mode="multiple"
+              onChange={(value) => updateForm('supplierIds', value)}
+              options={filteredSuppliers.map((supplier) => ({
+                label: supplier.supplierName,
+                value: supplier.supplierId,
+              }))}
+              placeholder={messages.purchaseRequest.noSupplier}
+              value={form.supplierIds}
+            />
           </label>
           <label>
             <span>{messages.purchaseRequest.expectedDeliveryDate}</span>
@@ -4783,7 +4867,7 @@ function PurchaseRequestView({
 		              <div>
 		                <dt>{messages.purchaseRequest.supplier}</dt>
 		                <dd>
-		                  <TruncatedText text={supplierNameOf(selectedDetail.supplierId, suppliers, messages)} />
+		                  <TruncatedText text={supplierNamesOf(selectedDetail, suppliers, messages)} />
 		                </dd>
 		              </div>
 		              <div>
@@ -4927,6 +5011,7 @@ function ApprovalCenterView({
   messages,
   selectedCompany,
   selectedCompanyId,
+  suppliers,
   users,
 }: {
   activeDemoUser?: UserSummary
@@ -4937,6 +5022,7 @@ function ApprovalCenterView({
   messages: LocalizedMessages
   selectedCompany: CompanyContext
   selectedCompanyId: string
+  suppliers: SupplierSummary[]
   users: UserSummary[]
 }) {
   const queryClient = useQueryClient()
@@ -4944,12 +5030,12 @@ function ApprovalCenterView({
   const [modal, modalContextHolder] = Modal.useModal()
   const handledRouteApprovalKey = useRef('')
   const routeApprovalId = routeParam(location.search, 'approvalId')
-  const isAdmin = activeDemoUser?.roles.some((role) => role.roleId === 'role-admin') ?? false
+  const isAdmin = demoUserHasExactRole(activeDemoUser, [ADMIN_ROLE_ID])
   const approvers = users.filter(
     (user) =>
       user.active &&
       user.companyId === selectedCompanyId &&
-      user.roles.some((role) => role.roleId === 'role-approver' || role.roleId === 'role-finance'),
+      demoUserHasExactRole(user, [APPROVER_ROLE_ID, FINANCE_ROLE_ID]),
   )
   const activeApproverId = approvers.find((user) => user.userId === activeDemoUser?.userId)?.userId ?? ''
   const approverIdsKey = approvers.map((user) => user.userId).join('|')
@@ -5365,7 +5451,7 @@ function ApprovalCenterView({
             <div className="context-grid">
               <span>{contextText(detail.contextSnapshot, 'departmentId')}</span>
               <span>{contextText(detail.contextSnapshot, 'budgetAccountId')}</span>
-              <span>{contextText(detail.contextSnapshot, 'supplierId') || messages.purchaseRequest.noSupplier}</span>
+              <span>{contextSupplierText(detail.contextSnapshot, suppliers, messages)}</span>
               <span>{contextText(detail.contextSnapshot, 'expectedDeliveryDate')}</span>
             </div>
           </section>
@@ -5499,11 +5585,11 @@ function RfqView({
     (request) => request.approval?.status === 'APPROVED' && !rfqRequestIds.has(request.requestId),
   )
   const buyers = users.filter(
-    (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
+    (user) => user.active && demoUserHasRoleCapability(user, [PROCUREMENT_ROLE_ID]),
   )
   const activeBuyer =
     activeDemoUser?.companyId === selectedCompanyId &&
-    activeDemoUser.roles.some((role) => role.roleId === 'role-procurement')
+    demoUserHasRoleCapability(activeDemoUser, [PROCUREMENT_ROLE_ID])
       ? activeDemoUser
       : undefined
   const [createForm, setCreateForm] = useState<RfqCreateFormState>(() =>
@@ -6369,11 +6455,11 @@ function PurchaseOrderView({
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const buyers = users.filter(
-    (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
+    (user) => user.active && demoUserHasRoleCapability(user, [PROCUREMENT_ROLE_ID]),
   )
   const activeBuyer =
     activeDemoUser?.companyId === selectedCompanyId &&
-    activeDemoUser.roles.some((role) => role.roleId === 'role-procurement')
+    demoUserHasRoleCapability(activeDemoUser, [PROCUREMENT_ROLE_ID])
       ? activeDemoUser
       : undefined
   const orderedRfqIds = new Set(purchaseOrders.map((purchaseOrder) => purchaseOrder.rfqId))
@@ -7201,10 +7287,10 @@ function ThreeWayMatchingView({
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'danger' } | null>(null)
   const [aiMatchingResponse, setAiMatchingResponse] = useState<AiAssistantResponse | null>(null)
   const activeUsers = users.filter((user) => user.active)
-  const financeUsers = activeUsers.filter((user) => user.roles.some((role) => role.roleId === 'role-finance'))
+  const financeUsers = activeUsers.filter((user) => demoUserHasRoleCapability(user, [FINANCE_ROLE_ID]))
   const actionActor =
     activeDemoUser?.companyId === selectedCompanyId &&
-    activeDemoUser.roles.some((role) => role.roleId === 'role-finance')
+    demoUserHasRoleCapability(activeDemoUser, [FINANCE_ROLE_ID])
       ? activeDemoUser
       : financeUsers[0] ?? activeUsers[0]
   const matchesQuery = useQuery({
@@ -7826,20 +7912,18 @@ function ReceiptsInvoicesView({
   const relatedReceipts = selectedPo ? receipts.filter((receipt) => receipt.poId === selectedPo.poId) : []
   const relatedInvoices = selectedPo ? invoices.filter((invoice) => invoice.poId === selectedPo.poId) : []
   const activeUsers = users.filter((user) => user.active)
-  const financeUsers = activeUsers.filter((user) => user.roles.some((role) => role.roleId === 'role-finance'))
+  const financeUsers = activeUsers.filter((user) => demoUserHasRoleCapability(user, [FINANCE_ROLE_ID]))
   const receiptUsers = activeUsers.filter((user) =>
-    user.roles.some((role) => role.roleId === 'role-warehouse' || role.roleId === 'role-procurement' || role.roleId === 'role-demo-operator'),
+    demoUserHasRoleCapability(user, [WAREHOUSE_ROLE_ID, PROCUREMENT_ROLE_ID, DEMO_OPERATOR_ROLE_ID]),
   )
   const activeReceiptUser =
     activeDemoUser?.companyId === selectedCompanyId &&
-    activeDemoUser.roles.some((role) =>
-      role.roleId === 'role-warehouse' || role.roleId === 'role-procurement' || role.roleId === 'role-demo-operator'
-    )
+    demoUserHasRoleCapability(activeDemoUser, [WAREHOUSE_ROLE_ID, PROCUREMENT_ROLE_ID, DEMO_OPERATOR_ROLE_ID])
       ? activeDemoUser
       : undefined
   const activeFinanceUser =
     activeDemoUser?.companyId === selectedCompanyId &&
-    activeDemoUser.roles.some((role) => role.roleId === 'role-finance')
+    demoUserHasRoleCapability(activeDemoUser, [FINANCE_ROLE_ID])
       ? activeDemoUser
       : undefined
   const [receiptForm, setReceiptForm] = useState<ReceiptCreateFormState>(() =>
@@ -10129,7 +10213,7 @@ function AiResultPanel({
 
   return (
     <section aria-busy={isLoading} className="ai-result-panel">
-      <PanelTitle icon={<ApiOutlined />} title={title ?? messages.ai.result} aside={messages.ai.dataState} />
+      <PanelTitle icon={<ApiOutlined />} title={title ?? messages.ai.result} />
       {isLoading ? (
         <div className="ai-loading-state" role="status">
           <LoadingOutlined className="ai-loading-icon" />
@@ -10677,10 +10761,10 @@ function buildPurchaseRequestFormDefaults(
 ): PurchaseRequestFormState {
   const requester =
     (preferredRequester?.companyId === selectedCompanyId &&
-    preferredRequester.roles.some((role) => role.roleId === 'role-applicant')
+    demoUserHasRoleCapability(preferredRequester, [APPLICANT_ROLE_ID])
       ? preferredRequester
       : undefined) ??
-    users.find((user) => user.roles.some((role) => role.roleId === 'role-applicant')) ??
+    users.find((user) => demoUserHasExactRole(user, [APPLICANT_ROLE_ID])) ??
     users.find((user) => user.active) ??
     users[0]
   const defaultCategory = categories[0]
@@ -10689,7 +10773,7 @@ function buildPurchaseRequestFormDefaults(
     budgetAccounts.find((account) => account.active) ??
     budgetAccounts[0]
   const categoryId = budgetAccount?.categoryId ?? defaultCategory?.categoryId ?? ''
-  const supplier = preferredSupplierForCategory(categoryId, suppliers)
+  const supplierIds = preferredSupplierIdsForCategory(categoryId, suppliers)
 
   return {
     budgetAccountId: budgetAccount?.budgetAccountId ?? '',
@@ -10708,7 +10792,7 @@ function buildPurchaseRequestFormDefaults(
       }),
     ],
     requesterId: requester?.userId ?? '',
-    supplierId: supplier?.supplierId ?? '',
+    supplierIds,
     title: '20 台笔记本采购',
   }
 }
@@ -10853,6 +10937,49 @@ function supplierNameOf(supplierId: string | null, suppliers: SupplierSummary[],
   return suppliers.find((supplier) => supplier.supplierId === supplierId)?.supplierName ?? supplierId
 }
 
+function supplierNamesText(supplierIds: string[], suppliers: SupplierSummary[], messages: LocalizedMessages) {
+  if (supplierIds.length === 0) {
+    return messages.purchaseRequest.noSupplier
+  }
+
+  return supplierIds.map((supplierId) => supplierNameOf(supplierId, suppliers, messages)).join(' / ')
+}
+
+function supplierIdsFromSnapshot(snapshot?: Record<string, unknown>) {
+  const value = snapshot?.supplierIds
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function supplierNamesOf(
+  request: Pick<PurchaseRequestDetail, 'fieldSnapshot' | 'supplierId' | 'supplierIds'>,
+  suppliers: SupplierSummary[],
+  messages: LocalizedMessages,
+) {
+  const supplierIds = request.supplierIds?.length
+    ? request.supplierIds
+    : supplierIdsFromSnapshot(request.fieldSnapshot).length > 0
+      ? supplierIdsFromSnapshot(request.fieldSnapshot)
+      : request.supplierId
+        ? [request.supplierId]
+        : []
+
+  return supplierNamesText(supplierIds, suppliers, messages)
+}
+
+function contextSupplierText(
+  snapshot: Record<string, unknown>,
+  suppliers: SupplierSummary[],
+  messages: LocalizedMessages,
+) {
+  const supplierIds = supplierIdsFromSnapshot(snapshot)
+  if (supplierIds.length > 0) {
+    return supplierNamesText(supplierIds, suppliers, messages)
+  }
+
+  const supplierId = contextText(snapshot, 'supplierId')
+  return supplierId ? supplierNamesText([supplierId], suppliers, messages) : messages.purchaseRequest.noSupplier
+}
+
 function preferredSupplierForCategory(categoryId: string, suppliers: SupplierSummary[], currentSupplierId?: string) {
   const supportsCategory = (supplier: SupplierSummary) =>
     supplier.categories.some((category) => category.categoryId === categoryId)
@@ -10866,6 +10993,25 @@ function preferredSupplierForCategory(categoryId: string, suppliers: SupplierSum
   }
 
   return suppliers.find(supportsCategory)
+}
+
+function preferredSupplierIdsForCategory(
+  categoryId: string,
+  suppliers: SupplierSummary[],
+  currentSupplierIds: string[] = [],
+) {
+  const validCurrentSupplierIds = currentSupplierIds.filter((supplierId) =>
+    suppliers.some((supplier) =>
+      supplier.supplierId === supplierId &&
+      supplier.categories.some((category) => category.categoryId === categoryId),
+    ),
+  )
+  if (validCurrentSupplierIds.length > 0) {
+    return validCurrentSupplierIds
+  }
+
+  const preferredSupplier = preferredSupplierForCategory(categoryId, suppliers)
+  return preferredSupplier ? [preferredSupplier.supplierId] : []
 }
 
 function suppliersForCategory(categoryId: string, suppliers: SupplierSummary[]) {

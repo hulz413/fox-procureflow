@@ -1,110 +1,110 @@
 ## ADDED Requirements
 
-### Requirement: Purchase request drafts are created from validated master data
-The system SHALL allow a caller to create a purchase request draft using seeded company, requester, department, procurement category, and budget account master data.
+### Requirement: 采购申请草稿基于已校验主数据创建
+系统 SHALL 允许调用方使用已 seed 的公司、申请人、部门、采购品类和预算科目主数据创建采购申请草稿。
 
-#### Scenario: Create a draft for the digital company laptop request
-- **WHEN** a caller submits a draft for `company-digital` with requester `user-digital-applicant`, category `category-it-hardware`, budget account `budget-digital-it-equipment`, title "20 台笔记本采购", expected delivery date, total amount, and at least one line item
-- **THEN** the system MUST persist a purchase request with status `DRAFT`
-- **AND** the system MUST return a stable `requestId`, the submitted company and requester identifiers, the calculated total amount, and all persisted line items
+#### Scenario: 为数字公司笔记本采购创建草稿
+- **WHEN** 调用方为 `company-digital` 提交草稿，使用申请人 `user-digital-applicant`、品类 `category-it-hardware`、预算科目 `budget-digital-it-equipment`、标题 "20 台笔记本采购"、期望交付日期、总金额和至少一条明细
+- **THEN** 系统 MUST 持久化状态为 `DRAFT` 的采购申请
+- **AND** 系统 MUST 返回稳定的 `requestId`、已提交的公司和申请人标识、计算后的总金额以及所有已持久化明细
 
-#### Scenario: Reject mismatched budget account company
-- **WHEN** a caller submits a draft for `company-digital` using a budget account that belongs to `company-manufacturing`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT persist a purchase request
+#### Scenario: 拒绝公司不匹配的预算科目
+- **WHEN** 调用方为 `company-digital` 提交草稿，但使用属于 `company-manufacturing` 的预算科目
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 持久化采购申请
 
-#### Scenario: Reject mismatched category and budget account
-- **WHEN** a caller submits a draft whose `categoryId` does not match the selected `budgetAccountId`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the error MUST identify that the budget account is not valid for the category
+#### Scenario: 拒绝品类和预算科目不匹配
+- **WHEN** 调用方提交的草稿中 `categoryId` 与所选 `budgetAccountId` 不匹配
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 错误 MUST 指明该预算科目不适用于该品类
 
-#### Scenario: Reject requester outside company
-- **WHEN** a caller submits a draft for one company using a requester from another company
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT fall back to the default active company
+#### Scenario: 拒绝公司外申请人
+- **WHEN** 调用方为一个公司提交草稿，却使用另一个公司的申请人
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 回退到默认活跃公司
 
-### Requirement: Draft purchase requests can be submitted as upstream business records
-The system SHALL allow a valid draft purchase request to be submitted, making it the upstream record for later approval, RFQ, PO, receiving, invoice, and matching workflows.
+### Requirement: 采购申请草稿可提交为上游业务记录
+系统 SHALL 允许有效采购申请草稿被提交，使其成为后续审批、RFQ、PO、收货、发票和匹配流程的上游记录。
 
-#### Scenario: Submit an existing draft
-- **WHEN** a caller submits an existing `DRAFT` purchase request by `requestId`
-- **THEN** the system MUST change the status to `SUBMITTED`
-- **AND** the system MUST set `submittedAt`
-- **AND** the system MUST keep the original company, requester, category, budget account, total amount, and line item data unchanged
+#### Scenario: 提交现有草稿
+- **WHEN** 调用方按 `requestId` 提交现有 `DRAFT` 采购申请
+- **THEN** 系统 MUST 将状态变为 `SUBMITTED`
+- **AND** 系统 MUST 设置 `submittedAt`
+- **AND** 系统 MUST 保持原始公司、申请人、品类、预算科目、总金额和明细数据不变
 
-#### Scenario: Reject duplicate submit
-- **WHEN** a caller submits a purchase request that is already `SUBMITTED`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST keep the original `submittedAt` value unchanged
+#### Scenario: 拒绝重复提交
+- **WHEN** 调用方提交已经是 `SUBMITTED` 的采购申请
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST 保持原始 `submittedAt` 值不变
 
-#### Scenario: Unknown request cannot be submitted
-- **WHEN** a caller submits an unknown `requestId`
-- **THEN** the system MUST return a not found error
-- **AND** the system MUST NOT create a new purchase request implicitly
+#### Scenario: 未知申请不能提交
+- **WHEN** 调用方提交未知 `requestId`
+- **THEN** 系统 MUST 返回 not found 错误
+- **AND** 系统 MUST NOT 隐式创建新的采购申请
 
-### Requirement: Purchase request APIs expose company-scoped list and detail data
-The system SHALL expose read APIs that return purchase request list and detail data scoped by company ownership.
+### Requirement: 采购申请 API 暴露公司级列表和详情数据
+系统 SHALL 暴露读 API，返回按公司归属隔离的采购申请列表和详情数据。
 
-#### Scenario: List purchase requests for one company
-- **WHEN** a caller requests `GET /api/purchase-requests?companyId=company-digital`
-- **THEN** the system MUST return only purchase requests owned by `company-digital`
-- **AND** the response MUST NOT include purchase requests owned by `company-manufacturing`
+#### Scenario: 列出一个公司的采购申请
+- **WHEN** 调用方请求 `GET /api/purchase-requests?companyId=company-digital`
+- **THEN** 系统 MUST 仅返回属于 `company-digital` 的采购申请
+- **AND** 响应 MUST NOT 包含属于 `company-manufacturing` 的采购申请
 
-#### Scenario: Filter purchase requests by status
-- **WHEN** a caller requests `GET /api/purchase-requests?companyId=company-digital&status=SUBMITTED`
-- **THEN** the system MUST return only `SUBMITTED` purchase requests for `company-digital`
+#### Scenario: 按状态筛选采购申请
+- **WHEN** 调用方请求 `GET /api/purchase-requests?companyId=company-digital&status=SUBMITTED`
+- **THEN** 系统 MUST 仅返回 `company-digital` 的 `SUBMITTED` 采购申请
 
-#### Scenario: Query purchase request detail
-- **WHEN** a caller requests `GET /api/purchase-requests/{requestId}` for an existing purchase request
-- **THEN** the system MUST return the request header, status, company, requester, department, category, budget account, total amount, expected delivery date, field snapshot, and line items
+#### Scenario: 查询采购申请详情
+- **WHEN** 调用方对现有采购申请请求 `GET /api/purchase-requests/{requestId}`
+- **THEN** 系统 MUST 返回申请头、状态、公司、申请人、部门、品类、预算科目、总金额、期望交付日期、字段快照和明细
 
-#### Scenario: Unknown company list request is rejected
-- **WHEN** a caller requests the purchase request list with an unknown `companyId`
-- **THEN** the system MUST return a client-visible error instead of falling back to a default company
+#### Scenario: 未知公司列表请求被拒绝
+- **WHEN** 调用方使用未知 `companyId` 请求采购申请列表
+- **THEN** 系统 MUST 返回客户端可见错误，而不是回退到默认公司
 
-### Requirement: Purchase request endpoints are documented and usable in the current demo security model
-The system SHALL expose the purchase request Intake endpoints in generated API documentation and allow local demo calls before JWT authentication is implemented.
+### Requirement: 采购申请端点已文档化并可用于当前演示安全模型
+系统 SHALL 在生成的 API 文档中暴露采购申请录入端点，并允许在 JWT 认证实现前进行本地演示调用。
 
-#### Scenario: Swagger documents purchase request endpoints
-- **WHEN** a developer opens Swagger UI or requests `/v3/api-docs`
-- **THEN** the API documentation MUST include the draft creation, draft submission, list, and detail endpoints for purchase requests
+#### Scenario: Swagger 记录采购申请端点
+- **WHEN** 开发者打开 Swagger UI 或请求 `/v3/api-docs`
+- **THEN** API 文档 MUST 包含采购申请的草稿创建、草稿提交、列表和详情端点
 
-#### Scenario: Demo frontend can call purchase request APIs
-- **WHEN** the frontend calls purchase request GET and POST endpoints in the current skeleton environment
-- **THEN** Spring Security MUST allow the calls without JWT
-- **AND** the service layer MUST still validate explicit company and master data ownership
+#### Scenario: 演示前端可以调用采购申请 API
+- **WHEN** 前端在当前 skeleton 环境中调用采购申请 GET 和 POST 端点
+- **THEN** Spring Security MUST 允许不带 JWT 调用
+- **AND** service layer MUST 仍然校验明确的公司和主数据归属
 
-### Requirement: Frontend provides purchase request intake workflow
-The frontend SHALL provide a real purchase request page in the procurement workspace for creating, submitting, listing, and viewing purchase requests.
+### Requirement: 前端提供采购申请录入流程
+前端 SHALL 在采购工作台中提供真实采购申请页面，用于创建、提交、列表查看和查看采购申请。
 
-#### Scenario: Open purchase request page
-- **WHEN** a user selects “采购申请” in the workspace navigation
-- **THEN** the system MUST open a `/purchase-requests` page
-- **AND** the page MUST load company, requester, category, and budget account options from backend APIs rather than static mock data
+#### Scenario: 打开采购申请页面
+- **WHEN** 用户在工作台导航中选择“采购申请”
+- **THEN** 系统 MUST 打开 `/purchase-requests` 页面
+- **AND** 页面 MUST 从后端 API 加载公司、申请人、品类和预算科目选项，而不是静态 mock 数据
 
-#### Scenario: Active company context scopes form options
-- **WHEN** a user opens the purchase request page under the active demo company context
-- **THEN** the requester and budget account options MUST show only records belonging to that active company
-- **AND** the purchase request page MUST NOT expose a company switcher in the current MVP slice
-- **AND** the supplier pool and procurement categories MUST remain group-level reference data
+#### Scenario: 活跃公司上下文约束表单选项
+- **WHEN** 用户在活跃演示公司上下文下打开采购申请页面
+- **THEN** 申请人和预算科目选项 MUST 仅展示属于该活跃公司的记录
+- **AND** 采购申请页面 MUST NOT 在当前 MVP 切片中暴露公司切换器
+- **AND** 供应商池和采购品类 MUST 保持集团级参考数据
 
-#### Scenario: Save draft from the frontend
-- **WHEN** a user fills the required purchase request fields and saves a draft
-- **THEN** the frontend MUST call the draft creation API
-- **AND** the new draft MUST appear in the list with its backend `requestId` and `DRAFT` status
+#### Scenario: 从前端保存草稿
+- **WHEN** 用户填写必填采购申请字段并保存草稿
+- **THEN** 前端 MUST 调用草稿创建 API
+- **AND** 新草稿 MUST 以其后端 `requestId` 和 `DRAFT` 状态出现在列表中
 
-#### Scenario: Submit purchase request from the frontend
-- **WHEN** a user submits a saved draft
-- **THEN** the frontend MUST call the submit API
-- **AND** the list and detail views MUST show the request as `SUBMITTED`
+#### Scenario: 从前端提交采购申请
+- **WHEN** 用户提交已保存草稿
+- **THEN** 前端 MUST 调用提交 API
+- **AND** 列表和详情视图 MUST 将该申请展示为 `SUBMITTED`
 
-### Requirement: Purchase request Intake does not implement downstream workflows
-The system SHALL keep purchase request Intake focused on creating and submitting the upstream request record.
+### Requirement: 采购申请 Intake 不实现下游流程
+系统 SHALL 将采购申请 Intake 聚焦在创建和提交上游申请记录。
 
-#### Scenario: Approval workflow is not created by intake
-- **WHEN** a purchase request is submitted
-- **THEN** the system MUST NOT create approval instances, approval nodes, approver tasks, RFQs, POs, receipts, invoices, matching records, or AI recommendations
+#### Scenario: Intake 不创建审批流
+- **WHEN** 采购申请被提交
+- **THEN** 系统 MUST NOT 创建审批实例、审批节点、审批人任务、RFQ、PO、收货、发票、匹配记录或 AI 建议
 
-#### Scenario: Downstream actions are absent from the frontend
-- **WHEN** a user views the purchase request page after this change
-- **THEN** the page MUST NOT present working approval, RFQ, PO, receiving, invoice, matching, attachment upload, or AI draft actions
+#### Scenario: 前端不提供下游操作
+- **WHEN** 用户查看本 change 后的采购申请页面
+- **THEN** 页面 MUST NOT 呈现可工作的审批、RFQ、PO、收货、发票、匹配、附件上传或 AI 草稿操作

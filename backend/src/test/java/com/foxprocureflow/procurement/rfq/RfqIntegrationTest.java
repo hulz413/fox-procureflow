@@ -1,5 +1,6 @@
 package com.foxprocureflow.procurement.rfq;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
@@ -134,6 +135,31 @@ class RfqIntegrationTest {
         mockMvc.perform(get("/api/rfqs").param("companyId", "company-unknown"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.message", containsString("Unknown companyId")));
+    }
+
+    @Test
+    void listsSeededRfqsWithPartialQuoteProgress() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/rfqs").param("companyId", "company-digital"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[*].rfqId", hasItem("RFQ-20260519-0601")))
+            .andExpect(jsonPath("$.data[*].rfqId", hasItem("RFQ-20260519-0602")))
+            .andReturn();
+
+        List<Map<String, Object>> rows = JsonPath.read(result.getResponse().getContentAsString(), "$.data");
+        Map<String, Object> oneOfThree = rowByRfqId(rows, "RFQ-20260519-0601");
+        Map<String, Object> twoOfThree = rowByRfqId(rows, "RFQ-20260519-0602");
+
+        assertThat(oneOfThree.get("supplierCount")).isEqualTo(3);
+        assertThat(oneOfThree.get("quoteCount")).isEqualTo(1);
+        assertThat(oneOfThree.get("status")).isEqualTo("QUOTING");
+        assertThat(twoOfThree.get("supplierCount")).isEqualTo(3);
+        assertThat(twoOfThree.get("quoteCount")).isEqualTo(2);
+        assertThat(twoOfThree.get("status")).isEqualTo("COMPARISON_READY");
+
+        mockMvc.perform(get("/api/rfqs/{rfqId}", "RFQ-20260519-0602").param("companyId", "company-digital"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.suppliers.length()").value(3))
+            .andExpect(jsonPath("$.data.quotes.length()").value(2));
     }
 
     @Test
@@ -392,5 +418,12 @@ class RfqIntegrationTest {
             "estimatedAmount", 72400.00
         )));
         return payload;
+    }
+
+    private Map<String, Object> rowByRfqId(List<Map<String, Object>> rows, String rfqId) {
+        return rows.stream()
+            .filter(row -> rfqId.equals(row.get("rfqId")))
+            .findFirst()
+            .orElseThrow();
     }
 }

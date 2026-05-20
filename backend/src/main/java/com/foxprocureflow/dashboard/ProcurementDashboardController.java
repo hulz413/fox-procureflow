@@ -22,8 +22,9 @@ public class ProcurementDashboardController {
     @GetMapping
     public ApiEnvelope<ProcurementDashboardResponse> dashboard(
         @RequestParam ProcurementDashboardScope scope,
-        @RequestParam(required = false) String companyId
+        @RequestParam(required = false) String companyId,
+        @RequestParam String actorId
     ) {
-        return ApiEnvelope.ok(dashboardService.dashboard(scope, companyId));
+        return ApiEnvelope.ok(dashboardService.dashboard(scope, companyId, actorId));
     }
 }

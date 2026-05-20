@@ -12,6 +12,7 @@ import {
   localizedContent,
   shouldConfirmReceiptInvoiceDrawerClose,
 } from './App'
+import { canDemoPersonaUsePrimaryAction, demoUserCanViewDashboard, demoUserHasRoleCapability } from './demoRoleCapabilities'
 
 const messages = localizedContent.zh
 
@@ -296,5 +297,39 @@ describe('attachment UI', () => {
         targetParams: { poId: 'PO-20260518-0302' },
       }),
     )
+  })
+})
+
+describe('demo role capabilities', () => {
+  it('lets system administrators use applicant purchase request capabilities', () => {
+    const adminUser = {
+      roles: [{ roleId: 'role-admin', roleName: '系统管理员', roleType: 'platform' }],
+    }
+
+    expect(demoUserHasRoleCapability(adminUser, ['role-applicant'])).toBe(true)
+    expect(demoUserHasRoleCapability(adminUser, ['role-procurement', 'role-finance'])).toBe(true)
+    expect(demoUserCanViewDashboard(adminUser)).toBe(true)
+    expect(canDemoPersonaUsePrimaryAction('admin', {
+      isDashboardRoute: false,
+      isPurchaseOrderRoute: false,
+      isPurchaseRequestRoute: true,
+      isReceiptInvoiceRoute: false,
+      isRfqRoute: false,
+    })).toBe(true)
+  })
+
+  it('does not grant procurement dashboard access to applicants', () => {
+    const applicantUser = {
+      roles: [{ roleId: 'role-applicant', roleName: '申请人', roleType: 'business' }],
+    }
+
+    expect(demoUserCanViewDashboard(applicantUser)).toBe(false)
+    expect(canDemoPersonaUsePrimaryAction('applicant', {
+      isDashboardRoute: true,
+      isPurchaseOrderRoute: false,
+      isPurchaseRequestRoute: false,
+      isReceiptInvoiceRoute: false,
+      isRfqRoute: false,
+    })).toBe(false)
   })
 })

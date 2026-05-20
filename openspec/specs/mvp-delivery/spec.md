@@ -1,4 +1,4 @@
-# mvp-delivery Spec
+# mvp-delivery 规格
 
 ## Purpose
 
@@ -6,81 +6,81 @@
 
 ## Requirements
 
-### Requirement: MVP demo runbook documents the complete delivery path
-The system SHALL provide a human-facing MVP demo runbook that explains how to prepare, start, verify, and demonstrate Fox Procureflow as a group-internal multi-company procurement platform.
+### Requirement: MVP 演示 runbook 记录完整交付路径
+系统 SHALL 提供面向人的 MVP 演示 runbook，说明如何准备、启动、验证和演示作为集团内部多公司采购平台的 Fox Procureflow。
 
-#### Scenario: Follow fresh checkout demo path
-- **WHEN** a developer or demo operator follows the documented MVP demo path from a fresh checkout
-- **THEN** the documentation MUST guide them through environment prerequisites, `.env` setup, infrastructure startup, backend startup, frontend startup, and the local URLs required for the demo
+#### Scenario: 按全新 checkout 演示路径操作
+- **WHEN** 开发者或演示操作员从全新 checkout 按文档中的 MVP 演示路径操作
+- **THEN** 文档 MUST 引导他们完成环境前置条件、`.env` 设置、基础设施启动、后端启动、前端启动，以及演示所需的本地 URL
 
-#### Scenario: Demonstrate group and company contexts
-- **WHEN** a demo operator uses the runbook to present the MVP
-- **THEN** the runbook MUST identify 星河控股集团, 星河数字科技有限公司, 星河智能制造有限公司, the shared supplier pool, and the company-owned procurement transaction areas
+#### Scenario: 演示集团和公司上下文
+- **WHEN** 演示操作员使用 runbook 呈现 MVP
+- **THEN** runbook MUST 识别星河控股集团、星河数字科技有限公司、星河智能制造有限公司、共享供应商池和公司归属采购交易区域
 
-#### Scenario: Explain optional AI availability
-- **WHEN** the runbook describes AI procurement assistant behavior
-- **THEN** it MUST distinguish the core procurement workflow from optional real provider calls that require `OPENAI_COMPATIBLE_ENABLED=true`, a provider API key, and MongoDB audit storage
+#### Scenario: 解释可选 AI 可用性
+- **WHEN** runbook 描述 AI 采购助手行为
+- **THEN** 它 MUST 区分核心采购流程与可选真实 provider 调用，后者需要 `OPENAI_COMPATIBLE_ENABLED=true`、provider API key 和 MongoDB 审计存储
 
-### Requirement: Local launch flow reports demo-ready service addresses
-The system SHALL provide a local launch flow that starts or guides startup for required MVP services and reports the addresses needed to inspect demo readiness.
+### Requirement: 本地启动流程报告演示就绪服务地址
+系统 SHALL 提供本地启动流程，用于启动或引导启动所需 MVP 服务，并报告检查演示就绪状态所需的地址。
 
-#### Scenario: Launch local MVP services
-- **WHEN** a developer runs the documented launch command from the repository root
-- **THEN** the system MUST start or guide startup for Docker infrastructure, the Spring Boot backend, and the Vite frontend, then print frontend, backend health, Swagger UI, RabbitMQ management, and MinIO console addresses
+#### Scenario: 启动本地 MVP 服务
+- **WHEN** 开发者在仓库根目录运行文档中的启动命令
+- **THEN** 系统 MUST 启动或引导启动 Docker 基础设施、Spring Boot 后端和 Vite 前端，然后打印前端、后端健康检查、Swagger UI、RabbitMQ management 和 MinIO console 地址
 
-#### Scenario: Detect unsupported local runtimes
-- **WHEN** the launch flow detects missing Docker Compose, unavailable Java 21, missing npm, or Node.js below the Vite-required version
-- **THEN** it MUST print actionable remediation guidance without presenting the environment as demo-ready
+#### Scenario: 检测不受支持的本地运行时
+- **WHEN** 启动流程检测到缺少 Docker Compose、Java 21 不可用、缺少 npm，或 Node.js 低于 Vite 要求版本
+- **THEN** 它 MUST 打印可执行的修复指引，而不是将环境呈现为 demo-ready
 
-#### Scenario: Avoid stale local app listeners
-- **WHEN** ports for the backend or frontend are already occupied by local listeners
-- **THEN** the launch flow MUST stop or clearly report the stale listeners before starting the current repository services
+#### Scenario: 避免陈旧本地应用监听器
+- **WHEN** 后端或前端端口已被本地 listener 占用
+- **THEN** 启动流程 MUST 在启动当前仓库服务前停止或明确报告陈旧 listener
 
-### Requirement: MVP smoke verification checks critical local surfaces
-The system SHALL provide a repeatable smoke verification path that checks whether the local MVP can support a complete demo without mutating procurement business state.
+### Requirement: MVP 冒烟验证检查关键本地表面
+系统 SHALL 提供可重复的 smoke 验证路径，用于检查本地 MVP 是否可支持完整演示，且不变更采购业务状态。
 
-#### Scenario: Verify backend and API documentation
-- **WHEN** the smoke verification runs against a started local environment
-- **THEN** it MUST verify the backend health endpoint, Swagger UI or OpenAPI JSON, and core API availability using real backend responses
+#### Scenario: 验证后端和 API 文档
+- **WHEN** smoke 验证针对已启动本地环境运行
+- **THEN** 它 MUST 使用真实后端响应验证后端健康端点、Swagger UI 或 OpenAPI JSON，以及核心 API 可用性
 
-#### Scenario: Verify frontend reachability
-- **WHEN** the smoke verification runs against a started local environment
-- **THEN** it MUST verify that the frontend workspace responds at the documented URL and does not require frontend static mock data to show procurement content
+#### Scenario: 验证前端可达性
+- **WHEN** smoke 验证针对已启动本地环境运行
+- **THEN** 它 MUST 验证前端工作台在文档 URL 上可响应，并且不需要前端静态 mock 数据展示采购内容
 
-#### Scenario: Verify infrastructure readiness
-- **WHEN** the smoke verification checks infrastructure
-- **THEN** it MUST verify MySQL as the required core data store and report MongoDB and MinIO readiness for AI audit and file attachment scenarios
+#### Scenario: 验证基础设施就绪
+- **WHEN** smoke 验证检查基础设施
+- **THEN** 它 MUST 验证 MySQL 作为必需核心数据存储，并报告 MongoDB 和 MinIO 对 AI 审计与文件附件场景的就绪情况
 
-#### Scenario: Preserve procurement business state
-- **WHEN** the smoke verification inspects purchase requests, approvals, RFQs, POs, receipts, invoices, three-way matching, dashboards, suppliers, AI, or attachments
-- **THEN** it MUST prefer read-only checks and MUST NOT automatically create, approve, cancel, receive, invoice, resolve, or delete business records
+#### Scenario: 保留采购业务状态
+- **WHEN** smoke 验证检查采购申请、审批、RFQ、PO、收货、发票、三单匹配、看板、供应商、AI 或附件
+- **THEN** 它 MUST 优先使用只读检查，并且 MUST NOT 自动创建、通过、取消、收货、开票、解决或删除业务记录
 
-### Requirement: Verification records capture current MVP delivery status
-The system SHALL maintain developer-facing verification notes that record the latest MVP delivery checks and known environment caveats.
+### Requirement: 验证记录捕获当前 MVP 交付状态
+系统 SHALL 维护面向开发者的验证说明，记录最新 MVP 交付检查和已知环境注意事项。
 
-#### Scenario: Record automated verification commands
-- **WHEN** a change updates MVP delivery verification
-- **THEN** the verification notes MUST list the commands used for backend tests, frontend lint or build, Docker Compose parsing, health checks, OpenAPI checks, and frontend reachability checks
+#### Scenario: 记录自动化验证命令
+- **WHEN** 某个 change 更新 MVP 交付验证
+- **THEN** 验证说明 MUST 列出用于后端测试、前端 lint 或 build、Docker Compose 解析、健康检查、OpenAPI 检查和前端可达性检查的命令
 
-#### Scenario: Record manual demo coverage
-- **WHEN** a full MVP demo path is manually checked
-- **THEN** the verification notes MUST record which business workbench entries were checked and which company context or group context each entry used
+#### Scenario: 记录手工演示覆盖范围
+- **WHEN** 完整 MVP 演示路径被手工检查
+- **THEN** 验证说明 MUST 记录已检查的业务工作台入口，以及每个入口使用的公司上下文或集团上下文
 
-#### Scenario: Record unresolved caveats
-- **WHEN** a verification step cannot be completed in the current environment
-- **THEN** the verification notes MUST record the skipped or failed step, the reason, and the residual demo risk
+#### Scenario: 记录未解决注意事项
+- **WHEN** 某个验证步骤无法在当前环境完成
+- **THEN** 验证说明 MUST 记录被跳过或失败的步骤、原因和残余演示风险
 
-### Requirement: Delivery hardening respects MVP scope boundaries
-The system SHALL improve delivery confidence without expanding the product scope beyond the current MVP roadmap.
+### Requirement: 交付加固遵守 MVP 范围边界
+系统 SHALL 在不扩展当前 MVP roadmap 产品范围的前提下提升交付信心。
 
-#### Scenario: Avoid new infrastructure scope
-- **WHEN** the delivery hardening is implemented
-- **THEN** it MUST NOT add Prometheus, Grafana, Jaeger, Zipkin, Keycloak, Redis hard dependencies, RabbitMQ hard dependencies, or new external services
+#### Scenario: 避免新增基础设施范围
+- **WHEN** 交付加固被实现
+- **THEN** 它 MUST NOT 增加 Prometheus、Grafana、Jaeger、Zipkin、Keycloak、Redis hard dependency、RabbitMQ hard dependency 或新的外部服务
 
-#### Scenario: Avoid new procurement workflow behavior
-- **WHEN** the delivery hardening is implemented
-- **THEN** it MUST NOT add new purchase request, approval, RFQ, PO, receipt, invoice, three-way matching, supplier, dashboard, AI, or attachment business behavior
+#### Scenario: 避免新增采购流程行为
+- **WHEN** 交付加固被实现
+- **THEN** 它 MUST NOT 增加新的采购申请、审批、RFQ、PO、收货、发票、三单匹配、供应商、看板、AI 或附件业务行为
 
-#### Scenario: Preserve multi-company data boundaries
-- **WHEN** scripts or documentation reference demo data
-- **THEN** they MUST preserve the distinction between group-shared suppliers and company-owned procurement transactions for 星河数字科技有限公司 and 星河智能制造有限公司
+#### Scenario: 保留多公司数据边界
+- **WHEN** 脚本或文档引用演示数据
+- **THEN** 它们 MUST 保留星河数字科技有限公司和星河智能制造有限公司的集团共享供应商与公司归属采购交易之间的区别

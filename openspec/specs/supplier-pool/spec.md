@@ -1,4 +1,4 @@
-# supplier-pool Spec
+# supplier-pool 规格
 
 ## Purpose
 
@@ -6,60 +6,60 @@
 
 ## Requirements
 
-### Requirement: Supplier pool is available as a first-class workspace page
-The system SHALL provide a dedicated supplier pool page in the procurement workspace so users can directly inspect the group shared supplier pool without entering the broader master data verification page.
+### Requirement: 供应商池作为一级工作台页面可用
+系统 SHALL 在采购工作台中提供专用供应商池页面，使用户无需进入更宽泛的主数据验证页面即可直接查看集团共享供应商池。
 
-#### Scenario: Open supplier pool from sidebar
-- **WHEN** a user clicks the sidebar supplier pool navigation item
-- **THEN** the frontend MUST navigate to `/suppliers`
-- **AND** the supplier pool navigation item MUST show the active route state
-- **AND** the page MUST render a supplier pool workspace rather than the dashboard or generic master data page
+#### Scenario: 从侧边栏打开供应商池
+- **WHEN** 用户点击侧边栏供应商池导航项
+- **THEN** 前端 MUST 导航到 `/suppliers`
+- **AND** 供应商池导航项 MUST 展示 活跃路由状态
+- **AND** 页面 MUST 渲染供应商池工作台，而不是看板 或通用主数据页面
 
-#### Scenario: Open supplier pool route directly
-- **WHEN** a user opens `/suppliers` directly in the browser
-- **THEN** the frontend MUST render the supplier pool workspace
-- **AND** it MUST keep the existing Fox Procureflow workspace shell, sidebar, topbar, and visual baseline
+#### Scenario: 直接打开供应商池路由
+- **WHEN** 用户在浏览器中直接打开 `/suppliers`
+- **THEN** 前端 MUST 渲染供应商池工作台
+- **AND** 它 MUST 保持现有 Fox Procureflow 工作台外壳、sidebar、topbar 和视觉基线
 
-### Requirement: Supplier pool page uses backend master data
-The supplier pool page SHALL load supplier and category data from backend master data APIs and SHALL NOT use static frontend mock data to hide empty or unavailable backend responses.
+### Requirement: 供应商池页面使用后端主数据
+供应商池页面 SHALL 从后端主数据 API 加载供应商和品类数据，并且 SHALL NOT 使用前端静态 mock 数据掩盖空或不可用的后端响应。
 
-#### Scenario: Display roadmap supplier pool
-- **WHEN** the backend master data APIs return the seeded supplier pool
-- **THEN** the page MUST display the roadmap suppliers 上海云舟信息技术有限公司, 深圳蓝芯电子科技有限公司, 苏州恒润工业设备有限公司, 杭州诚采办公用品有限公司, and 宁波安捷物流有限公司
-- **AND** each visible supplier row MUST include supplier name, service scope, location, risk level, status, and covered procurement categories
+#### Scenario: 展示 roadmap 供应商池
+- **WHEN** 后端主数据 API 返回已 seed 的供应商池
+- **THEN** 页面 MUST 展示 roadmap 供应商：上海云舟信息技术有限公司、深圳蓝芯电子科技有限公司、苏州恒润工业设备有限公司、杭州诚采办公用品有限公司和宁波安捷物流有限公司
+- **AND** 每条可见供应商行 MUST 包含供应商名称、服务范围、所在地、风险等级、状态和覆盖采购品类
 
-#### Scenario: Backend supplier data unavailable
-- **WHEN** the supplier master data request fails or returns no records
-- **THEN** the page MUST show a loading, error, or empty state that reflects the backend result
-- **AND** it MUST NOT fill the list with frontend-only demo suppliers
+#### Scenario: 后端供应商数据不可用
+- **WHEN** 供应商主数据请求失败或没有返回记录
+- **THEN** 页面 MUST 展示反映后端结果的 loading、error 或 empty 状态
+- **AND** 它 MUST NOT 用仅前端存在的演示供应商填充列表
 
-### Requirement: Supplier pool can be filtered without changing data ownership
-The supplier pool page SHALL allow users to filter the group shared supplier pool by practical inspection criteria while preserving the fact that suppliers are group-level reference data.
+### Requirement: 供应商池可筛选且不改变数据归属
+供应商池页面 SHALL 允许用户按实用查看条件筛选集团共享供应商池，同时保留供应商是集团级参考数据这一事实。
 
-#### Scenario: Filter by procurement category
-- **WHEN** a user selects a procurement category filter such as IT equipment or logistics services
-- **THEN** the supplier list MUST show only suppliers whose backend category coverage includes the selected category
-- **AND** clearing the filter MUST restore the full group shared supplier pool
+#### Scenario: 按采购品类筛选
+- **WHEN** 用户选择采购品类筛选项，例如 IT 设备或物流服务
+- **THEN** 供应商列表 MUST 仅展示后端品类覆盖包含所选品类的供应商
+- **AND** 清除筛选 MUST 恢复完整集团共享供应商池
 
-#### Scenario: Filter by risk status and keyword
-- **WHEN** a user enters a keyword and selects risk level or supplier status filters
-- **THEN** the supplier list MUST update to rows matching all active filters
-- **AND** the filter result MUST be derived from backend supplier fields including supplier name, service scope, location, risk level, status, and categories
+#### Scenario: 按风险状态和关键词筛选
+- **WHEN** 用户输入关键词并选择风险等级或供应商状态筛选项
+- **THEN** 供应商列表 MUST 更新为匹配所有活跃筛选项的行
+- **AND** 筛选结果 MUST 来自后端供应商字段，包括供应商名称、服务范围、所在地、风险等级、状态和品类
 
-#### Scenario: Switch company context while viewing suppliers
-- **WHEN** a user switches between 星河数字科技有限公司 and 星河智能制造有限公司 context on the supplier pool page
-- **THEN** the visible supplier pool MUST remain the same group-level supplier pool
-- **AND** the page MUST make clear that company-scoped procurement records remain isolated while suppliers are shared reference data
+#### Scenario: 查看供应商时切换公司上下文
+- **WHEN** 用户在供应商池页面的星河数字科技有限公司和星河智能制造有限公司上下文之间切换
+- **THEN** 可见供应商池 MUST 仍然是同一个集团级供应商池
+- **AND** 页面 MUST 明确公司级采购记录仍然隔离，而供应商是共享参考数据
 
-### Requirement: Supplier detail drawer remains read-only
-The supplier pool page SHALL provide a read-only supplier detail drawer for inspection and SHALL NOT expose write or procurement transaction actions from the supplier pool page.
+### Requirement: 供应商详情抽屉保持只读
+供应商池页面 SHALL 提供只读供应商详情抽屉用于查看，并且 SHALL NOT 从供应商池页面暴露写入或采购交易操作。
 
-#### Scenario: Open supplier detail drawer
-- **WHEN** a user opens a supplier from the supplier pool list
-- **THEN** the drawer MUST display the supplier name, service scope, location, risk level, status, shared scope, and covered procurement categories
-- **AND** it MUST display the group shared supplier pool boundary and company procurement data isolation boundary
+#### Scenario: 打开供应商详情抽屉
+- **WHEN** 用户从供应商池列表打开某个供应商
+- **THEN** 抽屉 MUST 展示供应商名称、服务范围、所在地、风险等级、状态、共享范围和覆盖采购品类
+- **AND** 它 MUST 展示集团共享供应商池边界和公司采购数据隔离边界
 
-#### Scenario: Supplier detail has no mutating actions
-- **WHEN** a user inspects the supplier list or supplier detail drawer
-- **THEN** the page MUST NOT present create, edit, delete, approval, RFQ creation, PO creation, receipt, invoice, matching, upload, or download actions
-- **AND** no supplier pool interaction from this page MUST mutate supplier master data or procurement transaction state
+#### Scenario: 供应商详情没有变更操作
+- **WHEN** 用户查看供应商列表或供应商详情抽屉
+- **THEN** 页面 MUST NOT 呈现创建、编辑、删除、审批、创建 RFQ、创建 PO、收货、发票、匹配、上传或下载操作
+- **AND** 来自该页面的任何供应商池交互 MUST NOT 变更供应商主数据或采购交易状态

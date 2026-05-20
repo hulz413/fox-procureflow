@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface DemoUserRoleRepository extends JpaRepository<DemoUserRoleJpaEntity, Long> {
 
     List<DemoUserRoleJpaEntity> findByUserIdIn(Collection<String> userIds);
+
+    boolean existsByUserIdAndRoleIdIn(String userId, Collection<String> roleIds);
 }

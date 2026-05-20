@@ -1,120 +1,120 @@
 ## ADDED Requirements
 
-### Requirement: Procurement dashboard exposes explicit group and company scopes
-The system SHALL provide a read-only procurement dashboard that can aggregate data for the demo group or for one selected company, with explicit scope semantics and company ownership validation.
+### Requirement: 采购看板 暴露明确集团和公司范围
+系统 SHALL 提供只读采购看板，可按演示集团或某个所选公司聚合数据，并具备明确范围语义和公司归属校验。
 
-#### Scenario: Query group dashboard
-- **WHEN** a caller requests `GET /api/procurement-dashboard?scope=GROUP`
-- **THEN** the system MUST return dashboard data aggregated across 星河数字科技有限公司 and 星河智能制造有限公司
-- **AND** the response MUST identify the scope as `GROUP`, include the demo group identifier, and include the generated timestamp
+#### Scenario: 查询集团看板
+- **WHEN** 调用方请求 `GET /api/procurement-dashboard?scope=GROUP`
+- **THEN** 系统 MUST 返回跨星河数字科技有限公司和星河智能制造有限公司聚合的 看板数据
+- **AND** 响应 MUST 将范围标识为 `GROUP`，包含演示集团标识，并包含生成时间戳
 
-#### Scenario: Query company dashboard
-- **WHEN** a caller requests `GET /api/procurement-dashboard?scope=COMPANY&companyId=company-digital`
-- **THEN** the system MUST return dashboard data aggregated only from records owned by `company-digital`
-- **AND** the response MUST identify the scope as `COMPANY`, include `company-digital`, and include the company display name
-- **AND** the response MUST NOT include procurement records owned by `company-manufacturing`
+#### Scenario: 查询公司看板
+- **WHEN** 调用方请求 `GET /api/procurement-dashboard?scope=COMPANY&companyId=company-digital`
+- **THEN** 系统 MUST 仅返回从 `company-digital` 归属记录聚合的 看板数据
+- **AND** 响应 MUST 将范围标识为 `COMPANY`，包含 `company-digital`，并包含公司展示名称
+- **AND** 响应 MUST NOT 包含属于 `company-manufacturing` 的采购记录
 
-#### Scenario: Reject company dashboard without valid company
-- **WHEN** a caller requests a company dashboard with a missing or unknown `companyId`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT fall back to the active demo company
+#### Scenario: 拒绝没有有效公司的公司看板
+- **WHEN** 调用方请求公司看板 但缺少或使用未知 `companyId`
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 回退到活跃演示公司
 
-### Requirement: Dashboard summarizes procurement lifecycle metrics
-The system SHALL summarize the current procurement lifecycle using existing purchase request, approval, RFQ, purchase order, receipt, invoice, and three-way matching data.
+### Requirement: 看板汇总采购生命周期指标
+系统 SHALL 使用现有采购申请、审批、RFQ、采购订单、收货、发票和三单匹配数据汇总当前采购生命周期。
 
-#### Scenario: Return dashboard summary metrics
-- **WHEN** a caller queries the procurement dashboard for `company-digital`
-- **THEN** the response MUST include summary metrics for purchase amount, pending approvals, active RFQs, issued purchase orders, receipt or invoice follow-up, and three-way matching exceptions
-- **AND** each metric MUST include a stable key, display label, numeric value, optional currency, and source timestamp or generated timestamp
+#### Scenario: 返回 看板摘要指标
+- **WHEN** 调用方查询 `company-digital` 的采购看板
+- **THEN** 响应 MUST 包含采购金额、待审批、活跃 RFQ、已发布采购订单、收货或发票跟进、三单匹配异常等摘要指标
+- **AND** 每个指标 MUST 包含稳定 key、展示标签、数值、可选币种以及来源时间戳或生成时间戳
 
-#### Scenario: Calculate purchase amount from issued purchase orders
-- **WHEN** the dashboard calculates purchase amount for a selected scope
-- **THEN** the amount MUST be aggregated from issued purchase order total amounts in that scope
-- **AND** draft or cancelled purchase orders MUST NOT increase the issued purchase amount
+#### Scenario: 从已发布采购订单计算采购金额
+- **WHEN** 看板为所选范围计算采购金额
+- **THEN** 金额 MUST 从该范围内已发布采购订单总金额聚合而来
+- **AND** 草稿或已取消采购订单 MUST NOT 增加已发布采购金额
 
-#### Scenario: Count pending approval work
-- **WHEN** the dashboard calculates pending approvals for a selected scope
-- **THEN** the count MUST include active or in-progress approval work owned by companies in that scope
-- **AND** completed, rejected, or withdrawn approval instances MUST NOT be counted as pending approval work
+#### Scenario: 统计待审批工作
+- **WHEN** 看板为所选范围计算待审批数量
+- **THEN** 数量 MUST 包含该范围公司归属的 活跃或进行中 审批工作
+- **AND** 已完成、已驳回或已撤回审批实例 MUST NOT 计入待审批工作
 
-#### Scenario: Count matching exceptions
-- **WHEN** the dashboard calculates matching exceptions for a selected scope
-- **THEN** the count MUST include current three-way matching results with status `EXCEPTION`
-- **AND** matched, pending input, and resolved matching results MUST NOT be counted as active exceptions
+#### Scenario: 统计匹配异常
+- **WHEN** 看板为所选范围计算匹配异常
+- **THEN** 数量 MUST 包含当前状态为 `EXCEPTION` 的三单匹配结果
+- **AND** 已匹配、待输入和已解决匹配结果 MUST NOT 计为活跃异常
 
-### Requirement: Dashboard provides trends, funnel, distributions, and exception highlights
-The system SHALL expose chart-ready datasets that help managers understand procurement progress, supplier concentration, and financial risk.
+### Requirement: 看板提供趋势、漏斗、分布和异常亮点
+系统 SHALL 暴露 chart-ready 数据集，帮助管理者理解采购进展、供应商集中度和财务风险。
 
-#### Scenario: Return purchase amount trend
-- **WHEN** a caller queries the dashboard for the group scope
-- **THEN** the response MUST include a purchase amount trend grouped by month or demo reporting period
-- **AND** each trend point MUST include period, amount, currency, and source document count
+#### Scenario: 返回采购金额趋势
+- **WHEN** 调用方查询集团范围看板
+- **THEN** 响应 MUST 包含按月份或演示报告周期分组的采购金额趋势
+- **AND** 每个趋势点 MUST 包含期间、金额、币种和来源单据数量
 
-#### Scenario: Return procurement document funnel
-- **WHEN** a caller queries the dashboard for a selected scope
-- **THEN** the response MUST include funnel counts for purchase requests, approved requests, comparable RFQs, issued purchase orders, received purchase orders, invoiced purchase orders, and matched purchase orders
-- **AND** the counts MUST be computed from backend data rather than frontend static constants
+#### Scenario: 返回采购单据漏斗
+- **WHEN** 调用方查询所选范围看板
+- **THEN** 响应 MUST 包含采购申请、已审批申请、可对比 RFQ、已发布采购订单、已收货采购订单、已开票采购订单和已匹配采购订单的漏斗数量
+- **AND** 数量 MUST 基于后端数据计算，而不是前端静态常量
 
-#### Scenario: Return status distributions
-- **WHEN** a caller queries the dashboard for a selected scope
-- **THEN** the response MUST include status distributions for at least approval, RFQ, purchase order, receipt, invoice, and three-way matching records
-- **AND** each distribution bucket MUST include status, count, and business label
+#### Scenario: 返回状态分布
+- **WHEN** 调用方查询所选范围看板
+- **THEN** 响应 MUST 至少包含审批、RFQ、采购订单、收货、发票和三单匹配记录的状态分布
+- **AND** 每个分布 bucket MUST 包含状态、数量和业务标签
 
-#### Scenario: Return supplier distribution
-- **WHEN** a caller queries the dashboard for a selected scope
-- **THEN** the response MUST include supplier distribution data based on supplier-related RFQ quote or purchase order records in that scope
-- **AND** supplier master data MAY come from the group-shared supplier pool while transaction amounts and counts MUST remain scoped to the selected companies
+#### Scenario: 返回供应商分布
+- **WHEN** 调用方查询所选范围看板
+- **THEN** 响应 MUST 包含基于该范围内供应商相关 RFQ quote 或采购订单记录的供应商分布数据
+- **AND** 供应商主数据 MAY 来自集团共享供应商池，但交易金额和数量 MUST 保持在所选公司范围内
 
-#### Scenario: Return matching exception highlights
-- **WHEN** the selected scope contains three-way matching exceptions
-- **THEN** the response MUST include exception highlights with match identifier, company identifier, PO number or PO identifier, supplier, severity, invoice variance, and last calculated timestamp
-- **AND** the highlights MUST be ordered so the most severe or most recent exceptions are visible first
+#### Scenario: 返回匹配异常亮点
+- **WHEN** 所选范围包含三单匹配异常
+- **THEN** 响应 MUST 包含异常亮点，包括匹配标识、公司标识、PO 编号或 PO 标识、供应商、严重程度、发票差异和最后计算时间戳
+- **AND** 亮点 MUST 排序，使最严重或最新的异常优先可见
 
-### Requirement: Dashboard APIs are documented and remain read-only
-The system SHALL document dashboard APIs and keep the dashboard capability free of business mutations, deferred infrastructure, and AI-generated summaries.
+### Requirement: 看板 API 已文档化并保持只读
+系统 SHALL 记录 看板 API，并保持 看板能力不包含业务变更、延期基础设施或 AI 生成摘要。
 
-#### Scenario: Swagger documents procurement dashboard endpoint
-- **WHEN** a developer opens Swagger UI or requests `/v3/api-docs`
-- **THEN** the API documentation MUST include the procurement dashboard endpoint, query parameters, scope values, and response shape
+#### Scenario: Swagger 记录采购看板 端点
+- **WHEN** 开发者打开 Swagger UI 或请求 `/v3/api-docs`
+- **THEN** API 文档 MUST 包含采购看板 端点、查询参数、范围值和响应结构
 
-#### Scenario: Dashboard query does not mutate procurement records
-- **WHEN** a caller queries the procurement dashboard
-- **THEN** the system MUST NOT create, update, or delete purchase requests, approval instances, RFQs, purchase orders, receipts, invoices, three-way matching results, handling records, uploaded files, or payment records
+#### Scenario: 看板查询不变更采购记录
+- **WHEN** 调用方查询采购看板
+- **THEN** 系统 MUST NOT 创建、更新或删除采购申请、审批实例、RFQ、采购订单、收货、发票、三单匹配结果、处理记录、已上传文件或付款记录
 
-#### Scenario: Dashboard does not require deferred infrastructure or AI
-- **WHEN** a developer runs the procurement dashboard in the MVP local environment
-- **THEN** the dashboard MUST use MySQL-backed existing business data and synchronous request handling
-- **AND** it MUST NOT require Redis, RabbitMQ, MongoDB, MinIO, Prometheus, Grafana, Jaeger, Zipkin, Keycloak, DeepSeek, or another AI service
+#### Scenario: 看板不需要延期基础设施或 AI
+- **WHEN** 开发者在 MVP 本地环境中运行采购看板
+- **THEN** 看板 MUST 使用 MySQL-backed 现有业务数据和同步请求处理
+- **AND** 它 MUST NOT 需要 Redis、RabbitMQ、MongoDB、MinIO、Prometheus、Grafana、Jaeger、Zipkin、Keycloak、DeepSeek 或其他 AI 服务
 
-### Requirement: Frontend provides a management procurement dashboard
-The frontend SHALL provide a real procurement dashboard page for managers to review group and company procurement status using backend dashboard APIs.
+### Requirement: 前端提供管理型采购看板
+前端 SHALL 提供真实采购看板 页面，让管理者使用后端 看板 API 查看集团和公司采购状态。
 
-#### Scenario: Open procurement dashboard from navigation
-- **WHEN** a user selects “采购看板” in the workspace navigation or opens the application root route
-- **THEN** the frontend MUST show the procurement dashboard page
-- **AND** the page MUST load dashboard data from backend APIs rather than frontend static mock data
+#### Scenario: 从导航打开采购看板
+- **WHEN** 用户在工作台导航中选择“采购看板”或打开应用根路由
+- **THEN** 前端 MUST 展示采购看板 页面
+- **AND** 页面 MUST 从后端 API 加载 看板数据，而不是前端静态 mock 数据
 
-#### Scenario: Switch dashboard scope
-- **WHEN** a user switches the dashboard scope between group summary and a specific company
-- **THEN** the frontend MUST request dashboard data for the selected scope
-- **AND** the visible KPI cards, charts, distributions, and exception highlights MUST refresh to match that scope
+#### Scenario: 切换 看板范围
+- **WHEN** 用户在集团摘要和具体公司之间切换 看板范围
+- **THEN** 前端 MUST 为所选范围请求 看板数据
+- **AND** 可见 KPI cards、charts、distributions 和 exception highlights MUST 刷新以匹配该范围
 
-#### Scenario: Review dashboard KPI and chart sections
-- **WHEN** dashboard data loads successfully
-- **THEN** the page MUST show KPI cards for purchase amount, pending approvals, active RFQs, issued purchase orders, and matching exceptions
-- **AND** the page MUST show chart-ready views for purchase amount trend, procurement document funnel, status distribution, and supplier distribution
+#### Scenario: 查看看板 KPI 和图表区域
+- **WHEN** 看板数据加载成功
+- **THEN** 页面 MUST 展示采购金额、待审批、活跃 RFQ、已发布采购订单和匹配异常的 KPI cards
+- **AND** 页面 MUST 展示采购金额趋势、采购单据漏斗、状态分布和供应商分布的 chart-ready 视图
 
-#### Scenario: Review exception highlights
-- **WHEN** the dashboard response contains matching exception highlights
-- **THEN** the frontend MUST show the exception company, PO or match reference, supplier, severity, invoice variance, and last calculated timestamp
-- **AND** the frontend SHOULD provide a navigation path to the three-way matching page for detailed handling
+#### Scenario: 查看异常亮点
+- **WHEN** 看板响应包含匹配异常亮点
+- **THEN** 前端 MUST 展示异常公司、PO 或匹配引用、供应商、严重程度、发票差异和最后计算时间戳
+- **AND** 前端 SHOULD 提供到三单匹配页面的导航路径，用于详细处理
 
-#### Scenario: Show real empty state without static filler
-- **WHEN** a selected company has no records for a dashboard section
-- **THEN** the frontend MUST show a clear empty state for that section
-- **AND** it MUST NOT fill the section with hard-coded procurement demo metrics
+#### Scenario: 无静态填充地展示真实空状态
+- **WHEN** 所选公司在某个 看板区域没有记录
+- **THEN** 前端 MUST 为该区域展示清晰空状态
+- **AND** 它 MUST NOT 用硬编码采购演示指标填充该区域
 
-#### Scenario: Show dashboard loading and error states
-- **WHEN** dashboard data is loading or the dashboard API fails
-- **THEN** the frontend MUST show a loading or error state that does not overlap with existing workspace controls
-- **AND** the user MUST still be able to switch company context or navigate to other procurement pages
+#### Scenario: 展示 看板 loading 和 error 状态
+- **WHEN** 看板数据正在加载或 看板 API 失败
+- **THEN** 前端 MUST 展示不会与现有工作台控件重叠的 loading 或 error 状态
+- **AND** 用户 MUST 仍然能够切换公司上下文或导航到其他采购页面

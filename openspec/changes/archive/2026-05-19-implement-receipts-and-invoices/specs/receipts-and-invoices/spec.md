@@ -1,157 +1,157 @@
 ## ADDED Requirements
 
-### Requirement: Receipts are registered from issued purchase orders
-The system SHALL allow warehouse or procurement users to create company-scoped receipt records from purchase orders whose status is `ISSUED`.
+### Requirement: 收货从已发布采购订单登记
+系统 SHALL 允许仓库或采购用户从状态为 `ISSUED` 的采购订单创建公司级收货记录。
 
-#### Scenario: Create partial receipt for an issued digital company PO
-- **WHEN** a user from `company-digital` creates a receipt for an `ISSUED` `company-digital` purchase order with one or more valid PO line quantities, received date, receiver, note, and attachment metadata
-- **THEN** the system MUST persist a receipt header with a stable `receiptId`
-- **AND** the system MUST persist receipt lines referencing the source `poId`, `poLineId`, line number, item snapshot, received quantity, and unit
-- **AND** the receipt MUST persist `company-digital`, source supplier, receiver, attachment metadata, and timestamps
+#### Scenario: 为已发布数字公司 PO 创建部分收货
+- **WHEN** `company-digital` 用户为 `ISSUED` 的 `company-digital` 采购订单创建收货，并提供一条或多条有效 PO 明细数量、收货日期、收货人、备注和附件元数据
+- **THEN** 系统 MUST 持久化带稳定 `receiptId` 的收货头
+- **AND** 系统 MUST 持久化收货明细，引用来源 `poId`、`poLineId`、行号、物料快照、收货数量和单位
+- **AND** 收货 MUST 持久化 `company-digital`、来源供应商、收货人、附件元数据和时间戳
 
-#### Scenario: Reject receipt for draft or cancelled purchase order
-- **WHEN** a user tries to create a receipt for a `DRAFT` or `CANCELLED` purchase order
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT persist a receipt, receipt line, receipt attachment, invoice, or matching record
+#### Scenario: 拒绝草稿或已取消采购订单的收货
+- **WHEN** 用户尝试为 `DRAFT` 或 `CANCELLED` 采购订单创建收货
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 持久化收货、收货明细、收货附件、发票或匹配记录
 
-#### Scenario: Reject receipt that exceeds PO line quantity
-- **WHEN** a user submits a receipt whose line quantity would make cumulative received quantity greater than the source PO line quantity
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the existing receipts for that PO MUST remain unchanged
+#### Scenario: 拒绝超过 PO 明细数量的收货
+- **WHEN** 用户提交的收货明细数量会导致累计收货数量大于来源 PO 明细数量
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 该 PO 的现有收货 MUST 保持不变
 
-#### Scenario: Reject cross-company receipt creation
-- **WHEN** a user from `company-digital` tries to create a receipt for a `company-manufacturing` purchase order
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT fall back to the active demo company
+#### Scenario: 拒绝跨公司创建收货
+- **WHEN** `company-digital` 用户尝试为 `company-manufacturing` 采购订单创建收货
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 回退到活跃演示公司
 
-### Requirement: Supplier invoices are registered from issued purchase orders
-The system SHALL allow finance or procurement users to create company-scoped supplier invoice records from purchase orders whose status is `ISSUED`.
+### Requirement: 供应商发票从已发布采购订单登记
+系统 SHALL 允许财务或采购用户从状态为 `ISSUED` 的采购订单创建公司级供应商发票记录。
 
-#### Scenario: Create supplier invoice for an issued digital company PO
-- **WHEN** a user from `company-digital` creates a supplier invoice for an `ISSUED` `company-digital` purchase order with invoice number, invoice date, registered user, line quantities, line amounts, tax data, note, and attachment metadata
-- **THEN** the system MUST persist an invoice header with a stable `invoiceId`
-- **AND** the system MUST persist invoice lines referencing the source `poId`, `poLineId`, line number, item snapshot, invoiced quantity, untaxed amount, tax rate, tax amount, total amount, and currency
-- **AND** the invoice MUST persist `company-digital`, PO supplier, invoice number, registered user, attachment metadata, and timestamps
+#### Scenario: 为已发布数字公司 PO 创建供应商发票
+- **WHEN** `company-digital` 用户为 `ISSUED` 的 `company-digital` 采购订单创建供应商发票，并提供发票号、发票日期、登记人、明细数量、明细金额、税数据、备注和附件元数据
+- **THEN** 系统 MUST 持久化带稳定 `invoiceId` 的发票头
+- **AND** 系统 MUST 持久化发票明细，引用来源 `poId`、`poLineId`、行号、物料快照、已开票数量、未税金额、税率、税额、总金额和币种
+- **AND** 发票 MUST 持久化 `company-digital`、PO 供应商、发票号、登记人、附件元数据和时间戳
 
-#### Scenario: Reject invoice for draft or cancelled purchase order
-- **WHEN** a user tries to create an invoice for a `DRAFT` or `CANCELLED` purchase order
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT persist an invoice, invoice line, invoice attachment, receipt, or matching record
+#### Scenario: 拒绝草稿或已取消采购订单的发票
+- **WHEN** 用户尝试为 `DRAFT` 或 `CANCELLED` 采购订单创建发票
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 持久化发票、发票明细、发票附件、收货或匹配记录
 
-#### Scenario: Reject invoice line outside the selected PO
-- **WHEN** a user submits an invoice line whose `poLineId` does not belong to the selected `poId`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT persist a partial invoice
+#### Scenario: 拒绝所选 PO 外的发票明细
+- **WHEN** 用户提交的发票明细中 `poLineId` 不属于所选 `poId`
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 持久化部分发票
 
-#### Scenario: Reject invoice quantity above PO line quantity
-- **WHEN** a user submits an invoice whose line quantity would make cumulative invoiced quantity greater than the source PO line quantity
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the existing invoices for that PO MUST remain unchanged
+#### Scenario: 拒绝超过 PO 明细数量的发票数量
+- **WHEN** 用户提交的发票明细数量会导致累计开票数量大于来源 PO 明细数量
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 该 PO 的现有发票 MUST 保持不变
 
-#### Scenario: Preserve invoice amount variance for later matching
-- **WHEN** a user creates an invoice whose total amount differs from the source PO total amount
-- **THEN** the system MUST persist the invoice amounts as entered
-- **AND** the PO fulfillment summary MUST expose the invoice amount variance
-- **AND** the system MUST NOT create a three-way matching result or matching exception in this change
+#### Scenario: 保留发票金额差异供后续匹配使用
+- **WHEN** 用户创建总金额与来源 PO 总金额不同的发票
+- **THEN** 系统 MUST 按输入持久化发票金额
+- **AND** PO 履约摘要 MUST 暴露发票金额差异
+- **AND** 系统 MUST NOT 在本 change 中创建三单匹配结果或匹配异常
 
-#### Scenario: Reject duplicate invoice number for same company supplier
-- **WHEN** a user submits an invoice number that already exists for the same `companyId` and PO supplier
-- **THEN** the system MUST reject the request with a conflict-style 4xx error
-- **AND** the existing invoice MUST remain unchanged
+#### Scenario: 拒绝同公司同供应商重复发票号
+- **WHEN** 用户提交的发票号已存在于同一 `companyId` 和 PO 供应商下
+- **THEN** 系统 MUST 以冲突语义的 4xx 错误拒绝请求
+- **AND** 现有发票 MUST 保持不变
 
-### Requirement: Receipt and invoice APIs expose company-scoped lists, details, creation, and PO fulfillment summaries
-The system SHALL expose receipt and invoice REST APIs that return company-scoped data, support the current demo security model, and keep service-layer ownership validation explicit.
+### Requirement: 收货和发票 API 暴露公司级列表、详情、创建和 PO 履约摘要
+系统 SHALL 暴露收货和发票 REST API，返回公司级数据，支持当前演示安全模型，并保持 service-layer 归属校验明确。
 
-#### Scenario: List receipts for one company
-- **WHEN** a caller requests `GET /api/receipts?companyId=company-digital`
-- **THEN** the system MUST return only receipts owned by `company-digital`
-- **AND** the response MUST NOT include receipts owned by `company-manufacturing`
+#### Scenario: 列出一个公司的收货
+- **WHEN** 调用方请求 `GET /api/receipts?companyId=company-digital`
+- **THEN** 系统 MUST 仅返回属于 `company-digital` 的收货
+- **AND** 响应 MUST NOT 包含属于 `company-manufacturing` 的收货
 
-#### Scenario: List invoices for one company
-- **WHEN** a caller requests `GET /api/invoices?companyId=company-digital`
-- **THEN** the system MUST return only invoices owned by `company-digital`
-- **AND** the response MUST NOT include invoices owned by `company-manufacturing`
+#### Scenario: 列出一个公司的发票
+- **WHEN** 调用方请求 `GET /api/invoices?companyId=company-digital`
+- **THEN** 系统 MUST 仅返回属于 `company-digital` 的发票
+- **AND** 响应 MUST NOT 包含属于 `company-manufacturing` 的发票
 
-#### Scenario: Query receipt detail
-- **WHEN** a caller requests `GET /api/receipts/{receiptId}?companyId=company-digital` for an existing receipt
-- **THEN** the system MUST return the receipt header, source PO summary, supplier snapshot, receipt lines, attachment metadata, note, receiver, status, and timestamps
+#### Scenario: 查询收货详情
+- **WHEN** 调用方对现有收货请求 `GET /api/receipts/{receiptId}?companyId=company-digital`
+- **THEN** 系统 MUST 返回收货头、来源 PO 摘要、供应商快照、收货明细、附件元数据、备注、收货人、状态和时间戳
 
-#### Scenario: Query invoice detail
-- **WHEN** a caller requests `GET /api/invoices/{invoiceId}?companyId=company-digital` for an existing invoice
-- **THEN** the system MUST return the invoice header, source PO summary, supplier snapshot, invoice lines, attachment metadata, note, registered user, amount totals, status, and timestamps
+#### Scenario: 查询发票详情
+- **WHEN** 调用方对现有发票请求 `GET /api/invoices/{invoiceId}?companyId=company-digital`
+- **THEN** 系统 MUST 返回发票头、来源 PO 摘要、供应商快照、发票明细、附件元数据、备注、登记人、金额合计、状态和时间戳
 
-#### Scenario: Query issued PO fulfillment summaries
-- **WHEN** a caller requests `GET /api/receipts-invoices/purchase-orders?companyId=company-digital`
-- **THEN** the system MUST return only `ISSUED` purchase orders owned by `company-digital`
-- **AND** each row MUST include PO amount, supplier, ordered line quantities, cumulative received quantity, cumulative invoiced quantity, cumulative invoice total amount, receipt status summary, invoice status summary, and invoice amount variance
+#### Scenario: 查询已发布 PO 履约摘要
+- **WHEN** 调用方请求 `GET /api/receipts-invoices/purchase-orders?companyId=company-digital`
+- **THEN** 系统 MUST 仅返回属于 `company-digital` 的 `ISSUED` 采购订单
+- **AND** 每行 MUST 包含 PO 金额、供应商、订购明细数量、累计收货数量、累计开票数量、累计发票总金额、收货状态摘要、发票状态摘要和发票金额差异
 
-#### Scenario: Unknown company list request is rejected
-- **WHEN** a caller requests receipt, invoice, or fulfillment summary data with an unknown `companyId`
-- **THEN** the system MUST return a client-visible error instead of falling back to a default company
+#### Scenario: 未知公司列表请求被拒绝
+- **WHEN** 调用方使用未知 `companyId` 请求收货、发票或履约摘要数据
+- **THEN** 系统 MUST 返回客户端可见错误，而不是回退到默认公司
 
-#### Scenario: Swagger documents receipt and invoice endpoints
-- **WHEN** a developer opens Swagger UI or requests `/v3/api-docs`
-- **THEN** the API documentation MUST include receipt list, receipt detail, receipt create, invoice list, invoice detail, invoice create, and PO fulfillment summary endpoints with request and response shapes
+#### Scenario: Swagger 记录收货和发票端点
+- **WHEN** 开发者打开 Swagger UI 或请求 `/v3/api-docs`
+- **THEN** API 文档 MUST 包含收货列表、收货详情、收货创建、发票列表、发票详情、发票创建和 PO 履约摘要端点及其请求/响应结构
 
-#### Scenario: Demo frontend can call receipt and invoice APIs
-- **WHEN** the frontend calls receipt and invoice GET and POST endpoints in the current skeleton environment
-- **THEN** Spring Security MUST allow the calls without JWT
-- **AND** the service layer MUST still validate explicit company, actor, receiver, registered user, purchase order, supplier, and line ownership or scope
+#### Scenario: 演示前端可以调用收货和发票 API
+- **WHEN** 前端在当前 skeleton 环境中调用收货和发票 GET 与 POST 端点
+- **THEN** Spring Security MUST 允许不带 JWT 调用
+- **AND** service layer MUST 仍然校验明确的公司、操作者、收货人、登记人、采购订单、供应商和明细归属或范围
 
-### Requirement: Receipt and invoice attachment metadata is stored without object upload
-The system SHALL store attachment metadata placeholders for receipts and invoices without requiring object storage or uploaded file bytes.
+### Requirement: 收货和发票附件元数据无对象上传存储
+系统 SHALL 为收货和发票存储附件元数据占位，而不要求对象存储或已上传文件字节。
 
-#### Scenario: Store receipt attachment metadata
-- **WHEN** a user includes receipt attachment file name, description, content type, and size metadata while creating a receipt
-- **THEN** the system MUST persist the metadata with the receipt
-- **AND** the system MUST NOT require a MinIO object key or upload file bytes in this change
+#### Scenario: 存储收货附件元数据
+- **WHEN** 用户在创建收货时包含收货附件文件名、描述、content type 和大小元数据
+- **THEN** 系统 MUST 将该元数据与收货一起持久化
+- **AND** 系统 MUST NOT 在本 change 中要求 MinIO object key 或上传文件字节
 
-#### Scenario: Store invoice attachment metadata
-- **WHEN** a user includes invoice attachment file name, description, content type, and size metadata while creating an invoice
-- **THEN** the system MUST persist the metadata with the invoice
-- **AND** the system MUST NOT require a MinIO object key or upload file bytes in this change
+#### Scenario: 存储发票附件元数据
+- **WHEN** 用户在创建发票时包含发票附件文件名、描述、content type 和大小元数据
+- **THEN** 系统 MUST 将该元数据与发票一起持久化
+- **AND** 系统 MUST NOT 在本 change 中要求 MinIO object key 或上传文件字节
 
-### Requirement: Frontend provides a receipts and invoices workspace
-The frontend SHALL provide a real receipts and invoices page in the procurement workspace for reviewing issued PO fulfillment, creating receipts, creating invoices, and viewing receipt and invoice details.
+### Requirement: 前端提供收货发票工作台
+前端 SHALL 在采购工作台中提供真实收货发票页面，用于查看已发布 PO 履约、创建收货、创建发票，以及查看收货和发票详情。
 
-#### Scenario: Open receipts and invoices page
-- **WHEN** a user selects “收货发票” in the workspace navigation
-- **THEN** the system MUST open a `/receipts-invoices` page
-- **AND** the page MUST load issued PO fulfillment summaries, receipts, and invoices from backend APIs rather than static mock data
+#### Scenario: 打开收货发票页面
+- **WHEN** 用户在工作台导航中选择“收货发票”
+- **THEN** 系统 MUST 打开 `/receipts-invoices` 页面
+- **AND** 页面 MUST 从后端 API 加载已发布 PO 履约摘要、收货和发票，而不是静态 mock 数据
 
-#### Scenario: Create receipt from the frontend
-- **WHEN** a warehouse or procurement user selects an issued PO, enters received quantities for valid PO lines, fills receiver and receipt metadata, and submits the receipt form
-- **THEN** the frontend MUST call the receipt create API
-- **AND** the receipt list and PO fulfillment summary MUST refresh to show the backend `receiptId` and updated received quantities
+#### Scenario: 从前端创建收货
+- **WHEN** 仓库或采购用户选择已发布 PO，输入有效 PO 明细的收货数量，填写收货人和收货元数据，并提交收货表单
+- **THEN** 前端 MUST 调用收货创建 API
+- **AND** 收货列表和 PO 履约摘要 MUST 刷新，以展示后端 `receiptId` 和更新后的收货数量
 
-#### Scenario: Create invoice from the frontend
-- **WHEN** a finance or procurement user selects an issued PO, enters invoice number, invoice date, line quantities, line amounts, tax data, registered user, and attachment metadata, and submits the invoice form
-- **THEN** the frontend MUST call the invoice create API
-- **AND** the invoice list and PO fulfillment summary MUST refresh to show the backend `invoiceId`, invoice totals, and invoice amount variance when present
+#### Scenario: 从前端创建发票
+- **WHEN** 财务或采购用户选择已发布 PO，输入发票号、发票日期、明细数量、明细金额、税数据、登记人和附件元数据，并提交发票表单
+- **THEN** 前端 MUST 调用发票创建 API
+- **AND** 发票列表和 PO 履约摘要 MUST 刷新，以展示后端 `invoiceId`、发票合计，以及存在时的发票金额差异
 
-#### Scenario: Review PO fulfillment detail
-- **WHEN** a user selects an issued PO from the receipts and invoices workspace
-- **THEN** the frontend MUST show PO supplier, PO amount, ordered lines, cumulative received quantities, cumulative invoiced quantities, invoice amount variance, related receipts, related invoices, and attachment metadata
+#### Scenario: 查看 PO 履约详情
+- **WHEN** 用户从收货发票工作台选择已发布 PO
+- **THEN** 前端 MUST 展示 PO 供应商、PO 金额、订购明细、累计收货数量、累计开票数量、发票金额差异、相关收货、相关发票和附件元数据
 
-#### Scenario: Guard unavailable actions in the frontend
-- **WHEN** no issued PO is available for the selected company or a PO is already fully received or fully invoiced
-- **THEN** the frontend MUST disable invalid create actions with a client-visible reason
-- **AND** it MUST still rely on backend validation for final enforcement
+#### Scenario: 前端防护不可用操作
+- **WHEN** 所选公司没有已发布 PO，或某个 PO 已经完全收货或完全开票
+- **THEN** 前端 MUST 禁用无效创建操作，并给出客户端可见原因
+- **AND** 它 MUST 仍然依赖后端校验进行最终强制约束
 
-### Requirement: Receipts and invoices do not implement matching, payment, upload, or AI workflows
-The system SHALL keep this change focused on receipt and invoice registration and SHALL NOT create downstream matching, payment, object storage, or AI-generated decisions.
+### Requirement: 收货和发票不实现匹配、付款、上传或 AI 流程
+系统 SHALL 将本 change 聚焦在收货和发票登记，并且 SHALL NOT 创建下游匹配、付款、对象存储或 AI 生成决策。
 
-#### Scenario: Receipt creation does not create matching records
-- **WHEN** a receipt is created for a purchase order
-- **THEN** the system MUST NOT create three-way matching results, matching difference items, matching exceptions, payment records, RabbitMQ events, or AI recommendations
-- **AND** the receipt MUST remain available as input for a later three-way matching slice
+#### Scenario: 收货创建不创建匹配记录
+- **WHEN** 为采购订单创建收货
+- **THEN** 系统 MUST NOT 创建三单匹配结果、匹配差异项、匹配异常、付款记录、RabbitMQ events 或 AI 建议
+- **AND** 收货 MUST 保持为后续三单匹配切片的输入
 
-#### Scenario: Invoice creation does not create matching records
-- **WHEN** an invoice is created for a purchase order
-- **THEN** the system MUST NOT create three-way matching results, matching difference items, matching exceptions, payment records, RabbitMQ events, or AI recommendations
-- **AND** the invoice MUST remain available as input for a later three-way matching slice
+#### Scenario: 发票创建不创建匹配记录
+- **WHEN** 为采购订单创建发票
+- **THEN** 系统 MUST NOT 创建三单匹配结果、匹配差异项、匹配异常、付款记录、RabbitMQ events 或 AI 建议
+- **AND** 发票 MUST 保持为后续三单匹配切片的输入
 
-#### Scenario: Receipt and invoice workflow does not require deferred infrastructure
-- **WHEN** a developer runs the receipt and invoice workflow in the MVP local environment
-- **THEN** the workflow MUST use MySQL and synchronous service calls
-- **AND** it MUST NOT require Redis, RabbitMQ, MongoDB, MinIO, Prometheus, Grafana, Jaeger, Zipkin, Keycloak, or DeepSeek
+#### Scenario: 收货和发票流程不需要延期基础设施
+- **WHEN** 开发者在 MVP 本地环境中运行收货和发票流程
+- **THEN** 流程 MUST 使用 MySQL 和同步 service 调用
+- **AND** 它 MUST NOT 需要 Redis、RabbitMQ、MongoDB、MinIO、Prometheus、Grafana、Jaeger、Zipkin、Keycloak 或 DeepSeek

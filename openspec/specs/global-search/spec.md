@@ -1,122 +1,122 @@
-# global-search Specification
+# global-search 规格
 
 ## Purpose
 
-Provide a read-only global locator for procurement business objects and shared reference data across the MVP workspace while preserving company data isolation.
+为 MVP 工作台中的采购业务对象和共享参考数据提供只读全局定位能力，覆盖跨模块搜索、键盘入口、结果导航和后端查询边界，同时保留公司数据隔离与集团共享数据语义。
 
 ## Requirements
 
-### Requirement: Global search exposes a read-only procurement search API
-The system SHALL provide a read-only global search API that returns matching procurement business objects and shared reference data for the current demo company context.
+### Requirement: 全局搜索暴露只读采购搜索 API
+系统 SHALL 提供只读全局搜索 API，为当前演示公司上下文返回匹配的采购业务对象和共享参考数据。
 
-#### Scenario: Search current company procurement objects
-- **WHEN** a caller requests `GET /api/global-search?companyId=company-digital&query=PO-20260518`
-- **THEN** the response MUST include matching company-owned purchase orders, receipts, invoices, and three-way matching records for `company-digital`
-- **AND** the response MUST NOT include procurement transaction records owned by `company-manufacturing`
+#### Scenario: 搜索当前公司的采购对象
+- **WHEN** 调用方请求 `GET /api/global-search?companyId=company-digital&query=PO-20260518`
+- **THEN** 响应 MUST 包含 `company-digital` 下匹配的公司归属采购订单、收货、发票和三单匹配记录
+- **AND** 响应 MUST NOT 包含属于 `company-manufacturing` 的采购交易记录
 
-#### Scenario: Search group shared supplier pool
-- **WHEN** a caller searches for a supplier name such as `上海云舟`
-- **THEN** the response MUST include matching suppliers from the group shared supplier pool
-- **AND** the supplier results MUST be marked as group shared reference data rather than company-owned transaction data
+#### Scenario: 搜索集团共享供应商池
+- **WHEN** 调用方搜索供应商名称，例如 `上海云舟`
+- **THEN** 响应 MUST 包含来自集团共享供应商池的匹配供应商
+- **AND** 供应商结果 MUST 标记为集团共享参考数据，而不是公司归属交易数据
 
-#### Scenario: Search with no useful query
-- **WHEN** a caller submits an empty query or a query that is too short to search reliably
-- **THEN** the API MUST return a successful empty result set with the normalized query and generated timestamp
-- **AND** the API MUST NOT return frontend static demo results or mutate any business record
+#### Scenario: 搜索没有有效查询词
+- **WHEN** 调用方提交空查询或过短而无法可靠搜索的查询
+- **THEN** API MUST 返回成功的空结果集，并包含规范化查询和生成时间戳
+- **AND** API MUST NOT 返回前端静态演示结果或变更任何业务记录
 
-#### Scenario: Reject unknown company context
-- **WHEN** a caller requests global search with an unknown `companyId`
-- **THEN** the system MUST reject the request with a client-visible 4xx error
-- **AND** the system MUST NOT fall back to the active demo company
+#### Scenario: 拒绝未知公司上下文
+- **WHEN** 调用方使用未知 `companyId` 请求全局搜索
+- **THEN** 系统 MUST 以客户端可见的 4xx 错误拒绝请求
+- **AND** 系统 MUST NOT 回退到活跃演示公司
 
-### Requirement: Search results are grouped, contextual, and ranked for business lookup
-The global search response SHALL group results by business type and provide enough context for a user to distinguish similar procurement objects.
+### Requirement: 搜索结果按业务查找需要分组、带上下文并排序
+全局搜索响应 SHALL 按业务类型分组结果，并提供足够上下文，帮助用户区分相似采购对象。
 
-#### Scenario: Return grouped result payload
-- **WHEN** global search finds results across purchase requests, RFQs, purchase orders, and suppliers
-- **THEN** the response MUST group results by stable result type
-- **AND** each result MUST include a stable identifier, display title, result type, status or state label when available, matched fields, and navigation target
+#### Scenario: 返回分组结果载荷
+- **WHEN** 全局搜索在采购申请、RFQ、采购订单和供应商中找到结果
+- **THEN** 响应 MUST 按稳定结果类型分组结果
+- **AND** 每个结果 MUST 包含稳定标识、展示标题、结果类型、可用时的状态或阶段标签、匹配字段和导航目标
 
-#### Scenario: Include business context in transaction results
-- **WHEN** a transaction result is returned for a purchase request, RFQ, purchase order, receipt, invoice, or matching record
-- **THEN** the result MUST include the owning company identifier and company name
-- **AND** it SHOULD include supplier, amount, currency, status, and relevant source document identifiers when those fields exist
+#### Scenario: 交易结果包含业务上下文
+- **WHEN** 返回采购申请、RFQ、采购订单、收货、发票或匹配记录的交易结果
+- **THEN** 结果 MUST 包含归属公司标识和公司名称
+- **AND** 当这些字段存在时，结果 SHOULD 包含供应商、金额、币种、状态和相关来源单据标识
 
-#### Scenario: Rank exact identifier matches first
-- **WHEN** a query exactly matches or strongly prefixes a business identifier such as `PR-`, `RFQ-`, `PO-`, an invoice number, or a matching identifier
-- **THEN** exact or prefix identifier matches MUST appear before broader title, supplier, or note matches within the same result type
+#### Scenario: 精确标识匹配优先排序
+- **WHEN** 查询精确匹配或强前缀匹配业务标识，例如 `PR-`、`RFQ-`、`PO-`、发票号或匹配标识
+- **THEN** 在同一结果类型内，精确或前缀标识匹配 MUST 排在更宽泛的标题、供应商或备注匹配之前
 
-### Requirement: Global search respects company isolation and shared data boundaries
-The system SHALL preserve the existing Fox Procureflow data ownership model while searching across modules.
+### Requirement: 全局搜索遵守公司隔离和共享数据边界
+系统 SHALL 在跨模块搜索时保留现有 Fox Procureflow 数据归属模型。
 
-#### Scenario: Transaction results remain company scoped
-- **WHEN** the current search company is `company-digital`
-- **THEN** purchase requests, approvals, RFQs, purchase orders, receipts, invoices, and three-way matching results MUST be limited to records whose `companyId` is `company-digital`
-- **AND** the response MUST NOT reveal titles, identifiers, amounts, suppliers, or statuses for `company-manufacturing` transaction records
+#### Scenario: 交易结果保持公司级隔离
+- **WHEN** 当前搜索公司是 `company-digital`
+- **THEN** 采购申请、审批、RFQ、采购订单、收货、发票和三单匹配结果 MUST 限定为 `companyId` 为 `company-digital` 的记录
+- **AND** 响应 MUST NOT 泄露 `company-manufacturing` 交易记录的标题、标识、金额、供应商或状态
 
-#### Scenario: Company-scoped master data remains company scoped
-- **WHEN** global search returns departments, users, or budget accounts
-- **THEN** those results MUST be limited to the selected company where the underlying master data is company-owned
-- **AND** procurement categories and suppliers MAY be returned as group shared reference data
+#### Scenario: 公司级主数据保持公司级隔离
+- **WHEN** 全局搜索返回部门、用户或预算科目
+- **THEN** 对底层主数据归属公司的对象，结果 MUST 限定在所选公司内
+- **AND** 采购品类和供应商 MAY 作为集团共享参考数据返回
 
-#### Scenario: Search does not change procurement state
-- **WHEN** a user performs global search or opens a search result
-- **THEN** the system MUST NOT create, update, approve, reject, publish, cancel, receive, invoice, recalculate, resolve, upload, or delete any procurement business record
+#### Scenario: 搜索不改变采购状态
+- **WHEN** 用户执行全局搜索或打开搜索结果
+- **THEN** 系统 MUST NOT 创建、更新、通过、驳回、发布、取消、收货、开票、重算、解决、上传或删除任何采购业务记录
 
-### Requirement: Frontend provides a command-palette global search experience
-The frontend SHALL turn the topbar search icon into a command-palette style global search dialog for finding procurement objects quickly.
+### Requirement: 前端提供 command-palette 风格全局搜索体验
+前端 SHALL 将 topbar 搜索图标变成 command-palette 风格的全局搜索对话框，用于快速查找采购对象。
 
-#### Scenario: Open search from the topbar
-- **WHEN** a user clicks the topbar search button
-- **THEN** the frontend MUST open a search dialog with a focused search input
-- **AND** the dialog MUST be available from the existing Fox Procureflow workspace shell without disrupting the current page
+#### Scenario: 从 topbar 打开搜索
+- **WHEN** 用户点击 topbar 搜索按钮
+- **THEN** 前端 MUST 打开带聚焦搜索输入框的搜索对话框
+- **AND** 对话框 MUST 可从现有 Fox Procureflow 工作台外壳打开，且不打断当前页面
 
-#### Scenario: Open search with keyboard shortcut
-- **WHEN** a user presses `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux while focused in the workspace
-- **THEN** the frontend MUST open the same global search dialog
-- **AND** pressing `Esc` MUST close the dialog without changing the current route
+#### Scenario: 使用键盘快捷键打开搜索
+- **WHEN** 用户在工作台聚焦时按下 macOS 上的 `Cmd+K` 或 Windows/Linux 上的 `Ctrl+K`
+- **THEN** 前端 MUST 打开同一个全局搜索对话框
+- **AND** 按下 `Esc` MUST 关闭对话框且不改变当前路由
 
-#### Scenario: Search and display backend results
-- **WHEN** a user enters a query for a known `PR`, `RFQ`, `PO`, supplier, invoice number, or matching exception
-- **THEN** the frontend MUST call the global search API using the current company context
-- **AND** it MUST render loading, results, empty, and error states without using static mock search data
+#### Scenario: 搜索并展示后端结果
+- **WHEN** 用户输入已知 `PR`、`RFQ`、`PO`、供应商、发票号或匹配异常的查询
+- **THEN** 前端 MUST 使用当前公司上下文调用全局搜索 API
+- **AND** 它 MUST 渲染 loading、results、empty 和 error 状态，且不使用静态 mock 搜索数据
 
-#### Scenario: Navigate search results with keyboard
-- **WHEN** search results are visible
-- **THEN** the user MUST be able to move selection through results with the keyboard and open the selected result with Enter
-- **AND** the selected result MUST be visually distinguishable from other results
+#### Scenario: 用键盘导航搜索结果
+- **WHEN** 搜索结果可见
+- **THEN** 用户 MUST 能够用键盘在结果中移动选择，并用 Enter 打开选中结果
+- **AND** 选中结果 MUST 与其他结果有清晰视觉区分
 
-### Requirement: Search results navigate to the owning workspace and target detail
-The frontend SHALL route each search result to the appropriate existing workspace and open or locate the matching business object when possible.
+### Requirement: 搜索结果导航到归属工作台和目标详情
+前端 SHALL 将每个搜索结果路由到合适的现有工作台，并尽可能打开或定位匹配业务对象。
 
-#### Scenario: Open purchase request result
-- **WHEN** a user opens a purchase request result from global search
-- **THEN** the frontend MUST navigate to `/purchase-requests` with a stable target parameter for the selected request
-- **AND** the purchase request workspace MUST open or select the matching request detail when the record is available
+#### Scenario: 打开采购申请结果
+- **WHEN** 用户从全局搜索打开采购申请结果
+- **THEN** 前端 MUST 导航到 `/purchase-requests`，并携带所选申请的稳定 target 参数
+- **AND** 当记录可用时，采购申请工作台 MUST 打开或选中匹配申请详情
 
-#### Scenario: Open RFQ or purchase order result
-- **WHEN** a user opens an RFQ or purchase order result from global search
-- **THEN** the frontend MUST navigate to `/rfqs` or `/purchase-orders` with a stable target parameter
-- **AND** the target workspace MUST open or select the matching detail when the record is available
+#### Scenario: 打开 RFQ 或采购订单结果
+- **WHEN** 用户从全局搜索打开 RFQ 或采购订单结果
+- **THEN** 前端 MUST 导航到 `/rfqs` 或 `/purchase-orders`，并携带稳定 target 参数
+- **AND** 当记录可用时，目标工作台 MUST 打开或选中匹配详情
 
-#### Scenario: Open receipt, invoice, or matching result
-- **WHEN** a user opens a receipt, invoice, PO fulfillment, or three-way matching result from global search
-- **THEN** the frontend MUST navigate to `/receipts-invoices` or `/three-way-matching` with a stable target parameter
-- **AND** the target workspace MUST open or select the related PO or matching detail when the record is available
+#### Scenario: 打开收货、发票或匹配结果
+- **WHEN** 用户从全局搜索打开收货、发票、PO 履约或三单匹配结果
+- **THEN** 前端 MUST 导航到 `/receipts-invoices` 或 `/three-way-matching`，并携带稳定 target 参数
+- **AND** 当记录可用时，目标工作台 MUST 打开或选中相关 PO 或匹配详情
 
-#### Scenario: Open supplier or master data result
-- **WHEN** a user opens a supplier or master data result from global search
-- **THEN** the frontend MUST navigate to `/suppliers` or `/master-data` as appropriate
-- **AND** supplier results MUST open or select the matching read-only supplier detail when the supplier is available
+#### Scenario: 打开供应商或主数据结果
+- **WHEN** 用户从全局搜索打开供应商或主数据结果
+- **THEN** 前端 MUST 按需导航到 `/suppliers` 或 `/master-data`
+- **AND** 当供应商可用时，供应商结果 MUST 打开或选中匹配的只读供应商详情
 
-### Requirement: Global search is documented and avoids deferred infrastructure
-The global search capability SHALL be documented and runnable in the MVP local environment without deferred infrastructure or AI services.
+### Requirement: 全局搜索已文档化并避免延期基础设施
+全局搜索能力 SHALL 被文档化，并可在 MVP 本地环境中运行，无需延期基础设施或 AI 服务。
 
-#### Scenario: Swagger documents global search endpoint
-- **WHEN** a developer opens Swagger UI or requests `/v3/api-docs`
-- **THEN** the API documentation MUST include the global search endpoint, query parameters, company context, result types, and response shape
+#### Scenario: Swagger 记录全局搜索端点
+- **WHEN** 开发者打开 Swagger UI 或请求 `/v3/api-docs`
+- **THEN** API 文档 MUST 包含全局搜索端点、查询参数、公司上下文、结果类型和响应结构
 
-#### Scenario: Search runs without external search infrastructure
-- **WHEN** a developer runs global search in the MVP local environment
-- **THEN** the search capability MUST use existing MySQL-backed data and synchronous request handling
-- **AND** it MUST NOT require Elasticsearch, Redis, RabbitMQ, MongoDB, MinIO, Prometheus, Grafana, Jaeger, Zipkin, Keycloak, DeepSeek, or another AI service
+#### Scenario: 搜索不依赖外部搜索基础设施
+- **WHEN** 开发者在 MVP 本地环境中运行全局搜索
+- **THEN** 搜索能力 MUST 使用现有 MySQL-backed 数据和同步请求处理
+- **AND** 它 MUST NOT 需要 Elasticsearch、Redis、RabbitMQ、MongoDB、MinIO、Prometheus、Grafana、Jaeger、Zipkin、Keycloak、DeepSeek 或其他 AI 服务
