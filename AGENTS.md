@@ -1,33 +1,31 @@
 # AGENTS.md
 
-## 文档查询
+## 文档与规范
 
-当用户询问库、框架、SDK、API、CLI 工具或云服务时，使用 Context7 MCP 获取当前文档。这包括 API 语法、配置、版本迁移、库特定调试、安装说明和 CLI 用法。
-
-不要将 Context7 用于重构、从零编写脚本、调试业务逻辑、代码审查或一般编程概念说明。
-
-## 仓库约定
-
-- 面向人的非结构化项目文档默认使用中文。技术标识、路径、环境变量、服务名、代码级命名和第三方产品名保持原文。
+- 用户询问库、框架、SDK、API、CLI 工具或云服务时，使用 Context7 MCP 获取当前文档；不要用于重构、业务逻辑调试、代码审查或一般编程概念。
+- 面向人的非结构化项目文档默认使用中文；技术标识、路径、环境变量、服务名、代码命名和第三方产品名保持原文。
 - 创建 commit 时使用 Conventional Commits。
 - 产品上下文、MVP 边界、roadmap 顺序和 OpenSpec artifact 规则以 `openspec/config.yaml` 和 `docs/mvp/roadmap.md` 为准。
 
 ## 本地开发
 
 - Docker 运行数据库、中间件和对象存储；React 前端和 Java 后端在宿主机运行。
-- 前端 Vite/Vitest 工具链需要 Node.js `>=20.19` 或 `>=22.12`；如果本机默认 `node -v` 是 `20.11.x`，`npm run dev` 会因 `node:util.styleText` 缺失而导致页面无法打开。先切到满足版本的 Node，再启动前端。
-- 本机 Java 21 通过 Homebrew `openjdk@21` 提供；运行 Gradle 或后端前若 shell 找不到 Java，使用 `JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"`，并把 `$(brew --prefix openjdk@21)/bin` 放到 `PATH` 前面。
-- 在默认本地端口启动服务前，先检查并停止旧的 `8080` 后端进程和 `5173` 前端进程，再启动当前代码。
-- 交付、commit 或结束一轮需要用户继续试用页面的工作前，不要只留下当前终端会话里的 `./gradlew bootRun` 或 `npm run dev`。这类临时进程会在工具会话结束、被清理或中断后消失，导致前端还在但后端 `8080` 不可用。
-- 如果工作中为了验证临时停止或重启过 `8080`/`5173`，收尾时必须用 `./scripts/launch.sh --detach` 恢复由 launchctl/后台脚本托管的前后端，并运行 `./scripts/smoke-check.sh` 确认 `8080`、`5173`、Swagger 和核心只读 API 全部可用。
-- 若用户只要求代码修改、不需要保持本地服务运行，可以在最终回复里明确说明服务已停止或未启动；否则默认保持 demo 服务可用。
+- 前端需 Node.js `>=20.19` 或 `>=22.12`；本机默认 Node 不满足时先切版本再运行 Vite/Vitest。
+- Java 21 来自 Homebrew `openjdk@21`；必要时使用 `JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"`，并把 `$(brew --prefix openjdk@21)/bin` 放到 `PATH` 前面。
+- 启动默认端口服务前，先清理旧的 `8080` 后端和 `5173` 前端 listener。
+
+## 服务收尾
+
+- 需要用户继续试用页面时，收尾前必须确保 demo 服务可用：运行 `./scripts/launch.sh --detach`，再运行 `./scripts/smoke-check.sh`。
+- 不要把当前终端会话里的 `./gradlew bootRun` 或 `npm run dev` 当成交付后的稳定服务；这类临时进程容易随工具会话结束而消失。
+- 如果用户只要求代码修改且不需要保持服务运行，在最终回复中明确说明服务未启动或已停止。
 
 ## 前端实现约束
 
-- 不要用前端静态 mock 数据掩盖空列表。优先使用 Flyway seed 数据、后端 API 或真实业务流程。
-- 采购执行类列表页应提供足够真实的演示数据，通常至少 3 条来自后端的数据，并覆盖不同状态。
-- 详情页或抽屉里的禁用按钮应提供 tooltip，说明具体禁用原因。
-- 详情页或抽屉存在未保存的可编辑输入时，关闭、切换选中行或离开当前编辑对象前应弹出确认。
+- 不用前端静态 mock 数据掩盖空列表；优先使用 Flyway seed、后端 API 或真实业务流程。
+- 采购执行类列表页通常至少展示 3 条后端演示数据，并覆盖不同状态。
+- 详情页或抽屉里的禁用按钮必须提供具体原因 tooltip。
+- 可编辑输入有未保存内容时，关闭、切换选中行或离开当前编辑对象前必须确认。
 
 ## 范围约束
 
