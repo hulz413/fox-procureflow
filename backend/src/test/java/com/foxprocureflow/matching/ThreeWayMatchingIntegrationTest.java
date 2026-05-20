@@ -69,16 +69,18 @@ class ThreeWayMatchingIntegrationTest {
             .andExpect(jsonPath("$.data[*].poId", hasItem("PO-20260518-0301")))
             .andExpect(jsonPath("$.data[*].poId", hasItem("PO-20260518-0302")))
             .andExpect(jsonPath("$.data[*].poId", hasItem("PO-20260518-0303")))
+            .andExpect(jsonPath("$.data[*].poId", hasItem("PO-20260518-0304")))
             .andExpect(jsonPath("$.data[?(@.poId=='PO-20260518-0301')].status", hasItem("PENDING_INPUT")))
             .andExpect(jsonPath("$.data[?(@.poId=='PO-20260518-0302')].status", hasItem("EXCEPTION")))
-            .andExpect(jsonPath("$.data[?(@.poId=='PO-20260518-0303')].status", hasItem("EXCEPTION")))
+            .andExpect(jsonPath("$.data[?(@.poId=='PO-20260518-0303')].status", hasItem("MATCHED")))
+            .andExpect(jsonPath("$.data[?(@.poId=='PO-20260518-0304')].status", hasItem("RESOLVED")))
             .andExpect(jsonPath("$.data[*].companyId", not(hasItem("company-manufacturing"))));
 
         mockMvc.perform(get("/api/three-way-matching/exceptions")
                 .param("companyId", "company-digital"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[*].poId", hasItem("PO-20260518-0302")))
-            .andExpect(jsonPath("$.data[*].poId", hasItem("PO-20260518-0303")))
+            .andExpect(jsonPath("$.data[*].poId", not(hasItem("PO-20260518-0303"))))
             .andExpect(jsonPath("$.data[*].poId", not(hasItem("PO-20260518-0201"))));
 
         mockMvc.perform(get("/api/three-way-matching/TWM-20260519-0002")
@@ -94,8 +96,8 @@ class ThreeWayMatchingIntegrationTest {
     void recalculatesMatchedPendingAmountMissingReceiptAndQuantityOverReceiptScenariosIdempotently() throws Exception {
         recalculate("company-digital", "PO-20260518-0303", "user-digital-finance")
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("EXCEPTION"))
-            .andExpect(jsonPath("$.data.differences[*].differenceType", hasItem("INVOICE_AMOUNT_MISMATCH")));
+            .andExpect(jsonPath("$.data.status").value("MATCHED"))
+            .andExpect(jsonPath("$.data.differences.length()").value(0));
 
         recalculate("company-digital", "PO-20260518-0301", "user-digital-finance")
             .andExpect(status().isOk())

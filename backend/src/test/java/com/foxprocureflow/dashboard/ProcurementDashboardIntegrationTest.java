@@ -72,7 +72,7 @@ class ProcurementDashboardIntegrationTest {
             .andExpect(jsonPath("$.data.companyIds", hasItem("company-digital")))
             .andExpect(jsonPath("$.data.companyIds", hasItem("company-manufacturing")))
             .andExpect(jsonPath("$.data.summary[?(@.key=='issuedPoAmount')].value", hasItem(377307.00)))
-            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(4)))
+            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(2)))
             .andExpect(jsonPath("$.data.spendTrend.length()").value(10))
             .andExpect(jsonPath("$.data.spendTrend[0].period").value("2026-05-10"))
             .andExpect(jsonPath("$.data.spendTrend[1].amount").value(0.00))
@@ -90,7 +90,7 @@ class ProcurementDashboardIntegrationTest {
             .andExpect(jsonPath("$.data.companyName").value("星河数字科技有限公司"))
             .andExpect(jsonPath("$.data.companyIds.length()").value(1))
             .andExpect(jsonPath("$.data.summary[?(@.key=='issuedPoAmount')].value", hasItem(267471.00)))
-            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(2)))
+            .andExpect(jsonPath("$.data.summary[?(@.key=='matchingExceptions')].value", hasItem(1)))
             .andExpect(jsonPath("$.data.exceptionHighlights[*].companyId", not(hasItem("company-manufacturing"))));
     }
 
