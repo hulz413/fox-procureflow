@@ -96,7 +96,7 @@
 .nav-item {
   min-height: 38px;
   display: grid;
-  grid-template-columns: 22px 1fr auto;
+  grid-template-columns: 22px 1fr;
   align-items: center;
   gap: 9px;
   padding: 0 10px;
@@ -114,17 +114,6 @@
 .nav-icon {
   display: inline-flex;
   color: currentColor;
-}
-
-.nav-item strong {
-  min-width: 24px;
-  min-height: 20px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  color: var(--pf-primary);
-  background: #eef5f0;
-  font-size: 11px;
 }
 
 .boundary-note {
@@ -445,6 +434,14 @@ h1 {
   border: 1px solid #cfd9d1;
   border-radius: 8px;
   background: #f8faf7;
+}
+
+.ai-card > .panel-title,
+.ai-action-row > .panel-title {
+  flex: 1;
+  min-height: 38px;
+  padding: 0;
+  border-bottom: 0;
 }
 
 .ai-action-row {
@@ -797,8 +794,24 @@ h1 {
 .app-shell :where(input, select, textarea):focus,
 .app-shell :where(input, select, textarea):focus-visible {
   border-color: var(--pf-primary);
-  outline: 2px solid rgba(47, 122, 77, 0.28);
-  outline-offset: 1px;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(47, 122, 77, 0.14);
+}
+
+.app-shell :where(input, select, textarea):focus-visible {
+  outline: 0;
+}
+
+.app-shell .ant-input:focus,
+.app-shell .ant-input-focused,
+.app-shell .ant-input-affix-wrapper:focus,
+.app-shell .ant-input-affix-wrapper-focused,
+.app-shell .ant-picker-focused,
+.app-shell .ant-input-number-focused,
+.app-shell .ant-select-focused .ant-select-selector {
+  border-color: var(--pf-primary) !important;
+  outline: 0 !important;
+  box-shadow: 0 0 0 3px rgba(47, 122, 77, 0.14) !important;
 }
 
 .user-menu-profile {
@@ -849,11 +862,6 @@ h1 {
   margin-left: auto;
   color: var(--pf-danger);
   background: #f6eeee;
-}
-
-.status-strip .status-pill.online {
-  color: var(--pf-primary);
-  background: var(--pf-primary-soft);
 }
 
 .dashboard-page {
@@ -1294,10 +1302,11 @@ tbody tr:last-child td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.35;
 }
 
 .foundation-table td small {
-  margin-top: 2px;
+  margin-top: 6px;
   color: var(--pf-muted);
 }
 
@@ -1478,8 +1487,8 @@ tbody tr:last-child td {
   min-height: 42px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 12px 12px;
   border-top: 1px solid var(--pf-border);
   color: var(--pf-muted);
@@ -1487,7 +1496,68 @@ tbody tr:last-child td {
   font-weight: 700;
 }
 
-.list-page-button:disabled {
+.list-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.list-pagination-total {
+  white-space: nowrap;
+}
+
+.list-page-button,
+.list-page-number {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.list-page-number {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--pf-text);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.list-page-number:hover,
+.list-page-number:focus-visible,
+.list-page-number.active {
+  border-color: var(--pf-primary);
+  color: var(--pf-primary);
+  background: #f3f8f5;
+  outline: 0;
+}
+
+.list-page-number.active {
+  font-weight: 800;
+}
+
+.list-page-ellipsis {
+  width: 30px;
+  display: inline-flex;
+  justify-content: center;
+  color: var(--pf-muted);
+  letter-spacing: 2px;
+}
+
+.list-page-size {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--pf-border);
+  border-radius: 7px;
+  color: var(--pf-text);
+  background: #fff;
+  white-space: nowrap;
+}
+
+.list-page-button:disabled,
+.list-page-number:disabled {
   cursor: not-allowed;
   opacity: 0.42;
 }
@@ -1555,9 +1625,9 @@ tbody tr:last-child td {
 }
 
 .detail-description {
-  margin: 0 0 12px;
+  margin: 10px 0 16px;
   color: var(--pf-muted);
-  line-height: 1.6;
+  line-height: 1.75;
 }
 
 .request-table strong,
@@ -2314,7 +2384,6 @@ tbody tr:last-child td {
   .brand div:not(.brand-icon),
   .company-card div,
   .nav-item span:nth-child(2),
-  .nav-item strong,
   .boundary-note span {
     display: none;
   }

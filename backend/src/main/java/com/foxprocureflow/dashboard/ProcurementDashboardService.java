@@ -151,15 +151,39 @@ public class ProcurementDashboardService {
 
     private List<SpendTrendPoint> spendTrend(MapSqlParameterSource params) {
         return jdbcTemplate.query("""
-            SELECT DATE_FORMAT(COALESCE(issued_at, updated_at, created_at), '%Y-%m-%d') AS period,
-                   COALESCE(SUM(total_amount), 0) AS amount,
-                   COALESCE(MAX(currency), :defaultCurrency) AS currency,
-                   COUNT(*) AS document_count
-            FROM purchase_orders
-            WHERE company_id IN (:companyIds)
-              AND status = 'ISSUED'
-            GROUP BY period
-            ORDER BY period
+            WITH RECURSIVE trend_bounds AS (
+                SELECT MIN(DATE(COALESCE(issued_at, updated_at, created_at))) AS start_date,
+                       MAX(DATE(COALESCE(issued_at, updated_at, created_at))) AS end_date
+                FROM purchase_orders
+                WHERE company_id IN (:companyIds)
+                  AND status = 'ISSUED'
+            ),
+            trend_dates AS (
+                SELECT start_date AS period_date
+                FROM trend_bounds
+                WHERE start_date IS NOT NULL
+                UNION ALL
+                SELECT DATE_ADD(period_date, INTERVAL 1 DAY)
+                FROM trend_dates
+                JOIN trend_bounds ON trend_dates.period_date < trend_bounds.end_date
+            ),
+            trend_amounts AS (
+                SELECT DATE(COALESCE(issued_at, updated_at, created_at)) AS period_date,
+                       COALESCE(SUM(total_amount), 0) AS amount,
+                       COALESCE(MAX(currency), :defaultCurrency) AS currency,
+                       COUNT(*) AS document_count
+                FROM purchase_orders
+                WHERE company_id IN (:companyIds)
+                  AND status = 'ISSUED'
+                GROUP BY period_date
+            )
+            SELECT DATE_FORMAT(trend_dates.period_date, '%Y-%m-%d') AS period,
+                   COALESCE(trend_amounts.amount, 0) AS amount,
+                   COALESCE(trend_amounts.currency, :defaultCurrency) AS currency,
+                   COALESCE(trend_amounts.document_count, 0) AS document_count
+            FROM trend_dates
+            LEFT JOIN trend_amounts ON trend_amounts.period_date = trend_dates.period_date
+            ORDER BY trend_dates.period_date
             """,
             withDefaultCurrency(params),
             (rs, rowNum) -> new SpendTrendPoint(

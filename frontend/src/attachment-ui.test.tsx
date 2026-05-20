@@ -275,6 +275,13 @@ describe('attachment UI', () => {
     expect(screen.getByText('办公耗材采购订单')).toBeInTheDocument()
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/api/global-search?companyId=company-digital&query=PO')
 
+    expect(screen.getByRole('button', { name: /移动工作站采购订单/ })).not.toHaveClass('active')
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /移动工作站采购订单/ })).toHaveClass('active')
+    })
+
     fireEvent.keyDown(input, { key: 'ArrowDown' })
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /办公耗材采购订单/ })).toHaveClass('active')

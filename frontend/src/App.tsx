@@ -1505,7 +1505,9 @@ export const localizedContent = {
       label: '列表分页',
       previous: '上一页',
       next: '下一页',
-      summary: '第 {current}/{total} 页 · 每页 {pageSize} 条',
+      page: '第 {page} 页',
+      pageSize: '{pageSize} 条/页',
+      total: '共 {totalItems} 条',
     },
     globalSearch: {
       title: '全局搜索',
@@ -2196,7 +2198,9 @@ export const localizedContent = {
       label: 'List pagination',
       previous: 'Previous page',
       next: 'Next page',
-      summary: 'Page {current}/{total} · {pageSize} per page',
+      page: 'Page {page}',
+      pageSize: '{pageSize}/page',
+      total: '{totalItems} total',
     },
     globalSearch: {
       title: 'Global Search',
@@ -2904,7 +2908,9 @@ function Workspace({
   const [dashboardScopeValue, setDashboardScopeValue] = useState<ProcurementDashboardScopeValue>('GROUP')
   const [isNotificationOpen, setNotificationOpen] = useState(false)
   const [isGlobalSearchOpen, setGlobalSearchOpen] = useState(false)
+  const [isSearchTooltipOpen, setSearchTooltipOpen] = useState(false)
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([])
+  const searchButtonRef = useRef<HTMLButtonElement>(null)
   const [modal, modalContextHolder] = Modal.useModal()
   const resetDemoDataMutation = useMutation({
     mutationFn: resetDemoData,
@@ -2970,18 +2976,6 @@ function Workspace({
     enabled: selectedCompanyId.length > 0,
     retry: 1,
   })
-  const fulfillmentPurchaseOrdersQuery = useQuery({
-    queryKey: ['receipts-invoices', 'purchase-orders', selectedCompanyId],
-    queryFn: () => fetchFulfillmentPurchaseOrders(selectedCompanyId),
-    enabled: selectedCompanyId.length > 0,
-    retry: 1,
-  })
-  const threeWayMatchesQuery = useQuery({
-    queryKey: ['three-way-matching', selectedCompanyId],
-    queryFn: () => fetchThreeWayMatches(selectedCompanyId),
-    enabled: selectedCompanyId.length > 0,
-    retry: 1,
-  })
   const dashboardScope: ProcurementDashboardScope = dashboardScopeValue === 'GROUP' ? 'GROUP' : 'COMPANY'
   const dashboardCompanyId = dashboardScope === 'COMPANY' ? dashboardScopeValue : undefined
   const procurementDashboardQuery = useQuery({
@@ -3014,33 +3008,6 @@ function Workspace({
   const budgetAccounts = budgetAccountsQuery.data?.data ?? []
   const rfqs = rfqsQuery.data?.data ?? []
   const purchaseOrders = purchaseOrdersQuery.data?.data ?? []
-  const fulfillmentPurchaseOrders = fulfillmentPurchaseOrdersQuery.data?.data ?? []
-  const threeWayMatches = threeWayMatchesQuery.data?.data ?? []
-  const activeApprovalCount = purchaseRequests.filter((request) => request.approval?.status === 'IN_PROGRESS').length
-  const masterDataCount =
-    companies.length +
-    departments.length +
-    users.length +
-    suppliers.length +
-    categories.length +
-    budgetAccounts.length
-  const dashboardNavCount =
-    purchaseRequests.length +
-    rfqs.length +
-    purchaseOrders.length +
-    fulfillmentPurchaseOrders.length +
-    threeWayMatches.length
-  const navCounts = new Map<string, number>([
-    ['/', dashboardNavCount],
-    ['/purchase-requests', purchaseRequests.length],
-    ['/approvals', activeApprovalCount],
-    ['/rfqs', rfqs.length],
-    ['/purchase-orders', purchaseOrders.length],
-    ['/receipts-invoices', fulfillmentPurchaseOrders.length],
-    ['/three-way-matching', threeWayMatches.length],
-    ['/suppliers', suppliers.length],
-    ['/master-data', masterDataCount],
-  ])
   const foundationLoading =
     masterContextQuery.isLoading ||
     companiesQuery.isLoading ||
@@ -3253,7 +3220,7 @@ function Workspace({
     const handleGlobalSearchShortcut = (event: globalThis.KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
-        setGlobalSearchOpen(true)
+        openGlobalSearch()
       }
     }
 
@@ -3286,8 +3253,27 @@ function Workspace({
     navigate(notification.path)
   }
 
+  const dismissSearchTooltip = () => {
+    setSearchTooltipOpen(false)
+    searchButtonRef.current?.blur()
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  }
+
+  const openGlobalSearch = () => {
+    dismissSearchTooltip()
+    setGlobalSearchOpen(true)
+  }
+
+  const closeGlobalSearch = () => {
+    dismissSearchTooltip()
+    setGlobalSearchOpen(false)
+  }
+
   const openGlobalSearchResult = (result: GlobalSearchResult) => {
     const params = new URLSearchParams(result.targetParams)
+    dismissSearchTooltip()
     setCreateDrawerOpen(false)
     setRfqCreateDrawerOpen(false)
     setPoCreateDrawerOpen(false)
@@ -3303,7 +3289,7 @@ function Workspace({
         companyId={selectedCompanyId}
         language={language}
         messages={messages}
-        onClose={() => setGlobalSearchOpen(false)}
+        onClose={closeGlobalSearch}
         onOpenResult={openGlobalSearchResult}
         open={isGlobalSearchOpen}
       />
@@ -3328,22 +3314,17 @@ function Workspace({
         </div>
 
         <nav className="nav-list" aria-label={messages.aria.modules}>
-          {messages.navItems.map((item) => {
-            const count = navCounts.get(item.path) ?? 0
-
-            return (
-              <NavLink
-                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-                end={item.path === '/'}
-                key={item.label}
-                to={item.path}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                <span>{item.label}</span>
-                <strong aria-label={`${item.label} ${count}`}>{count}</strong>
-              </NavLink>
-            )
-          })}
+          {messages.navItems.map((item) => (
+            <NavLink
+              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+              end={item.path === '/'}
+              key={item.label}
+              to={item.path}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         <div className="boundary-note">
@@ -3376,12 +3357,18 @@ function Workspace({
             </h1>
           </div>
           <div className={isFoundationRoute || isSupplierPoolRoute ? 'top-actions compact' : 'top-actions'}>
-            <Tooltip title={messages.aria.search} trigger={['hover', 'focus']}>
+            <Tooltip
+              open={isSearchTooltipOpen && !isGlobalSearchOpen}
+              onOpenChange={(open) => setSearchTooltipOpen(open && !isGlobalSearchOpen)}
+              title={messages.aria.search}
+              trigger={['hover', 'focus']}
+            >
               <button
                 type="button"
                 className="icon-button"
                 aria-label={messages.globalSearch.open}
-                onClick={() => setGlobalSearchOpen(true)}
+                onClick={openGlobalSearch}
+                ref={searchButtonRef}
               >
                 <SearchOutlined />
               </button>
@@ -9103,6 +9090,7 @@ function FoundationDataView({
                   <tr key={supplier.supplierId}>
                     <td>
                       <strong>{supplier.supplierName}</strong>
+                      <small>{supplier.supplierId}</small>
                     </td>
                     <td>{supplier.serviceScope}</td>
                     <td>{supplier.location}</td>
@@ -9244,7 +9232,7 @@ export function GlobalSearchDialog({
   open: boolean
 }) {
   const [query, setQuery] = useState('')
-  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const normalizedQuery = query.trim()
   const canSearch = open && companyId.length > 0 && normalizedQuery.length >= 2
@@ -9270,17 +9258,17 @@ export function GlobalSearchDialog({
   }, [open])
 
   useEffect(() => {
-    setSelectedIndex(0)
+    setSelectedIndex(null)
   }, [normalizedQuery, open])
 
   useEffect(() => {
-    if (selectedIndex >= flattenedResults.length) {
-      setSelectedIndex(Math.max(flattenedResults.length - 1, 0))
+    if (selectedIndex !== null && selectedIndex >= flattenedResults.length) {
+      setSelectedIndex(flattenedResults.length > 0 ? flattenedResults.length - 1 : null)
     }
   }, [flattenedResults.length, selectedIndex])
 
   const openSelectedResult = () => {
-    const result = flattenedResults[selectedIndex]
+    const result = selectedIndex === null ? null : flattenedResults[selectedIndex]
     if (result) {
       onOpenResult(result)
     }
@@ -9299,13 +9287,17 @@ export function GlobalSearchDialog({
 
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setSelectedIndex((current) => (current + 1) % flattenedResults.length)
+      setSelectedIndex((current) => (current === null ? 0 : (current + 1) % flattenedResults.length))
       return
     }
 
     if (event.key === 'ArrowUp') {
       event.preventDefault()
-      setSelectedIndex((current) => (current - 1 + flattenedResults.length) % flattenedResults.length)
+      setSelectedIndex((current) =>
+        current === null
+          ? flattenedResults.length - 1
+          : (current - 1 + flattenedResults.length) % flattenedResults.length,
+      )
       return
     }
 
@@ -9317,9 +9309,11 @@ export function GlobalSearchDialog({
 
   return (
     <Modal
+      centered
       className="global-search-modal"
       destroyOnClose={false}
       footer={null}
+      mousePosition={open ? getViewportCenter() : undefined}
       onCancel={onClose}
       open={open}
       title={null}
@@ -9365,14 +9359,16 @@ export function GlobalSearchDialog({
                 </div>
                 {group.results.map((result, index) => {
                   const globalIndex = start + index
-                  const isSelected = globalIndex === selectedIndex
+                  const isSelected = selectedIndex !== null && globalIndex === selectedIndex
 
                   return (
                     <button
                       aria-label={`${messages.globalSearch.openResult}: ${result.title}`}
                       className={isSelected ? 'global-search-result active' : 'global-search-result'}
                       key={`${result.type}-${result.id}`}
+                      onFocus={() => setSelectedIndex(globalIndex)}
                       onClick={() => onOpenResult(result)}
+                      onMouseEnter={() => setSelectedIndex(globalIndex)}
                       type="button"
                     >
                       <span className="global-search-result-icon">
@@ -9496,36 +9492,87 @@ function ListPagination({
     return null
   }
 
-  const summary = messages.pagination.summary
-    .replace('{current}', String(currentPage))
-    .replace('{total}', String(totalPages))
-    .replace('{pageSize}', String(pageSize))
+  const pageItems =
+    totalPages <= 7
+      ? Array.from({ length: totalPages }, (_item, index) => index + 1)
+      : compactPaginationItems(currentPage, totalPages)
+  const totalText = messages.pagination.total.replace('{totalItems}', String(totalItems))
+  const pageSizeText = messages.pagination.pageSize.replace('{pageSize}', String(pageSize))
 
   return (
     <nav aria-label={messages.pagination.label} className="list-pagination">
-      <button
-        aria-label={messages.pagination.previous}
-        className="icon-button list-page-button"
-        disabled={currentPage <= 1}
-        onClick={() => onPageChange(currentPage - 1)}
-        title={messages.pagination.previous}
-        type="button"
-      >
-        <LeftOutlined />
-      </button>
-      <span>{summary}</span>
-      <button
-        aria-label={messages.pagination.next}
-        className="icon-button list-page-button"
-        disabled={currentPage >= totalPages}
-        onClick={() => onPageChange(currentPage + 1)}
-        title={messages.pagination.next}
-        type="button"
-      >
-        <RightOutlined />
-      </button>
+      <span className="list-pagination-total">{totalText}</span>
+      <div className="list-pagination-controls">
+        <button
+          aria-label={messages.pagination.previous}
+          className="icon-button list-page-button"
+          disabled={currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          title={messages.pagination.previous}
+          type="button"
+        >
+          <LeftOutlined />
+        </button>
+        {pageItems.map((item) =>
+          typeof item === 'number' ? (
+            <button
+              aria-label={messages.pagination.page.replace('{page}', String(item))}
+              className={item === currentPage ? 'list-page-number active' : 'list-page-number'}
+              key={item}
+              onClick={() => onPageChange(item)}
+              type="button"
+            >
+              {item}
+            </button>
+          ) : (
+            <span aria-hidden="true" className="list-page-ellipsis" key={item}>
+              ...
+            </span>
+          ),
+        )}
+        <button
+          aria-label={messages.pagination.next}
+          className="icon-button list-page-button"
+          disabled={currentPage >= totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          title={messages.pagination.next}
+          type="button"
+        >
+          <RightOutlined />
+        </button>
+        <span className="list-page-size">{pageSizeText}</span>
+      </div>
     </nav>
   )
+}
+
+function compactPaginationItems(currentPage: number, totalPages: number) {
+  const pageSet = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
+
+  if (currentPage <= 3) {
+    pageSet.add(2)
+    pageSet.add(3)
+    pageSet.add(4)
+  }
+
+  if (currentPage >= totalPages - 2) {
+    pageSet.add(totalPages - 3)
+    pageSet.add(totalPages - 2)
+    pageSet.add(totalPages - 1)
+  }
+
+  const pages = Array.from(pageSet)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((left, right) => left - right)
+
+  return pages.reduce<Array<number | string>>((items, page, index) => {
+    const previousPage = pages[index - 1]
+    if (previousPage && page - previousPage > 1) {
+      items.push(`ellipsis-${previousPage}-${page}`)
+    }
+    items.push(page)
+    return items
+  }, [])
 }
 
 function StatusPill({
@@ -9538,10 +9585,13 @@ function StatusPill({
   label: string
 }) {
   const state = isError ? 'OFFLINE' : status
+  if (state === 'UP' || state === 'CHECKING') {
+    return null
+  }
 
   return (
-    <span className={state === 'UP' ? 'status-pill online' : 'status-pill'}>
-      <CheckCircleOutlined />
+    <span className="status-pill">
+      <AlertOutlined />
       {label} {state}
     </span>
   )
