@@ -46,6 +46,74 @@ const DEFAULT_LIST_PAGE_SIZE = 10
 
 type Language = 'zh' | 'en'
 
+type DemoPersonaKey = 'applicant' | 'approver' | 'procurement' | 'warehouse' | 'finance' | 'admin'
+
+type DemoPersona = {
+  allowedPaths: string[]
+  defaultPath: string
+  key: DemoPersonaKey
+  preferredUserIds: string[]
+  roleIds: string[]
+}
+
+const businessNavPaths = [
+  '/',
+  '/purchase-requests',
+  '/approvals',
+  '/rfqs',
+  '/purchase-orders',
+  '/receipts-invoices',
+  '/three-way-matching',
+  '/suppliers',
+]
+
+const demoPersonaMenuOrder: DemoPersonaKey[] = ['admin', 'applicant', 'approver', 'procurement', 'warehouse', 'finance']
+
+const demoPersonas: DemoPersona[] = [
+  {
+    allowedPaths: ['/', '/purchase-requests', '/suppliers'],
+    defaultPath: '/purchase-requests',
+    key: 'applicant',
+    preferredUserIds: ['user-digital-applicant', 'user-mfg-applicant'],
+    roleIds: ['role-applicant'],
+  },
+  {
+    allowedPaths: ['/', '/approvals', '/purchase-requests'],
+    defaultPath: '/approvals',
+    key: 'approver',
+    preferredUserIds: ['user-digital-approver', 'user-mfg-approver'],
+    roleIds: ['role-approver'],
+  },
+  {
+    allowedPaths: ['/', '/purchase-requests', '/rfqs', '/purchase-orders', '/suppliers'],
+    defaultPath: '/rfqs',
+    key: 'procurement',
+    preferredUserIds: ['user-digital-buyer', 'user-mfg-buyer'],
+    roleIds: ['role-procurement'],
+  },
+  {
+    allowedPaths: ['/', '/receipts-invoices', '/purchase-orders'],
+    defaultPath: '/receipts-invoices',
+    key: 'warehouse',
+    preferredUserIds: ['user-mfg-warehouse'],
+    roleIds: ['role-warehouse'],
+  },
+  {
+    allowedPaths: ['/', '/approvals', '/receipts-invoices', '/three-way-matching', '/purchase-orders'],
+    defaultPath: '/three-way-matching',
+    key: 'finance',
+    preferredUserIds: ['user-digital-finance', 'user-mfg-finance'],
+    roleIds: ['role-finance'],
+  },
+  {
+    allowedPaths: businessNavPaths,
+    defaultPath: '/master-data',
+    key: 'admin',
+    preferredUserIds: ['user-digital-admin'],
+    roleIds: ['role-admin'],
+  },
+]
+
 const antdLocales = {
   zh: zhCN,
   en: enUS,
@@ -1544,6 +1612,15 @@ export const localizedContent = {
       masterDataManagement: '基础数据管理',
       demoRole: '演示角色',
       demoRoleUnavailable: '暂无可选演示角色',
+      current: '当前',
+      demoRoles: {
+        applicant: '申请人视角',
+        approver: '审批人视角',
+        procurement: '采购执行视角',
+        warehouse: '仓储收货视角',
+        finance: '财务匹配视角',
+        admin: '系统管理视角',
+      },
       language: '切换语言',
       chinese: '中文',
       english: 'English',
@@ -2239,6 +2316,15 @@ export const localizedContent = {
       masterDataManagement: 'Master Data Admin',
       demoRole: 'Demo Role',
       demoRoleUnavailable: 'No demo roles available',
+      current: 'Current',
+      demoRoles: {
+        applicant: 'Requester View',
+        approver: 'Approver View',
+        procurement: 'Procurement View',
+        warehouse: 'Warehouse View',
+        finance: 'Finance Match View',
+        admin: 'Admin View',
+      },
       language: 'Language',
       chinese: '中文',
       english: 'English',
@@ -2909,7 +2995,7 @@ function Workspace({
   const [isPoCreateDrawerOpen, setPoCreateDrawerOpen] = useState(false)
   const [receiptInvoiceCreateMode, setReceiptInvoiceCreateMode] = useState<ReceiptInvoiceCreateMode | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
-  const [selectedDemoUserId, setSelectedDemoUserId] = useState('user-digital-buyer')
+  const [selectedDemoPersonaKey, setSelectedDemoPersonaKey] = useState<DemoPersonaKey>('admin')
   const [dashboardScopeValue, setDashboardScopeValue] = useState<ProcurementDashboardScopeValue>('GROUP')
   const [isNotificationOpen, setNotificationOpen] = useState(false)
   const [isGlobalSearchOpen, setGlobalSearchOpen] = useState(false)
@@ -3030,20 +3116,22 @@ function Workspace({
     ).values(),
   ).filter((user) => user.active)
   const demoUsersKey = allDemoUsers.map((user) => `${user.userId}:${user.companyId}`).join('|')
-  const preferredCompanyDemoUser =
-    allDemoUsers.find(
-      (user) =>
-        user.companyId === selectedCompanyId &&
-        user.roles.some((role) => role.roleId === 'role-procurement'),
-    ) ??
+  const selectedDemoPersona =
+    demoPersonas.find((persona) => persona.key === selectedDemoPersonaKey) ?? demoPersonas[2]
+  const selectedDemoUser =
+    userForDemoPersona(selectedDemoPersona, allDemoUsers, selectedCompanyId) ??
     allDemoUsers.find((user) => user.companyId === selectedCompanyId) ??
     allDemoUsers[0]
-  const selectedDemoUser =
-    allDemoUsers.find((user) => user.userId === selectedDemoUserId) ??
-    preferredCompanyDemoUser
   const selectedDemoRoleLabel = selectedDemoUser
     ? selectedDemoUser.roles.map((role) => role.roleName).join(' / ')
     : messages.userMenu.role
+  const currentRoutePath = isDashboardRoute ? '/' : location.pathname
+  const canAccessMasterData = selectedDemoPersona.key === 'admin'
+  const canResetDemoData = selectedDemoPersona.key === 'admin'
+  const visibleNavItems =
+    selectedDemoPersona.key === 'admin'
+      ? messages.navItems
+      : messages.navItems.filter((item) => selectedDemoPersona.allowedPaths.includes(item.path))
   const foundationLoading =
     masterContextQuery.isLoading ||
     companiesQuery.isLoading ||
@@ -3072,20 +3160,33 @@ function Workspace({
     categoriesQuery.isError
   const demoRoleMenuItems: MenuProps['items'] =
     allDemoUsers.length > 0
-      ? allDemoUsers.map((user) => {
+      ? demoPersonaMenuOrder.flatMap((personaKey) => {
+          const persona = demoPersonas.find((item) => item.key === personaKey)
+          if (!persona) {
+            return []
+          }
+
+          const user = userForDemoPersona(persona, allDemoUsers, selectedCompanyId)
+          if (!user) {
+            return []
+          }
+
           const company = companies.find((item) => item.companyId === user.companyId)
           const roleLabel = user.roles.map((role) => role.roleName).join(' / ')
-          return {
-            key: `demo-user:${user.userId}`,
+          const isCurrentPersona = persona.key === selectedDemoPersona.key
+          return [{
+            key: `demo-persona:${persona.key}`,
             label: (
-              <div className="user-menu-option">
-                <strong>{user.displayName}</strong>
-                <span>{roleLabel || user.positionTitle}</span>
+              <div className={isCurrentPersona ? 'user-menu-option active' : 'user-menu-option'}>
+                <strong>
+                  {messages.userMenu.demoRoles[persona.key]}
+                  {isCurrentPersona && <em>{messages.userMenu.current}</em>}
+                </strong>
+                <span>{user.displayName} · {roleLabel || user.positionTitle}</span>
                 <small>{company?.companyName ?? user.companyId}</small>
               </div>
             ),
-            disabled: user.userId === selectedDemoUser?.userId,
-          }
+          }]
         })
       : [
           {
@@ -3106,11 +3207,13 @@ function Workspace({
       ),
     },
     { type: 'divider' },
-    {
-      key: 'master-data',
-      icon: <DatabaseOutlined />,
-      label: messages.userMenu.masterDataManagement,
-    },
+    ...(canAccessMasterData
+      ? [{
+          key: 'master-data',
+          icon: <DatabaseOutlined />,
+          label: messages.userMenu.masterDataManagement,
+        }]
+      : []),
     {
       key: 'demo-role',
       icon: <UserOutlined />,
@@ -3134,15 +3237,17 @@ function Workspace({
         },
       ],
     },
-    {
-      key: 'reset-demo-data',
-      icon: resetDemoDataMutation.isPending ? <LoadingOutlined /> : <ReloadOutlined />,
-      label: resetDemoDataMutation.isPending
-        ? messages.userMenu.resetDemoDataRunning
-        : messages.userMenu.resetDemoData,
-      disabled: resetDemoDataMutation.isPending,
-      danger: true,
-    },
+    ...(canResetDemoData
+      ? [{
+          key: 'reset-demo-data',
+          icon: resetDemoDataMutation.isPending ? <LoadingOutlined /> : <ReloadOutlined />,
+          label: resetDemoDataMutation.isPending
+            ? messages.userMenu.resetDemoDataRunning
+            : messages.userMenu.resetDemoData,
+          disabled: resetDemoDataMutation.isPending,
+          danger: true,
+        }]
+      : []),
     { type: 'divider' },
     {
       key: 'logout',
@@ -3192,13 +3297,17 @@ function Workspace({
       return
     }
 
-    if (keyText.startsWith('demo-user:')) {
-      const nextUserId = keyText.replace('demo-user:', '')
-      const nextUser = allDemoUsers.find((user) => user.userId === nextUserId)
+    if (keyText.startsWith('demo-persona:')) {
+      const nextPersonaKey = keyText.replace('demo-persona:', '') as DemoPersonaKey
+      const nextPersona = demoPersonas.find((persona) => persona.key === nextPersonaKey)
+      const nextUser = nextPersona ? userForDemoPersona(nextPersona, allDemoUsers, selectedCompanyId) : undefined
       if (nextUser) {
-        setSelectedDemoUserId(nextUser.userId)
+        setSelectedDemoPersonaKey(nextPersonaKey)
         if (nextUser.companyId !== selectedCompanyId) {
           setSelectedCompanyId(nextUser.companyId)
+        }
+        if (nextPersona && nextPersona.key !== 'admin' && !nextPersona.allowedPaths.includes(currentRoutePath)) {
+          navigate(nextPersona.defaultPath)
         }
       }
       return
@@ -3219,7 +3328,7 @@ function Workspace({
 
   const handleNewRequestClick = () => {
     if (isReceiptInvoiceRoute) {
-      setReceiptInvoiceCreateMode('receipt')
+      setReceiptInvoiceCreateMode(selectedDemoPersona.key === 'finance' ? 'invoice' : 'receipt')
       return
     }
 
@@ -3252,15 +3361,20 @@ function Workspace({
   }, [companies, context.activeCompany.companyId, selectedCompanyId])
 
   useEffect(() => {
-    if (!preferredCompanyDemoUser) {
-      return
+    const personaUserInCompany = userForDemoPersona(selectedDemoPersona, allDemoUsers, selectedCompanyId)
+    const personaFallbackUser = userForDemoPersona(selectedDemoPersona, allDemoUsers)
+    if (!personaUserInCompany && personaFallbackUser && personaFallbackUser.companyId !== selectedCompanyId) {
+      setSelectedCompanyId(personaFallbackUser.companyId)
     }
+  }, [demoUsersKey, selectedCompanyId, selectedDemoPersona])
 
-    const currentDemoUser = allDemoUsers.find((user) => user.userId === selectedDemoUserId)
-    if (!currentDemoUser || currentDemoUser.companyId !== selectedCompanyId) {
-      setSelectedDemoUserId(preferredCompanyDemoUser.userId)
+  useEffect(() => {
+    const canAccessCurrentRoute =
+      selectedDemoPersona.key === 'admin' || selectedDemoPersona.allowedPaths.includes(currentRoutePath)
+    if (!canAccessCurrentRoute) {
+      navigate(selectedDemoPersona.defaultPath, { replace: true })
     }
-  }, [demoUsersKey, preferredCompanyDemoUser, selectedCompanyId, selectedDemoUserId])
+  }, [currentRoutePath, navigate, selectedDemoPersona])
 
   useEffect(() => {
     if (dashboardScopeValue === 'GROUP' || companies.length === 0) {
@@ -3329,15 +3443,24 @@ function Workspace({
     return () => window.removeEventListener('keydown', handleGlobalSearchShortcut)
   }, [])
 
+  const canUsePrimaryAction =
+    (selectedDemoPersona.key === 'applicant' && (isDashboardRoute || isPurchaseRequestRoute)) ||
+    (selectedDemoPersona.key === 'procurement' && (isRfqRoute || isPurchaseOrderRoute)) ||
+    (selectedDemoPersona.key === 'warehouse' && isReceiptInvoiceRoute) ||
+    (selectedDemoPersona.key === 'finance' && isReceiptInvoiceRoute)
   const primaryActionIcon = isReceiptInvoiceRoute
-    ? <InboxOutlined />
+    ? selectedDemoPersona.key === 'finance'
+      ? <ProfileOutlined />
+      : <InboxOutlined />
     : isPurchaseOrderRoute
       ? <ShoppingCartOutlined />
       : isRfqRoute
         ? <FileSearchOutlined />
         : <FileAddOutlined />
   const primaryActionLabel = isReceiptInvoiceRoute
-    ? messages.actions.newReceipt
+    ? selectedDemoPersona.key === 'finance'
+      ? messages.actions.newInvoice
+      : messages.actions.newReceipt
     : isPurchaseOrderRoute
     ? messages.actions.newPo
     : isRfqRoute
@@ -3415,7 +3538,7 @@ function Workspace({
         </div>
 
         <nav className="nav-list" aria-label={messages.aria.modules}>
-          {messages.navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
               end={item.path === '/'}
@@ -3506,7 +3629,7 @@ function Workspace({
                 )}
               </span>
             </Popover>
-            {!isFoundationRoute && !isSupplierPoolRoute && !isThreeWayMatchingRoute && (
+            {canUsePrimaryAction && (
               <button className="primary-button" onClick={handleNewRequestClick} type="button">
                 {primaryActionIcon}
                 <span>{primaryActionLabel}</span>
@@ -8805,6 +8928,57 @@ function ApprovalTimeline({
   )
 }
 
+function CompanyContextSelector({
+  companies,
+  label,
+  onCompanyChange,
+  selectedCompany,
+  selectedCompanyId,
+  statusLabel,
+}: {
+  companies: CompanyContext[]
+  label: string
+  onCompanyChange: (companyId: string) => void
+  selectedCompany: CompanyContext
+  selectedCompanyId: string
+  statusLabel: (company: CompanyContext) => string
+}) {
+  const companyOptions = companies.map((company) => ({
+    active: company.active,
+    businessScope: company.businessScope,
+    companyId: company.companyId,
+    companyName: company.companyName,
+    label: company.companyName,
+    value: company.companyId,
+  }))
+
+  return (
+    <div className="summary-block company-context-block">
+      <span>{label}</span>
+      <Select
+        className="company-context-select"
+        options={companyOptions}
+        optionFilterProp="label"
+        optionRender={(option) => {
+          const company = option.data as (typeof companyOptions)[number]
+          return (
+            <div className="company-select-option">
+              <strong>{company.label}</strong>
+              <span>{company.businessScope}</span>
+              <em>{statusLabel(company as CompanyContext)}</em>
+            </div>
+          )
+        }}
+        popupClassName="company-context-dropdown"
+        showSearch
+        value={selectedCompanyId}
+        onChange={onCompanyChange}
+      />
+      <small>{selectedCompany.businessScope}</small>
+    </div>
+  )
+}
+
 function SupplierPoolView({
   categories,
   companies,
@@ -8917,11 +9091,14 @@ function SupplierPoolView({
             <strong>{context.groupName}</strong>
             <small>{messages.supplierPool.groupBoundary}</small>
           </div>
-          <div className="summary-block">
-            <span>{messages.supplierPool.selectedCompany}</span>
-            <strong>{selectedCompany.companyName}</strong>
-            <small>{messages.supplierPool.companyHint}</small>
-          </div>
+          <CompanyContextSelector
+            companies={companies}
+            label={messages.supplierPool.selectedCompany}
+            onCompanyChange={onCompanyChange}
+            selectedCompany={selectedCompany}
+            selectedCompanyId={selectedCompanyId}
+            statusLabel={(company) => company.active ? messages.foundation.active : messages.foundation.inactive}
+          />
           <div className="summary-block">
             <span>{messages.supplierPool.visibleSuppliers}</span>
             <strong>{filteredSuppliers.length}</strong>
@@ -8934,34 +9111,6 @@ function SupplierPoolView({
           </div>
         </div>
 
-        <div className="company-switch" aria-label={messages.foundation.companySelector}>
-          {companies.map((company) => (
-            <button
-              className={company.companyId === selectedCompanyId ? 'company-option active' : 'company-option'}
-              key={company.companyId}
-              onClick={() => onCompanyChange(company.companyId)}
-              type="button"
-            >
-              <BankOutlined />
-              <span>
-                <strong>{company.companyName}</strong>
-                <small>{company.businessScope}</small>
-              </span>
-              <em>{company.active ? messages.foundation.active : messages.foundation.inactive}</em>
-            </button>
-          ))}
-        </div>
-
-        <div className="boundary-matrix">
-          <div>
-            <span>{messages.boundary.groupShared}</span>
-            <strong>{messages.supplierPool.groupBoundary}</strong>
-          </div>
-          <div>
-            <span>{messages.boundary.companyIsolated}</span>
-            <strong>{messages.supplierPool.companyBoundary}</strong>
-          </div>
-        </div>
         {isError && <div className="data-alert">{messages.supplierPool.unavailable}</div>}
       </section>
 
@@ -9187,29 +9336,14 @@ function FoundationDataView({
             <strong>{context.groupName}</strong>
             <small>{context.supplierPoolScope}</small>
           </div>
-          <div className="summary-block">
-            <span>{messages.foundation.selectedCompany}</span>
-            <strong>{selectedCompany.companyName}</strong>
-            <small>{selectedCompany.businessScope}</small>
-          </div>
-        </div>
-
-        <div className="company-switch" aria-label={messages.foundation.companySelector}>
-          {companies.map((company) => (
-            <button
-              className={company.companyId === selectedCompanyId ? 'company-option active' : 'company-option'}
-              key={company.companyId}
-              onClick={() => onCompanyChange(company.companyId)}
-              type="button"
-            >
-              <BankOutlined />
-              <span>
-                <strong>{company.companyName}</strong>
-                <small>{company.businessScope}</small>
-              </span>
-              <em>{company.active ? messages.foundation.active : messages.foundation.inactive}</em>
-            </button>
-          ))}
+          <CompanyContextSelector
+            companies={companies}
+            label={messages.foundation.selectedCompany}
+            onCompanyChange={onCompanyChange}
+            selectedCompany={selectedCompany}
+            selectedCompanyId={selectedCompanyId}
+            statusLabel={(company) => company.active ? messages.foundation.active : messages.foundation.inactive}
+          />
         </div>
 
         <div className="boundary-matrix">
@@ -10350,6 +10484,22 @@ function lineAmountOf(line: PurchaseRequestFormLine) {
   const unitPrice = Number.isFinite(line.estimatedUnitPrice) ? line.estimatedUnitPrice : 0
 
   return roundAmount(quantity * unitPrice)
+}
+
+function userForDemoPersona(persona: DemoPersona, users: UserSummary[], companyId?: string) {
+  const isInScope = (user: UserSummary) => !companyId || user.companyId === companyId
+  const hasPersonaRole = (user: UserSummary) =>
+    user.roles.some((role) => persona.roleIds.includes(role.roleId))
+  const preferredUsers = persona.preferredUserIds
+    .map((userId) => users.find((user) => user.userId === userId))
+    .filter((user): user is UserSummary => Boolean(user))
+
+  return (
+    preferredUsers.find(isInScope) ??
+    users.find((user) => isInScope(user) && hasPersonaRole(user)) ??
+    preferredUsers[0] ??
+    users.find(hasPersonaRole)
+  )
 }
 
 function buildPurchaseRequestFormDefaults(
