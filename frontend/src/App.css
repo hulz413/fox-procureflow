@@ -881,6 +881,15 @@ h1 {
   color: var(--pf-primary);
 }
 
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item:hover,
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-active,
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-submenu-title:hover,
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-submenu-title-active,
+.ant-dropdown-menu-submenu-popup .ant-dropdown-menu .ant-dropdown-menu-item:hover,
+.ant-dropdown-menu-submenu-popup .ant-dropdown-menu .ant-dropdown-menu-item-active {
+  background: var(--pf-primary-soft) !important;
+}
+
 .workspace {
   padding: 18px 16px 20px 12px;
 }
@@ -1014,6 +1023,38 @@ h1 {
   background: #eef5f0;
   font-size: 12px;
   font-weight: 700;
+}
+
+.panel-title-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panel-title-actions .primary-button,
+.panel-title-actions .secondary-button {
+  width: auto;
+  min-width: 112px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 14px;
+}
+
+.panel-title-actions .disabled-tooltip-wrap {
+  display: inline-flex;
+}
+
+.panel-title-actions .primary-button span,
+.panel-title-actions .secondary-button span {
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .chart-panel {
@@ -1184,6 +1225,25 @@ tbody tr:last-child td {
 .dashboard-exception {
   grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: start;
+}
+
+.dashboard-exception-link {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dashboard-exception-link:hover {
+  border-color: var(--pf-primary);
+  background: var(--pf-primary-soft);
+}
+
+.dashboard-exception-link:focus-visible {
+  outline: 2px solid var(--pf-primary);
+  outline-offset: 2px;
 }
 
 .dashboard-exception .risk-icon {
@@ -1647,16 +1707,18 @@ tbody tr:last-child td {
   letter-spacing: 2px;
 }
 
-.list-page-size {
+.list-page-size-select {
+  min-width: 96px;
+}
+
+.list-page-size-select .ant-select-selector {
   min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  border: 1px solid var(--pf-border);
-  border-radius: 7px;
+  border-radius: 7px !important;
+  font-weight: 700;
+}
+
+.list-page-size-select .ant-select-selection-item {
   color: var(--pf-text);
-  background: #fff;
-  white-space: nowrap;
 }
 
 .list-page-button:disabled,
@@ -2027,6 +2089,19 @@ tbody tr:last-child td {
 
 .approval-approver-select .ant-select-selection-search-input {
   min-height: 34px;
+}
+
+.approval-approver-readonly {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--pf-border);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--pf-text);
+  background: var(--pf-panel-soft);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .approval-task-table th:nth-child(1) {
@@ -2432,6 +2507,64 @@ tbody tr:last-child td {
 .quote-form textarea {
   min-height: 74px;
   resize: vertical;
+}
+
+.file-picker {
+  min-width: 0;
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--pf-border);
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.file-picker-input {
+  position: absolute;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  margin: -1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-picker-button {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 0 9px;
+  color: var(--pf-primary);
+  background: var(--pf-primary-soft);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.file-picker-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pf-text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-picker-name.muted {
+  color: var(--pf-muted);
+}
+
+.file-picker:focus-within {
+  border-color: var(--pf-primary);
+  box-shadow: 0 0 0 3px rgba(47, 122, 77, 0.14);
 }
 
 .attachment-list {

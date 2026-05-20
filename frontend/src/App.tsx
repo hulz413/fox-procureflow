@@ -43,6 +43,8 @@ const { Header, Sider, Content } = Layout
 
 const queryClient = new QueryClient()
 const DEFAULT_LIST_PAGE_SIZE = 10
+const LIST_PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+const ALL_APPROVERS_VALUE = '__all_approvers__'
 
 type Language = 'zh' | 'en'
 
@@ -1575,6 +1577,7 @@ export const localizedContent = {
       next: '下一页',
       page: '第 {page} 页',
       pageSize: '{pageSize} 条/页',
+      pageSizeSelect: '选择每页条数',
       total: '共 {totalItems} 条',
     },
     globalSearch: {
@@ -1910,6 +1913,7 @@ export const localizedContent = {
       taskList: '待审批任务',
       detail: '审批详情',
       approver: '审批人',
+      allApprovers: '全部审批人',
       activeCompany: '当前公司',
       requestSummary: '申请摘要',
       path: '审批路径',
@@ -1986,6 +1990,8 @@ export const localizedContent = {
       riskNote: '风险备注',
       attachmentFile: '附件文件名',
       attachmentDescription: '附件说明',
+      chooseAttachment: '选择文件',
+      noAttachmentSelected: '未选择文件',
       downloadAttachment: '下载',
       metadataOnlyReason: '仅有元数据，未上传真实文件',
       pendingUploadReason: '保存时上传后可下载',
@@ -2094,6 +2100,8 @@ export const localizedContent = {
       note: '备注',
       attachmentFile: '附件文件名',
       attachmentDescription: '附件说明',
+      chooseAttachment: '选择文件',
+      noAttachmentSelected: '未选择文件',
       attachments: '附件元数据',
       lineFulfillment: '明细履约',
       notReceived: '未收货',
@@ -2279,6 +2287,7 @@ export const localizedContent = {
       next: 'Next page',
       page: 'Page {page}',
       pageSize: '{pageSize}/page',
+      pageSizeSelect: 'Select page size',
       total: '{totalItems} total',
     },
     globalSearch: {
@@ -2614,6 +2623,7 @@ export const localizedContent = {
       taskList: 'Approval Tasks',
       detail: 'Approval Detail',
       approver: 'Approver',
+      allApprovers: 'All approvers',
       activeCompany: 'Active Company',
       requestSummary: 'Request Summary',
       path: 'Approval Path',
@@ -2690,6 +2700,8 @@ export const localizedContent = {
       riskNote: 'Risk Note',
       attachmentFile: 'Attachment File',
       attachmentDescription: 'Attachment Note',
+      chooseAttachment: 'Choose file',
+      noAttachmentSelected: 'No file selected',
       downloadAttachment: 'Download',
       metadataOnlyReason: 'Metadata only; no uploaded file',
       pendingUploadReason: 'Upload on save before download',
@@ -2798,6 +2810,8 @@ export const localizedContent = {
       note: 'Note',
       attachmentFile: 'Attachment File',
       attachmentDescription: 'Attachment Description',
+      chooseAttachment: 'Choose file',
+      noAttachmentSelected: 'No file selected',
       attachments: 'Attachment Metadata',
       lineFulfillment: 'Line Fulfillment',
       notReceived: 'Not received',
@@ -2939,11 +2953,16 @@ function routeParam(search: string, key: string) {
 function useListPagination<T>(
   items: T[],
   resetKey: string,
-  pageSize = DEFAULT_LIST_PAGE_SIZE,
+  initialPageSize = DEFAULT_LIST_PAGE_SIZE,
 ) {
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSizeState] = useState(initialPageSize)
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize))
   const currentPage = Math.min(page, totalPages)
+  const setPageSize = useCallback((nextPageSize: number) => {
+    setPageSizeState(nextPageSize)
+    setPage(1)
+  }, [])
 
   useEffect(() => {
     setPage(1)
@@ -2958,6 +2977,7 @@ function useListPagination<T>(
     pageItems: items.slice((currentPage - 1) * pageSize, currentPage * pageSize),
     pageSize,
     setPage,
+    setPageSize,
     totalItems: items.length,
     totalPages,
   }
@@ -3432,6 +3452,21 @@ function Workspace({
   }, [isReceiptInvoiceRoute, location.search, navigate])
 
   useEffect(() => {
+    if (!isThreeWayMatchingRoute) {
+      return
+    }
+
+    const routeCompanyId = new URLSearchParams(location.search).get('companyId')
+    if (!routeCompanyId || routeCompanyId === selectedCompanyId) {
+      return
+    }
+
+    if (companies.some((company) => company.companyId === routeCompanyId)) {
+      setSelectedCompanyId(routeCompanyId)
+    }
+  }, [companies, isThreeWayMatchingRoute, location.search, selectedCompanyId])
+
+  useEffect(() => {
     const handleGlobalSearchShortcut = (event: globalThis.KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
@@ -3788,6 +3823,7 @@ function Workspace({
               isLoading={procurementDashboardQuery.isLoading}
               language={language}
               messages={messages}
+              onCompanyChange={setSelectedCompanyId}
               onScopeChange={setDashboardScopeValue}
               scopeValue={dashboardScopeValue}
             />
@@ -3807,6 +3843,7 @@ function ProcurementDashboardView({
   isLoading,
   language,
   messages,
+  onCompanyChange,
   onScopeChange,
   scopeValue,
 }: {
@@ -3817,11 +3854,16 @@ function ProcurementDashboardView({
   isLoading: boolean
   language: Language
   messages: LocalizedMessages
+  onCompanyChange: (companyId: string) => void
   onScopeChange: (scopeValue: ProcurementDashboardScopeValue) => void
   scopeValue: ProcurementDashboardScopeValue
 }) {
   const navigate = useNavigate()
   const metrics = dashboardMetricsInOrder(dashboard?.summary ?? [])
+  const openExceptionDetail = (exception: ExceptionHighlight) => {
+    onCompanyChange(exception.companyId)
+    navigate(`/three-way-matching?companyId=${encodeURIComponent(exception.companyId)}&matchId=${encodeURIComponent(exception.matchId)}`)
+  }
 
   return (
     <div className="dashboard-page">
@@ -3932,7 +3974,13 @@ function ProcurementDashboardView({
                 ) : (
                   <div className="risk-list dashboard-exception-list">
                     {dashboard.exceptionHighlights.map((exception) => (
-                      <div className="risk-item dashboard-exception" key={exception.matchId}>
+                      <button
+                        aria-label={`${messages.dashboard.viewMatching}: ${exception.poTitle || exception.poId}`}
+                        className="risk-item dashboard-exception dashboard-exception-link"
+                        key={exception.matchId}
+                        onClick={() => openExceptionDetail(exception)}
+                        type="button"
+                      >
                         <span className="risk-icon">
                           <AlertOutlined />
                         </span>
@@ -3955,7 +4003,7 @@ function ProcurementDashboardView({
                         <span className={`tag ${exception.severity ? severityToneOf(exception.severity) : 'neutral'}`}>
                           {exception.severity ? formatMatchSeverity(exception.severity, messages) : messages.dashboard.empty}
                         </span>
-                      </div>
+                      </button>
                     ))}
                     <button className="primary-button dashboard-link-button" onClick={() => navigate('/three-way-matching')} type="button">
                       <SwapOutlined />
@@ -4491,6 +4539,7 @@ function PurchaseRequestView({
             currentPage={purchaseRequestPagination.currentPage}
             messages={messages}
             onPageChange={purchaseRequestPagination.setPage}
+            onPageSizeChange={purchaseRequestPagination.setPageSize}
             pageSize={purchaseRequestPagination.pageSize}
             totalItems={purchaseRequestPagination.totalItems}
             totalPages={purchaseRequestPagination.totalPages}
@@ -4895,16 +4944,16 @@ function ApprovalCenterView({
   const [modal, modalContextHolder] = Modal.useModal()
   const handledRouteApprovalKey = useRef('')
   const routeApprovalId = routeParam(location.search, 'approvalId')
+  const isAdmin = activeDemoUser?.roles.some((role) => role.roleId === 'role-admin') ?? false
   const approvers = users.filter(
     (user) =>
       user.active &&
       user.companyId === selectedCompanyId &&
       user.roles.some((role) => role.roleId === 'role-approver' || role.roleId === 'role-finance'),
   )
-  const fallbackApprover =
-    approvers.find((user) => user.userId === activeDemoUser?.userId) ??
-    approvers[0]
-  const [selectedApproverId, setSelectedApproverId] = useState(fallbackApprover?.userId ?? '')
+  const activeApproverId = approvers.find((user) => user.userId === activeDemoUser?.userId)?.userId ?? ''
+  const approverIdsKey = approvers.map((user) => user.userId).join('|')
+  const [selectedApproverId, setSelectedApproverId] = useState(isAdmin ? ALL_APPROVERS_VALUE : activeApproverId)
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [comment, setComment] = useState('')
@@ -4912,27 +4961,64 @@ function ApprovalCenterView({
   const [aiRiskResponse, setAiRiskResponse] = useState<AiAssistantResponse | null>(null)
 
   useEffect(() => {
-    if (fallbackApprover && activeDemoUser?.userId === fallbackApprover.userId && selectedApproverId !== fallbackApprover.userId) {
-      setSelectedApproverId(fallbackApprover.userId)
+    if (isAdmin) {
+      setSelectedApproverId((current) =>
+        current === ALL_APPROVERS_VALUE || approvers.some((user) => user.userId === current)
+          ? current
+          : ALL_APPROVERS_VALUE,
+      )
       return
     }
 
-    if (approvers.some((user) => user.userId === selectedApproverId)) {
+    if (activeApproverId) {
+      setSelectedApproverId((current) => (current === activeApproverId ? current : activeApproverId))
       return
     }
 
-    setSelectedApproverId(fallbackApprover?.userId ?? '')
-  }, [activeDemoUser?.userId, approvers, fallbackApprover, selectedApproverId])
+    setSelectedApproverId('')
+  }, [activeApproverId, approverIdsKey, isAdmin])
 
   const tasksQuery = useQuery({
     queryKey: ['approval-tasks', selectedCompanyId, selectedApproverId],
     queryFn: () => fetchApprovalTasks(selectedCompanyId, selectedApproverId),
-    enabled: selectedCompanyId.length > 0 && selectedApproverId.length > 0,
+    enabled: selectedCompanyId.length > 0 && selectedApproverId.length > 0 && selectedApproverId !== ALL_APPROVERS_VALUE,
     placeholderData: keepPreviousData,
     retry: 1,
   })
-  const tasks = tasksQuery.isPlaceholderData ? [] : (tasksQuery.data?.data ?? [])
+  const allApproverTaskQueries = useQueries({
+    queries: isAdmin && selectedApproverId === ALL_APPROVERS_VALUE
+      ? approvers.map((approver) => ({
+          queryKey: ['approval-tasks', selectedCompanyId, approver.userId],
+          queryFn: () => fetchApprovalTasks(selectedCompanyId, approver.userId),
+          enabled: selectedCompanyId.length > 0,
+          retry: 1,
+        }))
+      : [],
+  })
+  const allApproverTasks = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          allApproverTaskQueries
+            .flatMap((query) => query.data?.data ?? [])
+            .map((task) => [task.nodeId, task]),
+        ).values(),
+      ).sort((left, right) => {
+        const leftTime = left.activatedAt ? new Date(left.activatedAt).getTime() : 0
+        const rightTime = right.activatedAt ? new Date(right.activatedAt).getTime() : 0
+        return leftTime - rightTime
+      }),
+    [allApproverTaskQueries],
+  )
+  const isAllApproverMode = isAdmin && selectedApproverId === ALL_APPROVERS_VALUE
+  const tasks = isAllApproverMode ? allApproverTasks : (tasksQuery.isPlaceholderData ? [] : (tasksQuery.data?.data ?? []))
   const taskPagination = useListPagination(tasks, `${selectedCompanyId}:${selectedApproverId}`)
+  const tasksLoading = isAllApproverMode
+    ? allApproverTaskQueries.some((query) => query.isLoading)
+    : tasksQuery.isLoading
+  const tasksError = isAllApproverMode
+    ? allApproverTaskQueries.some((query) => query.isError)
+    : tasksQuery.isError
 
   const detailQuery = useQuery({
     queryKey: ['approval-detail', selectedApprovalId, selectedCompanyId],
@@ -4942,13 +5028,27 @@ function ApprovalCenterView({
   })
   const detail = detailQuery.data?.data
   const activeNode = detail?.nodes.find((node) => node.status === 'ACTIVE')
-  const canApprove = detail?.status === 'IN_PROGRESS' && activeNode?.approverId === selectedApproverId
+  const approvalActorId = selectedApproverId === ALL_APPROVERS_VALUE ? activeNode?.approverId ?? '' : selectedApproverId
+  const canApprove =
+    detail?.status === 'IN_PROGRESS' &&
+    Boolean(activeNode) &&
+    (isAdmin || activeNode?.approverId === selectedApproverId)
   const canWithdraw = detail?.status === 'IN_PROGRESS'
-  const approverOptions = approvers.map((user) => ({
-    label: `${user.displayName} · ${user.positionTitle}`,
-    searchText: `${user.displayName} ${user.positionTitle} ${user.email} ${user.userId}`,
-    value: user.userId,
-  }))
+  const activeApprover = approvers.find((user) => user.userId === activeApproverId)
+  const approverOptions = [
+    ...(isAdmin
+      ? [{
+          label: messages.approval.allApprovers,
+          searchText: messages.approval.allApprovers,
+          value: ALL_APPROVERS_VALUE,
+        }]
+      : []),
+    ...approvers.map((user) => ({
+      label: `${user.displayName} · ${user.positionTitle}`,
+      searchText: `${user.displayName} ${user.positionTitle} ${user.email} ${user.userId}`,
+      value: user.userId,
+    })),
+  ]
 
   const actionMutation = useMutation({
     mutationFn: ({
@@ -5031,7 +5131,7 @@ function ApprovalCenterView({
 
     actionMutation.mutate({
       action,
-      actorId: action === 'withdraw' ? detail.requesterId : selectedApproverId,
+      actorId: action === 'withdraw' ? detail.requesterId : approvalActorId,
       approvalId: detail.approvalId,
       comment,
     })
@@ -5043,7 +5143,7 @@ function ApprovalCenterView({
     }
     setAiRiskResponse(null)
     aiRiskMutation.mutate({
-      actorId: selectedApproverId || detail.requesterId,
+      actorId: approvalActorId || detail.requesterId,
       companyId: detail.companyId,
       requestId: detail.requestId,
     })
@@ -5117,26 +5217,32 @@ function ApprovalCenterView({
         <div className="approval-toolbar">
           <label>
             <span>{messages.approval.approver}</span>
-            <Select
-              aria-label={messages.approval.approver}
-              className="approval-approver-select"
-              disabled={approvers.length === 0}
-              filterOption={(input, option) =>
-                String(option?.searchText ?? option?.label ?? '')
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
-              notFoundContent={messages.approval.noApprover}
-              onChange={handleApproverChange}
-              optionFilterProp="label"
-              options={approverOptions}
-              placeholder={messages.approval.searchApprover}
-              showSearch
-              value={selectedApproverId || undefined}
-            />
+            {isAdmin ? (
+              <Select
+                aria-label={messages.approval.approver}
+                className="approval-approver-select"
+                disabled={approvers.length === 0}
+                filterOption={(input, option) =>
+                  String(option?.searchText ?? option?.label ?? '')
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
+                notFoundContent={messages.approval.noApprover}
+                onChange={handleApproverChange}
+                optionFilterProp="label"
+                options={approverOptions}
+                placeholder={messages.approval.searchApprover}
+                showSearch
+                value={selectedApproverId || undefined}
+              />
+            ) : (
+              <div className="approval-approver-readonly">
+                {activeApprover ? `${activeApprover.displayName} · ${activeApprover.positionTitle}` : messages.approval.noApprover}
+              </div>
+            )}
           </label>
         </div>
-        {(isError || tasksQuery.isError) && <div className="data-alert">{messages.approval.unavailable}</div>}
+        {(isError || tasksError) && <div className="data-alert">{messages.approval.unavailable}</div>}
         <div className="table-wrap">
           <table className="request-table approval-task-table">
             <thead>
@@ -5151,7 +5257,7 @@ function ApprovalCenterView({
               {tasks.length === 0 ? (
                 <tr>
                   <td colSpan={4}>
-                    {isLoading || tasksQuery.isLoading ? messages.approval.loading : messages.approval.emptyTasks}
+                    {isLoading || tasksLoading ? messages.approval.loading : messages.approval.emptyTasks}
                   </td>
                 </tr>
               ) : (
@@ -5188,6 +5294,7 @@ function ApprovalCenterView({
           currentPage={taskPagination.currentPage}
           messages={messages}
           onPageChange={taskPagination.setPage}
+          onPageSizeChange={taskPagination.setPageSize}
           pageSize={taskPagination.pageSize}
           totalItems={taskPagination.totalItems}
           totalPages={taskPagination.totalPages}
@@ -5871,6 +5978,7 @@ function RfqView({
             currentPage={rfqPagination.currentPage}
             messages={messages}
             onPageChange={rfqPagination.setPage}
+            onPageSizeChange={rfqPagination.setPageSize}
             pageSize={rfqPagination.pageSize}
             totalItems={rfqPagination.totalItems}
             totalPages={rfqPagination.totalPages}
@@ -6079,11 +6187,13 @@ function RfqView({
                 </label>
                 <label>
                   <span>{messages.rfq.attachmentFile}</span>
-                  <input
+                  <FilePicker
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt"
-                    type="file"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null
+                    ariaLabel={messages.rfq.attachmentFile}
+                    chooseLabel={messages.rfq.chooseAttachment}
+                    noFileLabel={messages.rfq.noAttachmentSelected}
+                    selectedLabel={quoteForm.file?.name ?? quoteForm.fileName}
+                    onFileChange={(file) => {
                       setQuoteDirty(true)
                       setQuoteForm((current) => ({
                         ...current,
@@ -6708,6 +6818,7 @@ function PurchaseOrderView({
             currentPage={purchaseOrderPagination.currentPage}
             messages={messages}
             onPageChange={purchaseOrderPagination.setPage}
+            onPageSizeChange={purchaseOrderPagination.setPageSize}
             pageSize={purchaseOrderPagination.pageSize}
             totalItems={purchaseOrderPagination.totalItems}
             totalPages={purchaseOrderPagination.totalPages}
@@ -7451,6 +7562,7 @@ function ThreeWayMatchingView({
             currentPage={matchingPagination.currentPage}
             messages={messages}
             onPageChange={matchingPagination.setPage}
+            onPageSizeChange={matchingPagination.setPageSize}
             pageSize={matchingPagination.pageSize}
             totalItems={matchingPagination.totalItems}
             totalPages={matchingPagination.totalPages}
@@ -8039,33 +8151,39 @@ function ReceiptsInvoicesView({
       {modalContextHolder}
       <section className="request-grid rfq-grid">
         <section className="panel request-list-panel">
-          <PanelTitle icon={<InboxOutlined />} title={messages.receiptInvoice.list} aside={selectedCompany.companyName} />
+          <PanelTitle
+            actions={(
+              <div className="panel-title-actions">
+                <span>{selectedCompany.companyName}</span>
+                <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
+                  <button
+                    className="primary-button"
+                    disabled={fulfillmentRows.length === 0}
+                    onClick={() => openCreateMode('receipt')}
+                    type="button"
+                  >
+                    <InboxOutlined />
+                    <span>{messages.receiptInvoice.createReceipt}</span>
+                  </button>
+                </DisabledActionTooltip>
+                <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
+                  <button
+                    className="secondary-button"
+                    disabled={fulfillmentRows.length === 0}
+                    onClick={() => openCreateMode('invoice')}
+                    type="button"
+                  >
+                    <ProfileOutlined />
+                    <span>{messages.receiptInvoice.createInvoice}</span>
+                  </button>
+                </DisabledActionTooltip>
+              </div>
+            )}
+            icon={<InboxOutlined />}
+            title={messages.receiptInvoice.list}
+          />
           {isError && <div className="data-alert">{messages.receiptInvoice.unavailable}</div>}
           {feedback && <div className={`data-alert ${feedback.tone === 'success' ? 'success' : ''}`}>{feedback.message}</div>}
-          <div className="action-row button-action-row">
-            <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
-              <button
-                className="primary-button"
-                disabled={fulfillmentRows.length === 0}
-                onClick={() => openCreateMode('receipt')}
-                type="button"
-              >
-                <InboxOutlined />
-                <span>{messages.receiptInvoice.createReceipt}</span>
-              </button>
-            </DisabledActionTooltip>
-            <DisabledActionTooltip title={fulfillmentRows.length === 0 ? messages.receiptInvoice.noIssuedPo : undefined}>
-              <button
-                className="secondary-button"
-                disabled={fulfillmentRows.length === 0}
-                onClick={() => openCreateMode('invoice')}
-                type="button"
-              >
-                <ProfileOutlined />
-                <span>{messages.receiptInvoice.createInvoice}</span>
-              </button>
-            </DisabledActionTooltip>
-          </div>
           <div className="table-wrap">
             <table className="request-table">
               <thead>
@@ -8123,6 +8241,7 @@ function ReceiptsInvoicesView({
             currentPage={fulfillmentPagination.currentPage}
             messages={messages}
             onPageChange={fulfillmentPagination.setPage}
+            onPageSizeChange={fulfillmentPagination.setPageSize}
             pageSize={fulfillmentPagination.pageSize}
             totalItems={fulfillmentPagination.totalItems}
             totalPages={fulfillmentPagination.totalPages}
@@ -8546,6 +8665,38 @@ function InvoiceFormLines({
   )
 }
 
+function FilePicker({
+  accept,
+  ariaLabel,
+  chooseLabel,
+  noFileLabel,
+  onFileChange,
+  selectedLabel,
+}: {
+  accept: string
+  ariaLabel: string
+  chooseLabel: string
+  noFileLabel: string
+  onFileChange: (file: File | null) => void
+  selectedLabel?: string
+}) {
+  return (
+    <span className="file-picker">
+      <input
+        accept={accept}
+        aria-label={ariaLabel}
+        className="file-picker-input"
+        type="file"
+        onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+      />
+      <span className="file-picker-button">{chooseLabel}</span>
+      <span className={selectedLabel ? 'file-picker-name' : 'file-picker-name muted'}>
+        {selectedLabel || noFileLabel}
+      </span>
+    </span>
+  )
+}
+
 export function ReceiptInvoiceAttachmentFields({
   description,
   file,
@@ -8567,12 +8718,14 @@ export function ReceiptInvoiceAttachmentFields({
     <>
       <label>
         <span>{messages.receiptInvoice.attachmentFile}</span>
-        <input
+        <FilePicker
           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt"
-          type="file"
-          onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+          ariaLabel={messages.receiptInvoice.attachmentFile}
+          chooseLabel={messages.receiptInvoice.chooseAttachment}
+          noFileLabel={messages.receiptInvoice.noAttachmentSelected}
+          selectedLabel={file?.name ?? fileName}
+          onFileChange={onFileChange}
         />
-        {fileName && <small>{file?.name ?? fileName}</small>}
       </label>
       <label>
         <span>{messages.receiptInvoice.attachmentDescription}</span>
@@ -9220,6 +9373,7 @@ function SupplierPoolView({
           currentPage={supplierPagination.currentPage}
           messages={messages}
           onPageChange={supplierPagination.setPage}
+          onPageSizeChange={supplierPagination.setPageSize}
           pageSize={supplierPagination.pageSize}
           totalItems={supplierPagination.totalItems}
           totalPages={supplierPagination.totalPages}
@@ -9769,6 +9923,7 @@ function ListPagination({
   currentPage,
   messages,
   onPageChange,
+  onPageSizeChange,
   pageSize,
   totalItems,
   totalPages,
@@ -9776,11 +9931,12 @@ function ListPagination({
   currentPage: number
   messages: LocalizedMessages
   onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
   pageSize: number
   totalItems: number
   totalPages: number
 }) {
-  if (totalItems <= pageSize) {
+  if (totalItems <= DEFAULT_LIST_PAGE_SIZE) {
     return null
   }
 
@@ -9789,7 +9945,6 @@ function ListPagination({
       ? Array.from({ length: totalPages }, (_item, index) => index + 1)
       : compactPaginationItems(currentPage, totalPages)
   const totalText = messages.pagination.total.replace('{totalItems}', String(totalItems))
-  const pageSizeText = messages.pagination.pageSize.replace('{pageSize}', String(pageSize))
 
   return (
     <nav aria-label={messages.pagination.label} className="list-pagination">
@@ -9832,7 +9987,17 @@ function ListPagination({
         >
           <RightOutlined />
         </button>
-        <span className="list-page-size">{pageSizeText}</span>
+        <Select
+          aria-label={messages.pagination.pageSizeSelect}
+          className="list-page-size-select"
+          options={LIST_PAGE_SIZE_OPTIONS.map((item) => ({
+            label: messages.pagination.pageSize.replace('{pageSize}', String(item)),
+            value: item,
+          }))}
+          popupClassName="list-page-size-dropdown"
+          value={pageSize}
+          onChange={onPageSizeChange}
+        />
       </div>
     </nav>
   )
@@ -11123,10 +11288,12 @@ function ProcureflowMark() {
 }
 
 function PanelTitle({
+  actions,
   icon,
   title,
   aside,
 }: {
+  actions?: ReactNode
   icon: ReactNode
   title: string
   aside?: string
@@ -11137,7 +11304,7 @@ function PanelTitle({
         {icon}
         {title}
       </strong>
-      {aside && <span>{aside}</span>}
+      {actions ?? (aside && <span>{aside}</span>)}
     </div>
   )
 }
