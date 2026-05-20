@@ -12,7 +12,7 @@ import { useListPagination } from '../../shared/hooks/useListPagination'
 import { routeParam } from '../../shared/utils/route'
 import { formatCurrency, getViewportCenter, createPurchaseRequestFormLine, lineAmountOf, buildPurchaseRequestFormDefaults, formatPurchaseRequestStatus, statusToneOf, currentStepOf, formatApprovalStatus, categoryNameOf, budgetNameOf, userNameOf, supplierNamesOf, preferredSupplierIdsForCategory, formatDate, formatDateTime, roundAmount } from '../../shared/utils/procurement'
 import { ListPagination, TruncatedText, DisabledActionTooltip, AiResultPanel, PanelTitle } from '../../shared/ui/common'
-import { ApprovalPath, ApprovalTimeline } from '../../shared/ui/procurementWidgets'
+import { ApprovalProgress } from '../../shared/ui/procurementWidgets'
 
 export function PurchaseRequestView({
   activeDemoUser,
@@ -984,22 +984,17 @@ export function PurchaseRequestView({
 	            </div>
 	            {selectedDetail.approval && (
 	              approvalDetail ? (
-	                <>
-	                  <ApprovalPath
-	                    aside={formatApprovalStatus(selectedDetail.approval.status, messages)}
-	                    messages={messages}
-	                    nodes={approvalDetail.nodes}
-	                    users={users}
-	                  />
-	                  <ApprovalTimeline
-	                    language={language}
-	                    messages={messages}
-	                    records={approvalDetail.timeline}
-	                    users={users}
-	                  />
-	                </>
+	                <ApprovalProgress
+	                  aside={formatApprovalStatus(selectedDetail.approval.status, messages)}
+	                  language={language}
+	                  messages={messages}
+	                  nodes={approvalDetail.nodes}
+	                  records={approvalDetail.timeline}
+	                  users={users}
+	                />
 	              ) : (
-	                <ApprovalTimeline
+	                <ApprovalProgress
+	                  aside={formatApprovalStatus(selectedDetail.approval.status, messages)}
 	                  language={language}
 	                  messages={messages}
 	                  records={selectedDetail.approval.timeline}

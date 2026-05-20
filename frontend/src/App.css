@@ -2089,6 +2089,7 @@ tbody tr:last-child td {
 .request-drawer .approval-section > .timeline,
 .request-drawer .approval-section > .timeline-list,
 .request-drawer .approval-section > .approval-path,
+.request-drawer .approval-section > .approval-progress,
 .request-drawer .approval-section > .approval-actions {
   margin: 12px;
   padding: 0;
@@ -2295,13 +2296,15 @@ tbody tr:last-child td {
 }
 
 .approval-path,
-.timeline-list {
+.timeline-list,
+.approval-progress {
   display: grid;
   gap: 8px;
   padding: 12px;
 }
 
-.approval-step {
+.approval-step,
+.approval-progress-event {
   min-width: 0;
   min-height: 58px;
   display: grid;
@@ -2314,7 +2317,15 @@ tbody tr:last-child td {
   background: var(--pf-panel-soft);
 }
 
-.approval-step > span {
+.approval-progress-event {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.approval-progress-item.approval-step {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.approval-step > span:first-child {
   width: 34px;
   height: 34px;
   display: grid;
@@ -2325,15 +2336,15 @@ tbody tr:last-child td {
   font-weight: 800;
 }
 
-.approval-step.warn > span {
+.approval-step.warn > span:first-child {
   background: var(--pf-warning);
 }
 
-.approval-step.danger > span {
+.approval-step.danger > span:first-child {
   background: var(--pf-danger);
 }
 
-.approval-step.neutral > span {
+.approval-step.neutral > span:first-child {
   background: #808983;
 }
 
@@ -2341,9 +2352,46 @@ tbody tr:last-child td {
   min-width: 0;
 }
 
-.approval-step strong {
+.approval-progress-main {
+  display: grid;
+  gap: 8px;
+}
+
+.approval-progress-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.approval-step > strong,
+.approval-progress-head strong {
   color: var(--pf-muted);
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.approval-progress-records {
+  display: grid;
+  gap: 6px;
+}
+
+.approval-progress-record {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(72px, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--pf-border);
+}
+
+.approval-progress-record .tag {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 9px;
+  line-height: 24px;
 }
 
 .timeline-item {
@@ -3018,6 +3066,7 @@ tbody tr:last-child td {
   .request-drawer .approval-section > .timeline,
   .request-drawer .approval-section > .timeline-list,
   .request-drawer .approval-section > .approval-path,
+  .request-drawer .approval-section > .approval-progress,
   .request-drawer .approval-section > .approval-actions {
     margin: 10px;
   }

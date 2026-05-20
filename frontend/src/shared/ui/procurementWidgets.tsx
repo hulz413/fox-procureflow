@@ -611,6 +611,152 @@ export function ApprovalTimeline({
   )
 }
 
+type ApprovalProgressEvent = {
+  kind: 'event'
+  record: ApprovalRecord
+}
+
+type ApprovalProgressStep = {
+  kind: 'step'
+  node: ApprovalNode
+  records: ApprovalRecord[]
+}
+
+type ApprovalProgressEntry = ApprovalProgressEvent | ApprovalProgressStep
+
+function compareApprovalRecords(first: ApprovalRecord, second: ApprovalRecord) {
+  return new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime()
+}
+
+function buildApprovalProgressEntries(nodes: ApprovalNode[], records: ApprovalRecord[]): ApprovalProgressEntry[] {
+  const sortedRecords = [...records].sort(compareApprovalRecords)
+  const sortedNodes = [...nodes].sort((first, second) => first.stepOrder - second.stepOrder)
+
+  if (sortedNodes.length === 0) {
+    return sortedRecords.map((record) => ({ kind: 'event', record }))
+  }
+
+  const nodeIds = new Set(sortedNodes.map((node) => node.nodeId))
+  const createdEvents = sortedRecords.filter((record) => !record.nodeId && record.action === 'CREATED')
+  const closingEvents = sortedRecords.filter((record) => !record.nodeId && record.action !== 'CREATED')
+  const orphanEvents = sortedRecords.filter((record) => record.nodeId && !nodeIds.has(record.nodeId))
+  const recordsByNodeId = sortedRecords
+    .filter((record) => record.nodeId && nodeIds.has(record.nodeId))
+    .reduce<Record<string, ApprovalRecord[]>>((groups, record) => {
+      const nodeId = record.nodeId as string
+      groups[nodeId] = [...(groups[nodeId] ?? []), record]
+      return groups
+    }, {})
+
+  return [
+    ...createdEvents.map((record) => ({ kind: 'event' as const, record })),
+    ...sortedNodes.map((node) => ({
+      kind: 'step' as const,
+      node,
+      records: recordsByNodeId[node.nodeId] ?? [],
+    })),
+    ...[...orphanEvents, ...closingEvents].sort(compareApprovalRecords).map((record) => ({
+      kind: 'event' as const,
+      record,
+    })),
+  ]
+}
+
+function ApprovalProgressRecordLine({
+  language,
+  messages,
+  record,
+  users,
+}: {
+  language: Language
+  messages: LocalizedMessages
+  record: ApprovalRecord
+  users: UserSummary[]
+}) {
+  return (
+    <div className="approval-progress-record">
+      <span className={`tag ${approvalActionToneOf(record.action)}`}>
+        {formatApprovalAction(record.action, messages)}
+      </span>
+      <TruncatedText className="text-small" text={userNameOf(record.actorId, users)} />
+      <TruncatedText
+        className="text-small"
+        text={`${formatDateTime(record.createdAt, language)}${record.comment ? ` · ${record.comment}` : ''}`}
+      />
+    </div>
+  )
+}
+
+export function ApprovalProgress({
+  aside,
+  language,
+  messages,
+  nodes = [],
+  records,
+  users,
+}: {
+  aside?: string
+  language: Language
+  messages: LocalizedMessages
+  nodes?: ApprovalNode[]
+  records: ApprovalRecord[]
+  users: UserSummary[]
+}) {
+  const entries = buildApprovalProgressEntries(nodes, records)
+
+  return (
+    <section className="approval-section">
+      <PanelTitle icon={<NodeIndexOutlined />} title={messages.approval.progress} aside={aside} />
+      <div className="approval-progress">
+        {entries.map((entry) =>
+          entry.kind === 'step' ? (
+            <div className={`approval-progress-item approval-step ${approvalNodeToneOf(entry.node.status)}`} key={entry.node.nodeId}>
+              <span>{entry.node.stepOrder}</span>
+              <div className="approval-progress-main">
+                <div className="approval-progress-head">
+                  <div>
+                    <TruncatedText className="text-strong" text={entry.node.nodeName} />
+                    <TruncatedText className="text-small" text={userNameOf(entry.node.approverId, users)} />
+                  </div>
+                  <strong>{formatApprovalNodeStatus(entry.node.status, messages)}</strong>
+                </div>
+                {entry.records.length > 0 && (
+                  <div className="approval-progress-records">
+                    {entry.records.map((record) => (
+                      <ApprovalProgressRecordLine
+                        key={record.recordId}
+                        language={language}
+                        messages={messages}
+                        record={record}
+                        users={users}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="approval-progress-item approval-progress-event" key={entry.record.recordId}>
+              <span className={`tag ${approvalActionToneOf(entry.record.action)}`}>
+                {formatApprovalAction(entry.record.action, messages)}
+              </span>
+              <div>
+                <TruncatedText className="text-strong" text={userNameOf(entry.record.actorId, users)} />
+                <TruncatedText
+                  className="text-small"
+                  text={`${formatDateTime(entry.record.createdAt, language)}${
+                    entry.record.comment ? ` · ${entry.record.comment}` : ''
+                  }`}
+                />
+              </div>
+            </div>
+          ),
+        )}
+      </div>
+    </section>
+  )
+}
+
 export function CompanyContextSelector({
   companies,
   label,

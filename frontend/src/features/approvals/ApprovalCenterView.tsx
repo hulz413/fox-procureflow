@@ -12,7 +12,7 @@ import { useListPagination } from '../../shared/hooks/useListPagination'
 import { routeParam } from '../../shared/utils/route'
 import { formatCurrency, getViewportCenter, formatApprovalStatus, approvalStatusToneOf, contextText, contextAmount, categoryNameOf, userNameOf, contextSupplierText, formatDateTime } from '../../shared/utils/procurement'
 import { ListPagination, TruncatedText, DisabledActionTooltip, AiResultPanel, PanelTitle } from '../../shared/ui/common'
-import { ApprovalPath, ApprovalTimeline } from '../../shared/ui/procurementWidgets'
+import { ApprovalProgress } from '../../shared/ui/procurementWidgets'
 
 export function ApprovalCenterView({
   activeDemoUser,
@@ -491,8 +491,7 @@ export function ApprovalCenterView({
             />
           </section>
 
-          <ApprovalPath messages={messages} nodes={detail.nodes} users={users} />
-          <ApprovalTimeline language={language} messages={messages} records={detail.timeline} users={users} />
+          <ApprovalProgress language={language} messages={messages} nodes={detail.nodes} records={detail.timeline} users={users} />
 
           <div className="approval-actions">
             <label>
