@@ -28,7 +28,7 @@ import {
   TranslationOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { keepPreviousData, QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, QueryClient, QueryClientProvider, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Avatar, ConfigProvider, Drawer, Dropdown, Layout, Modal, Popover, Select, Tooltip } from 'antd'
 import type { MenuProps, ThemeConfig } from 'antd'
 import enUS from 'antd/locale/en_US'
@@ -1541,6 +1541,9 @@ export const localizedContent = {
       name: '王然',
       role: '采购经理',
       email: 'wang.ran@xinghe.com',
+      masterDataManagement: '基础数据管理',
+      demoRole: '演示角色',
+      demoRoleUnavailable: '暂无可选演示角色',
       language: '切换语言',
       chinese: '中文',
       english: 'English',
@@ -1580,7 +1583,6 @@ export const localizedContent = {
       { label: '收货发票', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '三单匹配', icon: <SwapOutlined />, path: '/three-way-matching' },
       { label: '供应商池', icon: <TeamOutlined />, path: '/suppliers' },
-      { label: '主数据', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
       {
@@ -2234,6 +2236,9 @@ export const localizedContent = {
       name: 'Wang Ran',
       role: 'Procurement Manager',
       email: 'wang.ran@xinghe.com',
+      masterDataManagement: 'Master Data Admin',
+      demoRole: 'Demo Role',
+      demoRoleUnavailable: 'No demo roles available',
       language: 'Language',
       chinese: '中文',
       english: 'English',
@@ -2273,7 +2278,6 @@ export const localizedContent = {
       { label: 'Receiving & Invoices', icon: <InboxOutlined />, path: '/receipts-invoices' },
       { label: '3-Way Match', icon: <SwapOutlined />, path: '/three-way-matching' },
       { label: 'Supplier Pool', icon: <TeamOutlined />, path: '/suppliers' },
-      { label: 'Master Data', icon: <DatabaseOutlined />, path: '/master-data' },
     ],
     kpis: [
       {
@@ -2905,6 +2909,7 @@ function Workspace({
   const [isPoCreateDrawerOpen, setPoCreateDrawerOpen] = useState(false)
   const [receiptInvoiceCreateMode, setReceiptInvoiceCreateMode] = useState<ReceiptInvoiceCreateMode | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState(demoContext.activeCompany.companyId)
+  const [selectedDemoUserId, setSelectedDemoUserId] = useState('user-digital-buyer')
   const [dashboardScopeValue, setDashboardScopeValue] = useState<ProcurementDashboardScopeValue>('GROUP')
   const [isNotificationOpen, setNotificationOpen] = useState(false)
   const [isGlobalSearchOpen, setGlobalSearchOpen] = useState(false)
@@ -2998,6 +3003,14 @@ function Workspace({
     },
     language,
   ).companies
+  const allCompanyUsersQueries = useQueries({
+    queries: companies.map((company) => ({
+      queryKey: ['master-data', 'users', company.companyId],
+      queryFn: () => fetchUsers(company.companyId),
+      enabled: company.companyId.length > 0,
+      retry: 1,
+    })),
+  })
   const selectedCompany = companies.find((company) => company.companyId === selectedCompanyId) ?? context.activeCompany
   const healthStatus = data?.data.status ?? (isLoading ? 'CHECKING' : 'OFFLINE')
   const purchaseRequests = purchaseRequestsQuery.data?.data ?? []
@@ -3008,6 +3021,29 @@ function Workspace({
   const budgetAccounts = budgetAccountsQuery.data?.data ?? []
   const rfqs = rfqsQuery.data?.data ?? []
   const purchaseOrders = purchaseOrdersQuery.data?.data ?? []
+  const allDemoUsers = Array.from(
+    new Map(
+      [
+        ...users,
+        ...allCompanyUsersQueries.flatMap((query) => query.data?.data ?? []),
+      ].map((user) => [user.userId, user]),
+    ).values(),
+  ).filter((user) => user.active)
+  const demoUsersKey = allDemoUsers.map((user) => `${user.userId}:${user.companyId}`).join('|')
+  const preferredCompanyDemoUser =
+    allDemoUsers.find(
+      (user) =>
+        user.companyId === selectedCompanyId &&
+        user.roles.some((role) => role.roleId === 'role-procurement'),
+    ) ??
+    allDemoUsers.find((user) => user.companyId === selectedCompanyId) ??
+    allDemoUsers[0]
+  const selectedDemoUser =
+    allDemoUsers.find((user) => user.userId === selectedDemoUserId) ??
+    preferredCompanyDemoUser
+  const selectedDemoRoleLabel = selectedDemoUser
+    ? selectedDemoUser.roles.map((role) => role.roleName).join(' / ')
+    : messages.userMenu.role
   const foundationLoading =
     masterContextQuery.isLoading ||
     companiesQuery.isLoading ||
@@ -3034,18 +3070,53 @@ function Workspace({
     companiesQuery.isError ||
     suppliersQuery.isError ||
     categoriesQuery.isError
+  const demoRoleMenuItems: MenuProps['items'] =
+    allDemoUsers.length > 0
+      ? allDemoUsers.map((user) => {
+          const company = companies.find((item) => item.companyId === user.companyId)
+          const roleLabel = user.roles.map((role) => role.roleName).join(' / ')
+          return {
+            key: `demo-user:${user.userId}`,
+            label: (
+              <div className="user-menu-option">
+                <strong>{user.displayName}</strong>
+                <span>{roleLabel || user.positionTitle}</span>
+                <small>{company?.companyName ?? user.companyId}</small>
+              </div>
+            ),
+            disabled: user.userId === selectedDemoUser?.userId,
+          }
+        })
+      : [
+          {
+            key: 'demo-user:none',
+            label: messages.userMenu.demoRoleUnavailable,
+            disabled: true,
+          },
+        ]
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'profile',
       label: (
         <div className="user-menu-profile">
-          <strong>{messages.userMenu.name}</strong>
-          <span>{messages.userMenu.role}</span>
-          <small>{messages.userMenu.email}</small>
+          <strong>{selectedDemoUser?.displayName ?? messages.userMenu.name}</strong>
+          <span>{selectedDemoRoleLabel}</span>
+          <small>{selectedDemoUser?.email ?? messages.userMenu.email}</small>
         </div>
       ),
     },
     { type: 'divider' },
+    {
+      key: 'master-data',
+      icon: <DatabaseOutlined />,
+      label: messages.userMenu.masterDataManagement,
+    },
+    {
+      key: 'demo-role',
+      icon: <UserOutlined />,
+      label: messages.userMenu.demoRole,
+      children: demoRoleMenuItems,
+    },
     {
       key: 'language',
       icon: <TranslationOutlined />,
@@ -3114,6 +3185,25 @@ function Workspace({
   }
 
   const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
+    const keyText = String(key)
+
+    if (keyText === 'master-data') {
+      navigate('/master-data')
+      return
+    }
+
+    if (keyText.startsWith('demo-user:')) {
+      const nextUserId = keyText.replace('demo-user:', '')
+      const nextUser = allDemoUsers.find((user) => user.userId === nextUserId)
+      if (nextUser) {
+        setSelectedDemoUserId(nextUser.userId)
+        if (nextUser.companyId !== selectedCompanyId) {
+          setSelectedCompanyId(nextUser.companyId)
+        }
+      }
+      return
+    }
+
     if (key === 'language:zh' && language !== 'zh') {
       onLanguageChange()
     }
@@ -3160,6 +3250,17 @@ function Workspace({
       setSelectedCompanyId(context.activeCompany.companyId)
     }
   }, [companies, context.activeCompany.companyId, selectedCompanyId])
+
+  useEffect(() => {
+    if (!preferredCompanyDemoUser) {
+      return
+    }
+
+    const currentDemoUser = allDemoUsers.find((user) => user.userId === selectedDemoUserId)
+    if (!currentDemoUser || currentDemoUser.companyId !== selectedCompanyId) {
+      setSelectedDemoUserId(preferredCompanyDemoUser.userId)
+    }
+  }, [demoUsersKey, preferredCompanyDemoUser, selectedCompanyId, selectedDemoUserId])
 
   useEffect(() => {
     if (dashboardScopeValue === 'GROUP' || companies.length === 0) {
@@ -3308,7 +3409,7 @@ function Workspace({
         <div className="company-card">
           <BankOutlined />
           <div>
-            <strong>{context.activeCompany.companyName}</strong>
+            <strong>{selectedCompany.companyName}</strong>
             <span>{context.groupName}</span>
           </div>
         </div>
@@ -3429,7 +3530,7 @@ function Workspace({
           <section className="status-strip" aria-label={messages.aria.serviceStatus}>
             <span>{context.groupName}</span>
             <span>{context.supplierPoolScope}</span>
-            <span>{context.activeCompany.businessScope}</span>
+            <span>{selectedCompany.businessScope}</span>
             <StatusPill status={healthStatus} isError={isError} label={messages.status.backend} />
           </section>
 
@@ -3466,6 +3567,7 @@ function Workspace({
             />
           ) : isPurchaseRequestRoute ? (
               <PurchaseRequestView
+                activeDemoUser={selectedDemoUser}
                 budgetAccounts={budgetAccounts}
                 categories={categories}
                 isError={purchaseRequestsQuery.isError}
@@ -3485,6 +3587,7 @@ function Workspace({
             />
           ) : isApprovalRoute ? (
             <ApprovalCenterView
+              activeDemoUser={selectedDemoUser}
               categories={categories}
               isError={foundationError}
               isLoading={foundationLoading}
@@ -3496,6 +3599,7 @@ function Workspace({
             />
           ) : isRfqRoute ? (
             <RfqView
+              activeDemoUser={selectedDemoUser}
               categories={categories}
               isCreateOpen={isRfqCreateDrawerOpen}
               isError={rfqsQuery.isError || purchaseRequestsQuery.isError}
@@ -3515,6 +3619,7 @@ function Workspace({
             />
           ) : isPurchaseOrderRoute ? (
             <PurchaseOrderView
+              activeDemoUser={selectedDemoUser}
               categories={categories}
               isCreateOpen={isPoCreateDrawerOpen}
               isError={purchaseOrdersQuery.isError || rfqsQuery.isError}
@@ -3533,6 +3638,7 @@ function Workspace({
             />
           ) : isReceiptInvoiceRoute ? (
             <ReceiptsInvoicesView
+              activeDemoUser={selectedDemoUser}
               createMode={receiptInvoiceCreateMode}
               language={language}
               messages={messages}
@@ -3543,6 +3649,7 @@ function Workspace({
             />
           ) : isThreeWayMatchingRoute ? (
             <ThreeWayMatchingView
+              activeDemoUser={selectedDemoUser}
               language={language}
               messages={messages}
               selectedCompany={selectedCompany}
@@ -3747,6 +3854,7 @@ function ProcurementDashboardView({
 }
 
 function PurchaseRequestView({
+  activeDemoUser,
   budgetAccounts,
   categories,
   isError,
@@ -3762,6 +3870,7 @@ function PurchaseRequestView({
   suppliers,
   users,
 }: {
+  activeDemoUser?: UserSummary
   budgetAccounts: BudgetAccountSummary[]
   categories: CategorySummary[]
   isError: boolean
@@ -3792,7 +3901,7 @@ function PurchaseRequestView({
   const [aiDraftResponse, setAiDraftResponse] = useState<AiAssistantResponse | null>(null)
   const [aiRiskResponse, setAiRiskResponse] = useState<AiAssistantResponse | null>(null)
   const [form, setForm] = useState<PurchaseRequestFormState>(() =>
-    buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers),
+    buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers, activeDemoUser),
   )
   const purchaseRequestPagination = useListPagination(purchaseRequests, selectedCompanyId)
 
@@ -3821,18 +3930,23 @@ function PurchaseRequestView({
       setAiDraftResponse(null)
       setAiRiskResponse(null)
       setDetailDrawerOpen(false)
-      setForm(buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers))
+      setForm(buildPurchaseRequestFormDefaults(selectedCompanyId, users, categories, budgetAccounts, suppliers, activeDemoUser))
     }
-  }, [budgetAccounts, categories, isCreateOpen, selectedCompanyId, suppliers, users])
+  }, [activeDemoUser, budgetAccounts, categories, isCreateOpen, selectedCompanyId, suppliers, users])
 
   useEffect(() => {
     setForm((current) => {
       const currentRequester = users.find((user) => user.userId === current.requesterId)
+      const demoRequester =
+        activeDemoUser?.companyId === selectedCompanyId &&
+        activeDemoUser.roles.some((role) => role.roleId === 'role-applicant')
+          ? activeDemoUser
+          : undefined
       const applicant = users.find((user) => user.roles.some((role) => role.roleId === 'role-applicant'))
       const requester =
         currentRequester?.roles.some((role) => role.roleId === 'role-applicant')
           ? currentRequester
-          : applicant ?? users.find((user) => user.active) ?? users[0]
+          : demoRequester ?? applicant ?? users.find((user) => user.active) ?? users[0]
       const currentCategory = categories.find((category) => category.categoryId === current.categoryId)
       const defaultCategory = currentCategory ?? categories[0]
       const budgetForCurrentCategory = budgetAccounts.find(
@@ -3859,7 +3973,7 @@ function PurchaseRequestView({
         supplierId: supplier?.supplierId ?? '',
       }
     })
-  }, [budgetAccounts, categories, selectedCompanyId, suppliers, users])
+  }, [activeDemoUser, budgetAccounts, categories, selectedCompanyId, suppliers, users])
 
   const detailQuery = useQuery({
     queryKey: ['purchase-request', selectedRequestId],
@@ -4633,6 +4747,7 @@ function PurchaseRequestView({
 }
 
 function ApprovalCenterView({
+  activeDemoUser,
   categories,
   isError,
   isLoading,
@@ -4642,6 +4757,7 @@ function ApprovalCenterView({
   selectedCompanyId,
   users,
 }: {
+  activeDemoUser?: UserSummary
   categories: CategorySummary[]
   isError: boolean
   isLoading: boolean
@@ -4662,7 +4778,9 @@ function ApprovalCenterView({
       user.companyId === selectedCompanyId &&
       user.roles.some((role) => role.roleId === 'role-approver' || role.roleId === 'role-finance'),
   )
-  const fallbackApprover = approvers[0]
+  const fallbackApprover =
+    approvers.find((user) => user.userId === activeDemoUser?.userId) ??
+    approvers[0]
   const [selectedApproverId, setSelectedApproverId] = useState(fallbackApprover?.userId ?? '')
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | undefined>()
   const [isDetailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -4671,12 +4789,17 @@ function ApprovalCenterView({
   const [aiRiskResponse, setAiRiskResponse] = useState<AiAssistantResponse | null>(null)
 
   useEffect(() => {
+    if (fallbackApprover && activeDemoUser?.userId === fallbackApprover.userId && selectedApproverId !== fallbackApprover.userId) {
+      setSelectedApproverId(fallbackApprover.userId)
+      return
+    }
+
     if (approvers.some((user) => user.userId === selectedApproverId)) {
       return
     }
 
     setSelectedApproverId(fallbackApprover?.userId ?? '')
-  }, [approvers, fallbackApprover?.userId, selectedApproverId])
+  }, [activeDemoUser?.userId, approvers, fallbackApprover, selectedApproverId])
 
   const tasksQuery = useQuery({
     queryKey: ['approval-tasks', selectedCompanyId, selectedApproverId],
@@ -5097,6 +5220,7 @@ function ApprovalCenterView({
 }
 
 function RfqView({
+  activeDemoUser,
   categories,
   isCreateOpen,
   isError,
@@ -5112,6 +5236,7 @@ function RfqView({
   suppliers,
   users,
 }: {
+  activeDemoUser?: UserSummary
   categories: CategorySummary[]
   isCreateOpen: boolean
   isError: boolean
@@ -5146,8 +5271,13 @@ function RfqView({
   const buyers = users.filter(
     (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
   )
+  const activeBuyer =
+    activeDemoUser?.companyId === selectedCompanyId &&
+    activeDemoUser.roles.some((role) => role.roleId === 'role-procurement')
+      ? activeDemoUser
+      : undefined
   const [createForm, setCreateForm] = useState<RfqCreateFormState>(() =>
-    buildRfqCreateFormDefaults(selectedCompanyId, approvedRequests, suppliers, buyers),
+    buildRfqCreateFormDefaults(selectedCompanyId, approvedRequests, suppliers, buyers, activeBuyer),
   )
   const [quoteForm, setQuoteForm] = useState<RfqQuoteFormState>(() => buildRfqQuoteFormDefaults())
   const [isQuoteUploading, setQuoteUploading] = useState(false)
@@ -5176,15 +5306,15 @@ function RfqView({
     setCreateDirty(false)
     setFeedback(null)
     setDetailDrawerOpen(false)
-    setCreateForm(buildRfqCreateFormDefaults(selectedCompanyId, approvedRequests, suppliers, buyers))
-  }, [approvedRequests, buyers, isCreateOpen, selectedCompanyId, suppliers])
+    setCreateForm(buildRfqCreateFormDefaults(selectedCompanyId, approvedRequests, suppliers, buyers, activeBuyer))
+  }, [activeBuyer, approvedRequests, buyers, isCreateOpen, selectedCompanyId, suppliers])
 
   useEffect(() => {
     setCreateForm((current) => {
       const currentRequest = approvedRequests.find((request) => request.requestId === current.requestId)
       const request = currentRequest ?? approvedRequests[0]
       const procurementUser =
-        buyers.find((buyer) => buyer.userId === current.procurementUserId) ?? buyers[0]
+        buyers.find((buyer) => buyer.userId === current.procurementUserId) ?? activeBuyer ?? buyers[0]
       const validSupplierIds = suppliersForCategory(request?.categoryId ?? '', suppliers).map((supplier) => supplier.supplierId)
       const supplierIds = current.supplierIds.filter((supplierId) => validSupplierIds.includes(supplierId))
       const next = {
@@ -5204,7 +5334,7 @@ function RfqView({
       }
       return next
     })
-  }, [approvedRequests, buyers, suppliers])
+  }, [activeBuyer, approvedRequests, buyers, suppliers])
 
   const detailQuery = useQuery({
     queryKey: ['rfq-detail', selectedRfqId, selectedCompanyId],
@@ -5964,6 +6094,7 @@ function RfqView({
 }
 
 function PurchaseOrderView({
+  activeDemoUser,
   categories,
   isCreateOpen,
   isError,
@@ -5978,6 +6109,7 @@ function PurchaseOrderView({
   selectedCompanyId,
   users,
 }: {
+  activeDemoUser?: UserSummary
   categories: CategorySummary[]
   isCreateOpen: boolean
   isError: boolean
@@ -6006,10 +6138,15 @@ function PurchaseOrderView({
   const buyers = users.filter(
     (user) => user.active && user.roles.some((role) => role.roleId === 'role-procurement'),
   )
+  const activeBuyer =
+    activeDemoUser?.companyId === selectedCompanyId &&
+    activeDemoUser.roles.some((role) => role.roleId === 'role-procurement')
+      ? activeDemoUser
+      : undefined
   const orderedRfqIds = new Set(purchaseOrders.map((purchaseOrder) => purchaseOrder.rfqId))
   const eligibleRfqs = rfqs.filter((rfq) => rfq.status === 'COMPARISON_READY' && !orderedRfqIds.has(rfq.rfqId))
   const [createForm, setCreateForm] = useState<PurchaseOrderCreateFormState>(() =>
-    buildPurchaseOrderCreateFormDefaults(selectedCompanyId, eligibleRfqs, buyers),
+    buildPurchaseOrderCreateFormDefaults(selectedCompanyId, eligibleRfqs, buyers, activeBuyer),
   )
   const purchaseOrderPagination = useListPagination(purchaseOrders, selectedCompanyId)
 
@@ -6036,14 +6173,15 @@ function PurchaseOrderView({
     setCreateDirty(false)
     setFeedback(null)
     setDetailDrawerOpen(false)
-    setCreateForm(buildPurchaseOrderCreateFormDefaults(selectedCompanyId, eligibleRfqs, buyers))
-  }, [buyers, eligibleRfqs, isCreateOpen, selectedCompanyId])
+    setCreateForm(buildPurchaseOrderCreateFormDefaults(selectedCompanyId, eligibleRfqs, buyers, activeBuyer))
+  }, [activeBuyer, buyers, eligibleRfqs, isCreateOpen, selectedCompanyId])
 
   useEffect(() => {
     setCreateForm((current) => {
       const selectedRfq = eligibleRfqs.find((rfq) => rfq.rfqId === current.rfqId) ?? eligibleRfqs[0]
       const buyer =
         buyers.find((item) => item.userId === current.procurementUserId) ??
+        activeBuyer ??
         buyers.find((item) => item.companyId === selectedCompanyId) ??
         buyers[0]
       const next = {
@@ -6056,7 +6194,7 @@ function PurchaseOrderView({
       }
       return next
     })
-  }, [buyers, eligibleRfqs, selectedCompanyId])
+  }, [activeBuyer, buyers, eligibleRfqs, selectedCompanyId])
 
   const detailQuery = useQuery({
     queryKey: ['purchase-order-detail', selectedPoId, selectedCompanyId],
@@ -6802,12 +6940,14 @@ function PurchaseOrderView({
 }
 
 function ThreeWayMatchingView({
+  activeDemoUser,
   language,
   messages,
   selectedCompany,
   selectedCompanyId,
   users,
 }: {
+  activeDemoUser?: UserSummary
   language: Language
   messages: LocalizedMessages
   selectedCompany: CompanyContext
@@ -6828,7 +6968,11 @@ function ThreeWayMatchingView({
   const [aiMatchingResponse, setAiMatchingResponse] = useState<AiAssistantResponse | null>(null)
   const activeUsers = users.filter((user) => user.active)
   const financeUsers = activeUsers.filter((user) => user.roles.some((role) => role.roleId === 'role-finance'))
-  const actionActor = financeUsers[0] ?? activeUsers[0]
+  const actionActor =
+    activeDemoUser?.companyId === selectedCompanyId &&
+    activeDemoUser.roles.some((role) => role.roleId === 'role-finance')
+      ? activeDemoUser
+      : financeUsers[0] ?? activeUsers[0]
   const matchesQuery = useQuery({
     queryKey: ['three-way-matching', selectedCompanyId],
     queryFn: () => fetchThreeWayMatches(selectedCompanyId),
@@ -7393,6 +7537,7 @@ export function shouldConfirmReceiptInvoiceDrawerClose(
 }
 
 function ReceiptsInvoicesView({
+  activeDemoUser,
   createMode,
   language,
   messages,
@@ -7401,6 +7546,7 @@ function ReceiptsInvoicesView({
   selectedCompanyId,
   users,
 }: {
+  activeDemoUser?: UserSummary
   createMode: ReceiptInvoiceCreateMode | null
   language: Language
   messages: LocalizedMessages
@@ -7449,11 +7595,23 @@ function ReceiptsInvoicesView({
   const receiptUsers = activeUsers.filter((user) =>
     user.roles.some((role) => role.roleId === 'role-warehouse' || role.roleId === 'role-procurement' || role.roleId === 'role-demo-operator'),
   )
+  const activeReceiptUser =
+    activeDemoUser?.companyId === selectedCompanyId &&
+    activeDemoUser.roles.some((role) =>
+      role.roleId === 'role-warehouse' || role.roleId === 'role-procurement' || role.roleId === 'role-demo-operator'
+    )
+      ? activeDemoUser
+      : undefined
+  const activeFinanceUser =
+    activeDemoUser?.companyId === selectedCompanyId &&
+    activeDemoUser.roles.some((role) => role.roleId === 'role-finance')
+      ? activeDemoUser
+      : undefined
   const [receiptForm, setReceiptForm] = useState<ReceiptCreateFormState>(() =>
-    buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId),
+    buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, undefined, activeReceiptUser),
   )
   const [invoiceForm, setInvoiceForm] = useState<InvoiceCreateFormState>(() =>
-    buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId),
+    buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, undefined, activeFinanceUser),
   )
 
   useEffect(() => {
@@ -7479,9 +7637,9 @@ function ReceiptsInvoicesView({
     setCreateDirty(false)
     setFeedback(null)
     setDetailDrawerOpen(false)
-    setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId))
-    setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId))
-  }, [createMode, financeUsers, fulfillmentRows, receiptUsers, selectedCompanyId])
+    setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, undefined, activeReceiptUser))
+    setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, undefined, activeFinanceUser))
+  }, [activeFinanceUser, activeReceiptUser, createMode, financeUsers, fulfillmentRows, receiptUsers, selectedCompanyId])
 
   const receiptMutation = useMutation({
     mutationFn: createReceipt,
@@ -7598,9 +7756,9 @@ function ReceiptsInvoicesView({
   const openCreateMode = (mode: ReceiptInvoiceCreateMode, po?: FulfillmentPurchaseOrder) => {
     const row = po ?? fulfillmentRows[0]
     if (mode === 'receipt') {
-      setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, row?.poId))
+      setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, row?.poId, activeReceiptUser))
     } else {
-      setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, row?.poId))
+      setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, row?.poId, activeFinanceUser))
     }
     setCreateDirty(false)
     setFeedback(null)
@@ -7609,12 +7767,12 @@ function ReceiptsInvoicesView({
 
   const updateReceiptPo = (poId: string) => {
     setCreateDirty(true)
-    setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, poId))
+    setReceiptForm(buildReceiptCreateFormDefaults(fulfillmentRows, receiptUsers, selectedCompanyId, poId, activeReceiptUser))
   }
 
   const updateInvoicePo = (poId: string) => {
     setCreateDirty(true)
-    setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, poId))
+    setInvoiceForm(buildInvoiceCreateFormDefaults(fulfillmentRows, financeUsers, selectedCompanyId, poId, activeFinanceUser))
   }
 
   const updateReceiptLine = (poLineId: string, receivedQuantity: number) => {
@@ -8327,7 +8485,7 @@ function FulfillmentDetail({
   const invoiceDisabledReason = po.invoiceSummary === 'FULLY_INVOICED' ? messages.receiptInvoice.fullyInvoicedReason : undefined
 
   return (
-    <div className="request-detail rfq-detail">
+    <div className="request-detail rfq-detail fulfillment-detail">
       <div className="detail-heading">
         <div>
           <TruncatedText className="text-strong" text={po.title} />
@@ -10200,8 +10358,13 @@ function buildPurchaseRequestFormDefaults(
   categories: CategorySummary[],
   budgetAccounts: BudgetAccountSummary[],
   suppliers: SupplierSummary[],
+  preferredRequester?: UserSummary,
 ): PurchaseRequestFormState {
   const requester =
+    (preferredRequester?.companyId === selectedCompanyId &&
+    preferredRequester.roles.some((role) => role.roleId === 'role-applicant')
+      ? preferredRequester
+      : undefined) ??
     users.find((user) => user.roles.some((role) => role.roleId === 'role-applicant')) ??
     users.find((user) => user.active) ??
     users[0]
@@ -10435,10 +10598,12 @@ function buildRfqCreateFormDefaults(
   approvedRequests: PurchaseRequestListItem[],
   suppliers: SupplierSummary[],
   buyers: UserSummary[],
+  preferredBuyer?: UserSummary,
 ): RfqCreateFormState {
   const request = approvedRequests.find((item) => item.companyId === selectedCompanyId) ?? approvedRequests[0]
   const candidateSuppliers = suppliersForCategory(request?.categoryId ?? '', suppliers)
   const buyer =
+    (preferredBuyer?.companyId === selectedCompanyId ? preferredBuyer : undefined) ??
     buyers.find((user) => user.companyId === selectedCompanyId) ??
     buyers[0]
 
@@ -10480,9 +10645,11 @@ function buildPurchaseOrderCreateFormDefaults(
   selectedCompanyId: string,
   eligibleRfqs: RfqListItem[],
   buyers: UserSummary[],
+  preferredBuyer?: UserSummary,
 ): PurchaseOrderCreateFormState {
   const rfq = eligibleRfqs.find((item) => item.companyId === selectedCompanyId) ?? eligibleRfqs[0]
   const buyer =
+    (preferredBuyer?.companyId === selectedCompanyId ? preferredBuyer : undefined) ??
     buyers.find((user) => user.companyId === selectedCompanyId) ??
     buyers[0]
 
@@ -10503,12 +10670,14 @@ function buildReceiptCreateFormDefaults(
   users: UserSummary[],
   selectedCompanyId: string,
   preferredPoId?: string,
+  preferredReceiver?: UserSummary,
 ): ReceiptCreateFormState {
   const po =
     fulfillmentRows.find((row) => row.poId === preferredPoId) ??
     fulfillmentRows.find((row) => row.receiptSummary !== 'FULLY_RECEIVED') ??
     fulfillmentRows[0]
   const receiver =
+    (preferredReceiver?.companyId === selectedCompanyId ? preferredReceiver : undefined) ??
     users.find((user) => user.companyId === selectedCompanyId) ??
     users[0]
 
@@ -10534,12 +10703,14 @@ function buildInvoiceCreateFormDefaults(
   users: UserSummary[],
   selectedCompanyId: string,
   preferredPoId?: string,
+  preferredRegisteredUser?: UserSummary,
 ): InvoiceCreateFormState {
   const po =
     fulfillmentRows.find((row) => row.poId === preferredPoId) ??
     fulfillmentRows.find((row) => row.invoiceSummary !== 'FULLY_INVOICED') ??
     fulfillmentRows[0]
   const registeredUser =
+    (preferredRegisteredUser?.companyId === selectedCompanyId ? preferredRegisteredUser : undefined) ??
     users.find((user) => user.companyId === selectedCompanyId) ??
     users[0]
 
