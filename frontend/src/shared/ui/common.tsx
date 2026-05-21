@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { DEFAULT_LIST_PAGE_SIZE, LIST_PAGE_SIZE_OPTIONS } from '../../domain/types'
 import type { Language, AiAssistantResponse, AiDraftPreviewResult, AiRiskReviewResult, AiRfqExplanationResult, AiMatchingExplanationResult } from '../../domain/types'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
-import { formatOptionalCurrency, formatDateTime } from '../utils/procurement'
+import { formatOptionalCurrency, formatDateTime, formatRiskLevel, riskToneOf } from '../utils/procurement'
 
 export function ListPagination({
   currentPage,
@@ -269,10 +269,11 @@ function AiResultBody({
     const result = response.result as AiRiskReviewResult
     return (
       <div className="ai-result-content">
-        <AiSummaryLine label={messages.ai.riskLevel} value={result.riskLevel} />
-        <AiSummaryLine
-          label={messages.ai.continueRecommended}
-          value={typeof result.continueRecommended === 'boolean' ? String(result.continueRecommended) : undefined}
+        <AiRiskSummaryRow
+          continueRecommended={result.continueRecommended}
+          language={language}
+          messages={messages}
+          riskLevel={result.riskLevel}
         />
         <AiObjectListBlock
           title={messages.ai.riskItems}
@@ -322,6 +323,43 @@ function AiResultBody({
       <AiListBlock title={messages.ai.likelyCauses} values={result.likelyCauses} />
       <AiListBlock title={messages.ai.suggestedActions} values={result.suggestedActions} />
       <AiListBlock title={messages.ai.requiredFollowUpData} values={result.requiredFollowUpData} />
+    </div>
+  )
+}
+
+function AiRiskSummaryRow({
+  continueRecommended,
+  language,
+  messages,
+  riskLevel,
+}: {
+  continueRecommended?: boolean
+  language: Language
+  messages: LocalizedMessages
+  riskLevel?: string
+}) {
+  if (!riskLevel && typeof continueRecommended !== 'boolean') {
+    return null
+  }
+
+  return (
+    <div className="ai-risk-summary-row">
+      {riskLevel ? (
+        <div className="ai-risk-summary-item">
+          <span>{messages.ai.riskLevel}</span>
+          <strong className={`tag ai-risk-pill ${riskToneOf(riskLevel)}`}>
+            {formatRiskLevel(riskLevel, language)}
+          </strong>
+        </div>
+      ) : null}
+      {typeof continueRecommended === 'boolean' ? (
+        <div className="ai-risk-summary-item">
+          <span>{messages.ai.continueRecommended}</span>
+          <strong className={`tag ai-decision-pill ${continueRecommended ? 'success' : 'warn'}`}>
+            {continueRecommended ? messages.ai.continueRecommendedYes : messages.ai.continueRecommendedNo}
+          </strong>
+        </div>
+      ) : null}
     </div>
   )
 }

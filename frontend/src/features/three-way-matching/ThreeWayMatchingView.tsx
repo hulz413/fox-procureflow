@@ -78,6 +78,7 @@ export function ThreeWayMatchingView({
         : matchingRows
   const matchingPagination = useListPagination(tabRows, `${selectedCompanyId}:${activeTab}`)
   const detail = detailQuery.data?.data
+  const detailQuantityUnit = commonFulfillmentUnit(detail?.lines ?? [])
   const isError = matchesQuery.isError || exceptionsQuery.isError || detailQuery.isError
   const isLoading = matchesQuery.isLoading || exceptionsQuery.isLoading
   const totals = {
@@ -465,11 +466,31 @@ export function ThreeWayMatchingView({
               </div>
               <div>
                 <dt>{messages.matching.receiptSummary}</dt>
-                <dd>{`${detail.receiptSummary.receiptCount} · ${detail.receiptSummary.receivedQuantity}`}</dd>
+                <dd>
+                  {formatMatchingSummaryValue({
+                    count: detail.receiptSummary.receiptCount,
+                    language,
+                    pluralLabel: messages.matching.receiptDocumentPlural,
+                    quantity: detail.receiptSummary.receivedQuantity,
+                    quantityLabel: messages.matching.receivedQuantityLabel,
+                    singularLabel: messages.matching.receiptDocumentSingular,
+                    unit: detailQuantityUnit,
+                  })}
+                </dd>
               </div>
               <div>
                 <dt>{messages.matching.invoiceSummary}</dt>
-                <dd>{`${detail.invoiceSummary.invoiceCount} · ${detail.invoiceSummary.invoicedQuantity}`}</dd>
+                <dd>
+                  {formatMatchingSummaryValue({
+                    count: detail.invoiceSummary.invoiceCount,
+                    language,
+                    pluralLabel: messages.matching.invoiceDocumentPlural,
+                    quantity: detail.invoiceSummary.invoicedQuantity,
+                    quantityLabel: messages.matching.invoicedQuantityLabel,
+                    singularLabel: messages.matching.invoiceDocumentSingular,
+                    unit: detailQuantityUnit,
+                  })}
+                </dd>
               </div>
             </dl>
 
@@ -625,6 +646,48 @@ export function ThreeWayMatchingView({
       </Drawer>
     </>
   )
+}
+
+function commonFulfillmentUnit(lines: Array<{ unit: string }>) {
+  if (lines.length === 0) {
+    return ''
+  }
+
+  const firstUnit = lines[0]?.unit ?? ''
+  return firstUnit && lines.every((line) => line.unit === firstUnit) ? firstUnit : ''
+}
+
+function formatMatchingSummaryValue({
+  count,
+  language,
+  pluralLabel,
+  quantity,
+  quantityLabel,
+  singularLabel,
+  unit,
+}: {
+  count: number
+  language: Language
+  pluralLabel: string
+  quantity: number
+  quantityLabel: string
+  singularLabel: string
+  unit: string
+}) {
+  const separator = language === 'zh' ? '，' : ', '
+  const documentLabel = count === 1 ? singularLabel : pluralLabel
+  return `${formatQuantityNumber(count, language)} ${documentLabel}${separator}${quantityLabel} ${formatQuantityWithUnit(quantity, unit, language)}`
+}
+
+function formatQuantityWithUnit(quantity: number, unit: string, language: Language) {
+  const formattedQuantity = formatQuantityNumber(quantity, language)
+  return unit ? `${formattedQuantity} ${unit}` : formattedQuantity
+}
+
+function formatQuantityNumber(quantity: number, language: Language) {
+  return new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
+    maximumFractionDigits: 2,
+  }).format(quantity)
 }
 
 function matchingTabParam(search: string): ThreeWayMatchTab | '' {

@@ -740,70 +740,73 @@ export function RfqView({
                     onChange={(event) => updateQuoteForm('deliveryDate', event.target.value)}
                   />
                 </label>
-                <label>
-                  <span>{messages.rfq.supplierScore}</span>
-                  <input
-                    min="0"
-                    max="100"
-                    required
-                    step="0.01"
-                    type="number"
-                    value={quoteForm.supplierScore}
-                    onChange={(event) => updateQuoteForm('supplierScore', Number(event.target.value))}
+                <div className="quote-risk-fields">
+                  <label>
+                    <span>{messages.rfq.supplierScore}</span>
+                    <input
+                      min="0"
+                      max="100"
+                      required
+                      step="0.01"
+                      type="number"
+                      value={quoteForm.supplierScore}
+                      onChange={(event) => updateQuoteForm('supplierScore', Number(event.target.value))}
+                    />
+                  </label>
+                  <label>
+                    <span>{messages.rfq.riskNote}</span>
+                    <textarea value={quoteForm.riskNote} onChange={(event) => updateQuoteForm('riskNote', event.target.value)} />
+                  </label>
+                </div>
+                <div className="quote-attachment-fields">
+                  <label>
+                    <span>{messages.rfq.attachmentFile}</span>
+                    <FilePicker
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt"
+                      ariaLabel={messages.rfq.attachmentFile}
+                      chooseLabel={messages.rfq.chooseAttachment}
+                      noFileLabel={messages.rfq.noAttachmentSelected}
+                      selectedLabel={quoteForm.file?.name ?? quoteForm.fileName}
+                      onFileChange={(file) => {
+                        setQuoteDirty(true)
+                        setQuoteForm((current) => ({
+                          ...current,
+                          file,
+                          fileName: file?.name ?? current.fileName,
+                          uploadedAttachments: file ? [] : current.uploadedAttachments,
+                        }))
+                      }}
+                    />
+                  </label>
+                  <label>
+                    <span>{messages.rfq.attachmentDescription}</span>
+                    <input
+                      value={quoteForm.fileDescription}
+                      onChange={(event) => updateQuoteForm('fileDescription', event.target.value)}
+                    />
+                  </label>
+                  <AttachmentList
+                    attachments={[
+                      ...quoteForm.uploadedAttachments,
+                      ...(quoteForm.uploadedAttachments.length === 0 && quoteForm.fileName
+                        ? [{
+                            attachmentId: '',
+                            contentType: 'application/pdf',
+                            description: quoteForm.fileDescription || null,
+                            downloadable: false,
+                            downloadDisabledReason: quoteForm.file
+                              ? messages.rfq.pendingUploadReason
+                              : messages.rfq.metadataOnlyReason,
+                            downloadUrl: null,
+                            originalFileName: quoteForm.fileName,
+                            sizeBytes: quoteForm.file?.size ?? 0,
+                            storageStatus: quoteForm.file ? 'PENDING' : 'METADATA_ONLY',
+                          }]
+                        : []),
+                    ]}
+                    messages={messages}
                   />
-                </label>
-                <label>
-                  <span>{messages.rfq.attachmentFile}</span>
-                  <FilePicker
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt"
-                    ariaLabel={messages.rfq.attachmentFile}
-                    chooseLabel={messages.rfq.chooseAttachment}
-                    noFileLabel={messages.rfq.noAttachmentSelected}
-                    selectedLabel={quoteForm.file?.name ?? quoteForm.fileName}
-                    onFileChange={(file) => {
-                      setQuoteDirty(true)
-                      setQuoteForm((current) => ({
-                        ...current,
-                        file,
-                        fileName: file?.name ?? current.fileName,
-                        uploadedAttachments: file ? [] : current.uploadedAttachments,
-                      }))
-                    }}
-                  />
-                </label>
-                <label className="form-wide">
-                  <span>{messages.rfq.riskNote}</span>
-                  <textarea value={quoteForm.riskNote} onChange={(event) => updateQuoteForm('riskNote', event.target.value)} />
-                </label>
-                <label className="form-wide">
-                  <span>{messages.rfq.attachmentDescription}</span>
-                  <input
-                    value={quoteForm.fileDescription}
-                    onChange={(event) => updateQuoteForm('fileDescription', event.target.value)}
-                  />
-                </label>
-                <AttachmentList
-                  attachments={[
-                    ...quoteForm.uploadedAttachments,
-                    ...(quoteForm.uploadedAttachments.length === 0 && quoteForm.fileName
-                      ? [{
-                          attachmentId: '',
-                          contentType: 'application/pdf',
-                          description: quoteForm.fileDescription || null,
-                          downloadable: false,
-                          downloadDisabledReason: quoteForm.file
-                            ? messages.rfq.pendingUploadReason
-                            : messages.rfq.metadataOnlyReason,
-                          downloadUrl: null,
-                          originalFileName: quoteForm.fileName,
-                          sizeBytes: quoteForm.file?.size ?? 0,
-                          storageStatus: quoteForm.file ? 'PENDING' : 'METADATA_ONLY',
-                        }]
-                      : []),
-                  ]}
-                  className="form-wide"
-                  messages={messages}
-                />
+                </div>
                 <DisabledActionTooltip className="form-wide" title={saveQuoteDisabledReason}>
                   <button className="primary-button form-wide" disabled={Boolean(saveQuoteDisabledReason)} type="submit">
                     <CheckCircleOutlined />

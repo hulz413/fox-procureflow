@@ -15,20 +15,27 @@ export function formatCurrency(value: number, currency: string, language: Langua
 }
 
 export function formatRiskLevel(riskLevel: string, language: Language) {
+  const normalizedRiskLevel = riskLevel.toLowerCase()
   const labels =
     language === 'zh'
       ? { high: '高', low: '低', medium: '中' }
       : { high: 'High', low: 'Low', medium: 'Medium' }
 
-  return labels[riskLevel as keyof typeof labels] ?? riskLevel
+  return labels[normalizedRiskLevel as keyof typeof labels] ?? riskLevel
 }
 
 export function riskToneOf(riskLevel: string) {
-  if (riskLevel === 'high') {
+  const normalizedRiskLevel = riskLevel.toLowerCase()
+
+  if (normalizedRiskLevel === 'high') {
     return 'danger'
   }
 
-  return riskLevel === 'medium' ? 'warn' : ''
+  if (normalizedRiskLevel === 'medium') {
+    return 'warn'
+  }
+
+  return normalizedRiskLevel === 'low' ? 'success' : ''
 }
 
 export function formatSupplierStatus(status: string, messages: LocalizedMessages) {

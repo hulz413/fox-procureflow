@@ -753,6 +753,10 @@ export function PurchaseOrderView({
               <PanelTitle icon={<InboxOutlined />} title={messages.purchaseOrder.deliverySchedule} />
               <dl className="detail-grid">
                 <div>
+                  <dt>{messages.purchaseOrder.plannedDeliveryDate}</dt>
+                  <dd>{formatDate(detail.deliverySchedule.plannedDeliveryDate, language)}</dd>
+                </div>
+                <div>
                   <dt>{messages.purchaseOrder.deliveryLocation}</dt>
                   <dd>
                     <TruncatedText text={detail.deliverySchedule.deliveryLocation} />
