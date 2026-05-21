@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ADMIN_ROLE_ID, APPROVER_ROLE_ID, FINANCE_ROLE_ID, demoUserHasExactRole } from '../../demoRoleCapabilities'
 import { ALL_APPROVERS_VALUE } from '../../domain/types'
-import type { Language, UserSummary, CategorySummary, SupplierSummary, BudgetAccountSummary, DepartmentSummary, AiAssistantResponse } from '../../domain/types'
+import type { Language, UserSummary, CategorySummary, SupplierSummary, BudgetAccountSummary, DepartmentSummary, AiAssistantResponse, ApprovalTask } from '../../domain/types'
 import { fetchApprovalTasks, fetchApprovalDetail, approveApproval, rejectApproval, withdrawApproval, reviewAiPurchaseRequestRisk } from '../../api/client'
 import type { LocalizedMessages } from '../../i18n/localizedContent'
 import { useListPagination } from '../../shared/hooks/useListPagination'
@@ -311,12 +311,13 @@ export function ApprovalCenterView({
                 <th>{messages.purchaseRequest.title}</th>
                 <th>{messages.purchaseRequest.totalAmount}</th>
                 <th>{messages.approval.node}</th>
+                <th>{messages.approval.arrivedAt}</th>
               </tr>
             </thead>
             <tbody>
               {tasks.length === 0 ? (
                 <tr>
-                  <td colSpan={4}>
+                  <td colSpan={5}>
                     {isLoading || tasksLoading ? messages.approval.loading : messages.approval.emptyTasks}
                   </td>
                 </tr>
@@ -343,6 +344,11 @@ export function ApprovalCenterView({
                     <td>{formatCurrency(task.totalAmount, task.currency, language)}</td>
                     <td>
                       <TruncatedText text={task.nodeName} />
+                    </td>
+                    <td>
+                      <span className="approval-arrival-time" title={approvalTaskArrivalTitle(task, messages, language)}>
+                        <TruncatedText text={formatApprovalWaitingDuration(task.activatedAt, language) || '-'} />
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -420,6 +426,12 @@ export function ApprovalCenterView({
               <dt>{messages.approval.startedAt}</dt>
               <dd>{formatDateTime(detail.startedAt, language)}</dd>
             </div>
+            {activeNode?.activatedAt ? (
+              <div>
+                <dt>{messages.approval.arrivedAt}</dt>
+                <dd>{formatDateTime(activeNode.activatedAt, language)}</dd>
+              </div>
+            ) : null}
           </dl>
 
           <section className="approval-context">
@@ -528,4 +540,47 @@ export function ApprovalCenterView({
     </Drawer>
     </>
   )
+}
+
+function approvalTaskArrivalTitle(task: ApprovalTask, messages: LocalizedMessages, language: Language) {
+  return task.activatedAt ? `${messages.approval.arrivedAt}: ${formatDateTime(task.activatedAt, language)}` : undefined
+}
+
+function formatApprovalWaitingDuration(activatedAt: string | null, language: Language) {
+  if (!activatedAt) {
+    return ''
+  }
+
+  const elapsedMs = Date.now() - new Date(activatedAt).getTime()
+  const safeElapsedMs = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0
+  const elapsedMinutes = Math.floor(safeElapsedMs / 60_000)
+  const elapsedHours = Math.floor(safeElapsedMs / 3_600_000)
+  const elapsedDays = Math.floor(elapsedHours / 24)
+  const remainingHours = elapsedHours % 24
+
+  if (language === 'zh') {
+    if (elapsedMinutes < 1) {
+      return '已等待不足1分钟'
+    }
+    if (elapsedHours < 1) {
+      return `已等待 ${elapsedMinutes}分钟`
+    }
+    if (elapsedDays < 1) {
+      return `已等待 ${elapsedHours}小时`
+    }
+
+    return `已等待 ${elapsedDays}天${remainingHours > 0 ? `${remainingHours}小时` : ''}`
+  }
+
+  if (elapsedMinutes < 1) {
+    return 'Waited under 1 min'
+  }
+  if (elapsedHours < 1) {
+    return `Waited ${elapsedMinutes} min`
+  }
+  if (elapsedDays < 1) {
+    return `Waited ${elapsedHours}h`
+  }
+
+  return `Waited ${elapsedDays}d${remainingHours > 0 ? ` ${remainingHours}h` : ''}`
 }
