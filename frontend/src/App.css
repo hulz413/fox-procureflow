@@ -2906,12 +2906,13 @@ tbody tr:last-child td {
 
 .file-picker {
   min-width: 0;
+  height: 36px;
   min-height: 36px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border: 1px solid var(--pf-border);
   border-radius: 7px;
   background: #fff;

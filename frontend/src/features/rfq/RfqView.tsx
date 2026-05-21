@@ -780,7 +780,7 @@ export function RfqView({
                   </label>
                   <label>
                     <span>{messages.rfq.attachmentDescription}</span>
-                    <input
+                    <textarea
                       value={quoteForm.fileDescription}
                       onChange={(event) => updateQuoteForm('fileDescription', event.target.value)}
                     />
